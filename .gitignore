@@ -144,3 +144,6 @@ id_rsa*
 
 # Local security audit report (not committed)
 SECURITY-AUDIT.md
+
+# Local agent instructions (not committed)
+CLAUDE.md

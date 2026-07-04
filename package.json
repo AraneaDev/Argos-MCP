@@ -1,6 +1,6 @@
 {
   "name": "sql-access",
-  "version": "2.6.2",
+  "version": "2.6.3",
   "description": "MCP server for accessing SQL databases, with support for PostgreSQL, MySQL, SQLite, MSSQL, and SSH tunnels",
   "type": "module",
   "main": "dist/index.js",

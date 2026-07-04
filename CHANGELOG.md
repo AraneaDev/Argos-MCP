@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.3] - 2026-07-04
+
 ### Changed
 - `bump-version.sh` now promotes the `## [Unreleased]` CHANGELOG section to the released version, syncs version references in `docs/api/typescript-api.md` and `docs/tutorials/01-installation.md`, and refuses to release when the `[Unreleased]` section is missing or empty
 

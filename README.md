@@ -1,4 +1,4 @@
-# MCP SQL Access Server v2.6.0
+# MCP SQL Access Server v2.6.1
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Test Coverage](https://img.shields.io/badge/Coverage-88%25-brightgreen)](https://github.com/AraneaDev/mcp-sql-access-server)
@@ -8,9 +8,9 @@
 [![JSDoc](https://img.shields.io/badge/JSDoc-enforced-blue)](https://jsdoc.app/)
 [![Strict TypeScript](https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript)](https://www.typescriptlang.org/)
 
-**Enterprise-grade MCP SQL Access Server v2.6.0** - Connect Claude Desktop to your databases with bulletproof security, comprehensive monitoring, and seamless multi-database support.
+**Enterprise-grade MCP SQL Access Server v2.6.1** - Connect Claude Desktop to your databases with bulletproof security, comprehensive monitoring, and seamless multi-database support.
 
-## Why Choose MCP SQL Access Server v2.6.0?
+## Why Choose MCP SQL Access Server v2.6.1?
 
 ### **Security First**
 - **SELECT-Only Mode** - Production-safe read-only database access

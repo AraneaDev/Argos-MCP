@@ -5,6 +5,88 @@ All notable changes to the SQL MCP Server will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+- `bump-version.sh` now promotes the `## [Unreleased]` CHANGELOG section to the released version, syncs version references in `docs/api/typescript-api.md` and `docs/tutorials/01-installation.md`, and refuses to release when the `[Unreleased]` section is missing or empty
+
+### Fixed
+- Backfilled missing CHANGELOG entries (2.4.4 through 2.6.2) and corrected stale version references in the TypeScript API and installation docs
+
+## [2.6.2] - 2026-07-04
+
+### Changed
+- Applied Prettier formatting to satisfy the `format:check` CI gate
+
+### Removed
+- Stopped tracking `CLAUDE.md` in git and added it to `.gitignore`
+
+## [2.6.1] - 2026-07-04
+
+### Changed
+- Hardened `utils` unit tests to a 100% mutation score (via chaos-mcp)
+
+## [2.6.0] - 2026-07-04
+
+Remediation of security audit findings (3 critical, 8 high, 6 medium, 3 low from `SECURITY-AUDIT.md`).
+
+### Added
+- SSH remote host key verification with fingerprint pinning (fails closed)
+
+### Changed
+- SELECT-only enforcement now also guards `sql_analyze_performance` and rejects data-modifying CTEs, `EXPLAIN ANALYZE`, `COPY ... PROGRAM`, stacked statements, and embedded write keywords (leading-token check)
+- Fail-secure config defaults: `select_only` defaults to `true`, `ssl_verify` preserves `undefined` so TLS cert validation stays on, and MCP-added databases are always read-only
+- SSH hardening: dropped SHA-1 KEX/HMAC, gated debug trace behind `SSH_DEBUG`, warn on non-loopback bind
+- Honor configured `max_rows`; added PostgreSQL `statement_timeout`; wrapped batch/analyze in the query timeout; MSSQL placeholder replacement now skips string literals
+
+### Fixed
+- Redact secret fields before logging tool args; log/config files written `0600`; non-destructive, size-capped log rotation; atomic config writes
+- Client-facing errors routed through `sanitizeMessage` (bearer tokens, passphrases, PEM); redaction now fails closed
+
+### Security
+- `npm audit fix` (6 of 7 advisories); documented the HTTP-transport auth caveat
+
+## [2.5.3] - 2026-05-25
+
+### Changed
+- Extracted adapter construction into a dedicated `AdapterFactory` with logic and security refinements for database adapters and sanitization
+
+## [2.5.2] - 2026-05-25
+
+### Added
+- CI now packages release assets as both `.zip` and `.tgz`
+- CLAUDE.md project guidelines
+
+### Changed
+- Unified config loading and fixed runtime field redaction
+- Default `ssl_verify` to `true` when SSL is enabled, extended to MSSQL
+- Enforce `query_timeout` via `Promise.race`
+- Unified path validation across config handlers; validate config in `handleUpdateDatabase`
+- Renamed repository references and URLs to `mcp-sql-access-server`
+
+### Fixed
+- `sql_test_connection` now reports the actual connection status
+
+### Security
+- Sanitize database names in schema file paths; set restrictive (`0600`) permissions on schema files
+
+## [2.5.1] - 2026-04-06
+
+### Added
+- Audit logging of config changes made via MCP tools
+
+### Security
+- Validate queries even when `select_only` is false
+- Block `select_only` changes via MCP tools
+- Block MySQL version-conditional comment bypass
+- Validate database names to prevent INI injection
+- Validate config in `handleAddDatabase`
+- Validate SQLite file paths against traversal
+
+### Fixed
+- Resolved lint warnings and a flaky backoff test
+- Ensure bin files are executable after build
+
 ## [2.5.0] - 2026-04-06
 
 ### Added
@@ -34,6 +116,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Testing
 - New test coverage for circuit breaker, query cache, schema race conditions, and SSH tunnels
+
+## [2.4.4] - 2026-04-05
+
+### Fixed
+- Documentation: corrected version references and class names, and updated the bump script
 
 ## [2.4.3] - 2026-04-05
 

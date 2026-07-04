@@ -56,7 +56,7 @@ mcp-sql-server --version
 
 **Expected Output:**
 ```
-SQL MCP Server v2.5.1
+SQL MCP Server v2.6.2
 ```
 
 ### Method 2: Local Project Installation

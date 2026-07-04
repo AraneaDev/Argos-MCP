@@ -9,6 +9,9 @@ set -euo pipefail
 #   - src/types/index.ts (SERVER_VERSION constant)
 #   - README.md (title and description version references)
 #   - docs/README.md (Version: x.y.z footer)
+#   - docs/api/typescript-api.md ("as of vX.Y.Z")
+#   - docs/tutorials/01-installation.md ("SQL MCP Server vX.Y.Z")
+#   - CHANGELOG.md (promotes the [Unreleased] section to the new version)
 
 BUMP="${1:-}"
 
@@ -30,6 +33,21 @@ if [[ -n "$(git status --porcelain)" ]]; then
 fi
 
 OLD_VERSION=$(node -p "require('./package.json').version")
+
+# Require an [Unreleased] section to promote (fail before mutating any file)
+if ! grep -q '^## \[Unreleased\]' CHANGELOG.md; then
+  echo "Error: CHANGELOG.md has no '## [Unreleased]' section to promote."
+  echo "Add one (with your notes under it) before bumping."
+  exit 1
+fi
+
+# Require the [Unreleased] section to have content (no empty releases)
+UNRELEASED_BODY=$(awk '/^## \[Unreleased\]/{f=1; next} /^## \[/{f=0} f' CHANGELOG.md | grep -c '[^[:space:]]' || true)
+if [[ "$UNRELEASED_BODY" -eq 0 ]]; then
+  echo "Error: the [Unreleased] section in CHANGELOG.md is empty."
+  echo "Document what changed under '## [Unreleased]' before bumping."
+  exit 1
+fi
 
 # Calculate new version
 if [[ "$BUMP" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
@@ -63,7 +81,20 @@ sed -i "s/v${OLD_VERSION}/v${NEW_VERSION}/g" README.md
 echo "  Updating docs/README.md..."
 sed -i "s/\*\*Version:\*\* ${OLD_VERSION}/**Version:** ${NEW_VERSION}/" docs/README.md
 
-# 5. Verify all files match
+# 5. docs/api/typescript-api.md — "as of vX.Y.Z"
+echo "  Updating docs/api/typescript-api.md..."
+sed -i "s/as of v${OLD_VERSION}/as of v${NEW_VERSION}/g" docs/api/typescript-api.md
+
+# 6. docs/tutorials/01-installation.md — "SQL MCP Server vX.Y.Z"
+echo "  Updating docs/tutorials/01-installation.md..."
+sed -i "s/SQL MCP Server v${OLD_VERSION}/SQL MCP Server v${NEW_VERSION}/g" docs/tutorials/01-installation.md
+
+# 7. CHANGELOG.md — promote [Unreleased] to the new version, leaving a fresh empty [Unreleased]
+echo "  Updating CHANGELOG.md..."
+RELEASE_DATE=$(date +%F)
+sed -i "0,/^## \[Unreleased\]/s//## [Unreleased]\n\n## [${NEW_VERSION}] - ${RELEASE_DATE}/" CHANGELOG.md
+
+# 8. Verify all files match
 echo ""
 echo "  Verifying..."
 
@@ -93,6 +124,24 @@ if [[ "$DOCS_README_COUNT" -lt 1 ]]; then
   ERRORS=$((ERRORS + 1))
 fi
 
+CHANGELOG_COUNT=$(grep -cF "## [${NEW_VERSION}]" CHANGELOG.md || true)
+if [[ "$CHANGELOG_COUNT" -lt 1 ]]; then
+  echo "  FAIL: CHANGELOG.md has no '## [${NEW_VERSION}]' entry"
+  ERRORS=$((ERRORS + 1))
+fi
+
+TS_API_COUNT=$(grep -cF "as of v${NEW_VERSION}" docs/api/typescript-api.md || true)
+if [[ "$TS_API_COUNT" -lt 1 ]]; then
+  echo "  FAIL: docs/api/typescript-api.md has no reference to v${NEW_VERSION}"
+  ERRORS=$((ERRORS + 1))
+fi
+
+INSTALL_COUNT=$(grep -cF "SQL MCP Server v${NEW_VERSION}" docs/tutorials/01-installation.md || true)
+if [[ "$INSTALL_COUNT" -lt 1 ]]; then
+  echo "  FAIL: docs/tutorials/01-installation.md has no reference to v${NEW_VERSION}"
+  ERRORS=$((ERRORS + 1))
+fi
+
 if [[ "$ERRORS" -gt 0 ]]; then
   echo ""
   echo "  ERROR: ${ERRORS} verification(s) failed. Aborting."
@@ -102,9 +151,10 @@ fi
 
 echo "  OK: All files updated to v${NEW_VERSION}"
 
-# 5. Commit and tag
+# 9. Commit and tag
 echo ""
-git add package.json package-lock.json src/types/index.ts README.md docs/README.md
+git add package.json package-lock.json src/types/index.ts README.md docs/README.md \
+  docs/api/typescript-api.md docs/tutorials/01-installation.md CHANGELOG.md
 git commit -m "chore: bump version to v${NEW_VERSION}"
 git tag -a "v${NEW_VERSION}" -m "Release v${NEW_VERSION}"
 
@@ -116,6 +166,9 @@ echo "  package-lock.json    ✓"
 echo "  src/types/index.ts   ✓"
 echo "  README.md            ✓"
 echo "  docs/README.md       ✓"
+echo "  docs/api/typescript-api.md         ✓"
+echo "  docs/tutorials/01-installation.md  ✓"
+echo "  CHANGELOG.md         ✓"
 echo "  git tag v${NEW_VERSION}   ✓"
 echo ""
 echo "To push: git push && git push --tags"

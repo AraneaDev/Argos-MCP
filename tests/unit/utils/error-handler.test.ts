@@ -399,6 +399,24 @@ describe('error-handler', () => {
       expect(sanitized).not.toContain('root:pass');
     });
 
+    it('should redact passphrase and bearer tokens and spaced password assignments', () => {
+      expect(sanitizeError(new Error('ssh_passphrase=hunter2 fail'))).not.toContain('hunter2');
+      expect(sanitizeError(new Error('auth failed: Bearer eyJabc.DEF-123'))).not.toContain(
+        'eyJabc'
+      );
+      const spaced = sanitizeError(new Error('bad password = topsecret here'));
+      expect(spaced).not.toContain('topsecret');
+    });
+
+    it('should strip PEM private key blocks', () => {
+      const err = new Error(
+        'key error -----BEGIN RSA PRIVATE KEY-----\nMIIabcSECRET\n-----END RSA PRIVATE KEY----- done'
+      );
+      const sanitized = sanitizeError(err);
+      expect(sanitized).not.toContain('MIIabcSECRET');
+      expect(sanitized).toContain('[REDACTED KEY]');
+    });
+
     it('should remove file paths', () => {
       const err = new Error('error reading /home/user/secret/config.ini');
       const sanitized = sanitizeError(err);

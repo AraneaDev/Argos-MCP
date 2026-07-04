@@ -22,6 +22,7 @@ jest.mock('fs', () => ({
   existsSync: jest.fn(),
   statSync: jest.fn(),
   mkdirSync: jest.fn(),
+  renameSync: jest.fn(),
 }));
 
 jest.mock('path', () => ({
@@ -37,7 +38,7 @@ jest.mock('../../../src/utils/error-handler.js', () => ({
   getErrorMessage: (err: unknown) => (err instanceof Error ? err.message : 'Unknown error'),
 }));
 
-import { readFileSync, existsSync, writeFileSync, statSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, statSync, mkdirSync, renameSync } from 'fs';
 import { join, dirname } from 'path';
 import { parse as parseIni } from 'ini';
 
@@ -47,6 +48,7 @@ const mockFs = {
   writeFileSync: writeFileSync as jest.MockedFunction<typeof writeFileSync>,
   statSync: statSync as jest.MockedFunction<typeof statSync>,
   mkdirSync: mkdirSync as jest.MockedFunction<typeof mkdirSync>,
+  renameSync: renameSync as jest.MockedFunction<typeof renameSync>,
 };
 const mockParseIni = parseIni as jest.MockedFunction<typeof parseIni>;
 const mockJoin = join as jest.MockedFunction<typeof join>;
@@ -283,14 +285,25 @@ describe('config', () => {
       expect(config.mcp_configurable).toBe(true);
     });
 
-    it('should default boolean fields to false', () => {
+    it('should fail secure: select_only defaults to true, mcp_configurable to false', () => {
       const config = parseDatabaseConfig('db', {
         type: 'mysql',
         host: 'localhost',
         username: 'root',
       });
-      expect(config.select_only).toBe(false);
+      // Omitting select_only must NOT silently grant write access.
+      expect(config.select_only).toBe(true);
       expect(config.mcp_configurable).toBe(false);
+    });
+
+    it('honors an explicit select_only=false', () => {
+      const config = parseDatabaseConfig('db', {
+        type: 'mysql',
+        host: 'localhost',
+        username: 'root',
+        select_only: 'false',
+      });
+      expect(config.select_only).toBe(false);
     });
 
     // SQLite specific
@@ -873,11 +886,13 @@ describe('config', () => {
 
       saveConfigFile(config, '/test/config.ini');
 
+      // Atomic write: content goes to a temp file (0600) then is renamed into place.
       expect(mockFs.writeFileSync).toHaveBeenCalledWith(
-        '/test/config.ini',
+        '/test/config.ini.tmp',
         expect.stringContaining('[database.mydb]'),
-        'utf-8'
+        { encoding: 'utf-8', mode: 0o600 }
       );
+      expect(mockFs.renameSync).toHaveBeenCalledWith('/test/config.ini.tmp', '/test/config.ini');
     });
 
     it('should write security section', () => {
@@ -1080,9 +1095,9 @@ describe('config', () => {
         { mode: 0o600 }
       );
 
-      // Verify INI content uses the key file path
+      // Verify INI content uses the key file path (config is written atomically to .tmp)
       const written = (mockFs.writeFileSync as jest.Mock).mock.calls.find(
-        (call) => call[0] === '/test/config.ini'
+        (call) => call[0] === '/test/config.ini.tmp'
       )[1] as string;
       expect(written).toContain('ssh_private_key=/test/keys/mydb_ssh_key');
       expect(written).not.toContain(privateKeyContent);

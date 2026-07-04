@@ -141,7 +141,8 @@ async function generateTemplate(
     }
 
     const filename = `config.${templateType}.ini`;
-    fs.writeFileSync(filename, configFile.content);
+    // Config files are meant to hold DB/SSH credentials — restrict to owner only.
+    fs.writeFileSync(filename, configFile.content, { mode: 0o600 });
 
     // eslint-disable-next-line no-console
     console.log(` Template saved to: ${filename}`);

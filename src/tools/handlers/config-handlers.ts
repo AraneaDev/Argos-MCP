@@ -61,7 +61,10 @@ export async function handleAddDatabase(
 
   const dbConfig: DatabaseConfig = {
     type: dbType as DatabaseConfig['type'],
-    select_only: args.select_only !== false,
+    // Fail secure: databases added via MCP tools are always read-only. Enabling write
+    // access requires a human to edit config.ini, mirroring the rule that select_only
+    // cannot be changed via MCP — the AI must not provision its own write access.
+    select_only: true,
     mcp_configurable: true,
   };
 
@@ -122,7 +125,7 @@ export async function handleAddDatabase(
   return createToolResponse(
     ` Database '${name}' added successfully (type: ${dbType})\n` +
       ` MCP configurable: yes (can be locked via sql_set_mcp_configurable)\n` +
-      ` SELECT-only: ${dbConfig.select_only ? 'yes' : 'no'}\n` +
+      ` SELECT-only: yes (read-only). To allow writes, set select_only=false in config.ini manually.\n` +
       `Use sql_test_connection to verify connectivity.`
   );
 }

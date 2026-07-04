@@ -1,7 +1,7 @@
 /**
  * Enhanced logging utilities for SQL MCP Server
  */
-import { createWriteStream, existsSync, unlinkSync } from 'fs';
+import { createWriteStream, existsSync, unlinkSync, renameSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import type { WriteStream } from 'fs';
@@ -9,6 +9,42 @@ import type { WriteStream } from 'fs';
 const _currentFile = fileURLToPath(import.meta.url);
 const _currentDir = dirname(_currentFile);
 const PROJECT_ROOT = resolve(_currentDir, '..', '..');
+
+// Substrings that mark a context key as holding a secret. Values under such keys
+// are replaced with [REDACTED] before anything is written to the log file, so that
+// credentials passed as tool arguments never land on disk in cleartext.
+const SECRET_KEY_PATTERNS = [
+  'password',
+  'passwd',
+  'pwd',
+  'passphrase',
+  'secret',
+  'token',
+  'private_key',
+  'privatekey',
+  'api_key',
+  'apikey',
+  'authorization',
+  'credential',
+];
+
+/**
+ * Deep-redact secret-looking fields in an arbitrary log context value.
+ */
+function redactSecretsDeep(value: unknown, depth = 0): unknown {
+  if (depth > 6 || value === null || typeof value !== 'object') return value;
+  if (Array.isArray(value)) return value.map((v) => redactSecretsDeep(v, depth + 1));
+  const out: Record<string, unknown> = {};
+  for (const [key, val] of Object.entries(value as Record<string, unknown>)) {
+    const lowered = key.toLowerCase();
+    if (val !== undefined && val !== null && SECRET_KEY_PATTERNS.some((p) => lowered.includes(p))) {
+      out[key] = '[REDACTED]';
+    } else {
+      out[key] = redactSecretsDeep(val, depth + 1);
+    }
+  }
+  return out;
+}
 
 /**
  * Logger configuration interface
@@ -45,6 +81,7 @@ export class Logger {
   private config: Required<LoggerConfig>;
   private logStream?: WriteStream;
   private initialized = false;
+  private bytesWritten = 0;
 
   constructor(config: LoggerConfig = {}) {
     this.config = {
@@ -179,8 +216,11 @@ export class Logger {
 
     // File output
     if (this.config.enableFile && this.logStream) {
+      const line = formattedMessage + '\n';
+      this.maybeRotateBySize(line.length);
       try {
-        this.logStream.write(formattedMessage + '\n');
+        this.logStream?.write(line);
+        this.bytesWritten += line.length;
       } catch (error) {
         // Ignore write errors to avoid cascading failures
         if (error && typeof error === 'object' && 'code' in error && error.code !== 'EPIPE') {
@@ -215,7 +255,7 @@ export class Logger {
     let formatted = `[${timestamp}] [${entry.level}] ${entry.message}`;
 
     if (entry.context && Object.keys(entry.context).length > 0) {
-      formatted += ` | Context: ${JSON.stringify(entry.context)}`;
+      formatted += ` | Context: ${JSON.stringify(redactSecretsDeep(entry.context))}`;
     }
 
     return formatted;
@@ -278,9 +318,17 @@ export class Logger {
   }
 
   private rotateLogFile(): void {
+    // Preserve the previous log as <logFile>.1 instead of deleting it, so a prior
+    // session's record survives a restart. Only one generation is kept.
     try {
       if (existsSync(this.config.logFile)) {
-        unlinkSync(this.config.logFile);
+        const previous = `${this.config.logFile}.1`;
+        try {
+          if (existsSync(previous)) unlinkSync(previous);
+        } catch {
+          /* ignore */
+        }
+        renameSync(this.config.logFile, previous);
       }
     } catch (error) {
       try {
@@ -291,9 +339,31 @@ export class Logger {
     }
   }
 
+  /**
+   * Rotate the active log when it would exceed maxLogSize, keeping one generation.
+   * Prevents unbounded growth (disk-fill) within a long-running session.
+   */
+  private maybeRotateBySize(nextChunkLength: number): void {
+    if (!this.config.enableFile || !this.logStream) return;
+    if (!(this.config.maxLogSize > 0)) return;
+    if (this.bytesWritten + nextChunkLength <= this.config.maxLogSize) return;
+
+    try {
+      this.logStream.end();
+    } catch {
+      /* ignore */
+    }
+    this.logStream = undefined;
+    this.rotateLogFile();
+    this.bytesWritten = 0;
+    this.createLogStream();
+  }
+
   private createLogStream(): void {
     try {
-      this.logStream = createWriteStream(this.config.logFile, { flags: 'a' });
+      // 0o600: the log can contain query text and connection context — owner-only.
+      this.logStream = createWriteStream(this.config.logFile, { flags: 'a', mode: 0o600 });
+      this.bytesWritten = 0;
 
       this.logStream.on('error', (error) => {
         try {

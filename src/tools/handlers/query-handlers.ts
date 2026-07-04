@@ -15,7 +15,12 @@ import {
   formatCondensedTableResults,
   createToolResponse,
 } from '../../utils/response-formatter.js';
-import { getErrorMessage, ValidationError } from '../../utils/error-handler.js';
+import {
+  getErrorMessage,
+  sanitizeError,
+  sanitizeMessage,
+  ValidationError,
+} from '../../utils/error-handler.js';
 import type { ToolHandlerContext } from './types.js';
 import { requireDbConfig } from './types.js';
 
@@ -82,7 +87,9 @@ export async function handleSqlQuery(
 
     return createToolResponse(responseText);
   } catch (error) {
-    const errorMessage = getErrorMessage(error);
+    // Sanitize before returning to the client — raw driver errors can leak data,
+    // schema, or connection details. SecurityViolationError messages are preserved.
+    const errorMessage = sanitizeError(error);
     let responseText = ` Query failed on ${database}: ${errorMessage}`;
 
     if (error instanceof SecurityViolationError) {
@@ -189,7 +196,7 @@ export async function handleBatchQuery(
           responseText += ' No results returned\n';
         }
       } else {
-        responseText += `[ERROR] Failed: ${queryResult.error}\n`;
+        responseText += `[ERROR] Failed: ${sanitizeMessage(queryResult.error || '')}\n`;
       }
 
       responseText += ` Query: \`${queryResult.query?.substring(0, 100)}${queryResult.query && queryResult.query.length > 100 ? '...' : ''}\`\n\n`;
@@ -197,7 +204,7 @@ export async function handleBatchQuery(
 
     return createToolResponse(responseText);
   } catch (error) {
-    const errorMessage = getErrorMessage(error);
+    const errorMessage = sanitizeError(error);
     let responseText = ` **Batch Query Failed** (${database})\n\n`;
     responseText += ` **Error:** ${errorMessage}\n\n`;
 
@@ -219,6 +226,21 @@ export async function handleAnalyzePerformance(
 
   try {
     const dbConfig = requireDbConfig(ctx.config, database);
+
+    // Performance analysis EXECUTES the query (and, on some engines, again via EXPLAIN
+    // ANALYZE). It must pass the same security validation as sql_query — otherwise it is
+    // a full bypass of SELECT-only mode.
+    const validation = dbConfig.select_only
+      ? ctx.securityManager.validateSelectOnlyQuery(query, dbConfig.type)
+      : ctx.securityManager.validateAnyQuery(query, dbConfig.type);
+    if (!validation.allowed) {
+      throw new SecurityViolationError(
+        dbConfig.select_only
+          ? `Analyze blocked: Database '${database}' is configured for SELECT-only access. ${validation.reason}`
+          : `Analyze blocked: ${validation.reason}`,
+        { database, query: query.substring(0, 100), reason: validation.reason }
+      );
+    }
 
     if (dbConfig.ssh_host) {
       ctx.logger.info(`SSH tunnel will be managed by ConnectionManager for '${database}'`);
@@ -245,7 +267,7 @@ export async function handleAnalyzePerformance(
 
     return createToolResponse(responseText);
   } catch (error) {
-    const errorMessage = getErrorMessage(error);
+    const errorMessage = sanitizeError(error);
     return createToolResponse(
       ` Performance analysis failed for ${database}: ${errorMessage}`,
       true

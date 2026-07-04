@@ -205,18 +205,27 @@ export abstract class DatabaseAdapter {
   protected abstract extractFieldNames(_result: unknown): string[];
 
   /**
+   * Resolve the effective maximum row count from configuration (default 1000).
+   */
+  protected getMaxRows(): number {
+    const configured = this.config.max_rows;
+    return typeof configured === 'number' && configured > 0 ? configured : 1000;
+  }
+
+  /**
    * Normalize query result to standard format with optional redaction
    */
   protected normalizeQueryResult(
     rawResult: unknown,
     startTime: number,
-    maxRows = 1000
+    maxRows?: number
   ): QueryResult {
     const executionTime = Date.now() - startTime;
+    const cap = maxRows ?? this.getMaxRows();
 
     // Extract rows - implementation varies by adapter
     const rawRows = this.extractRawRows(rawResult);
-    const { rows, truncated } = this.truncateResults(rawRows, maxRows);
+    const { rows, truncated } = this.truncateResults(rawRows, cap);
 
     // Extract field names
     const fields = this.extractFieldNames(rawResult);

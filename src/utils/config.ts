@@ -3,7 +3,7 @@
  * Handles loading and validating database configuration from config.ini
  */
 
-import { readFileSync, existsSync, writeFileSync, statSync, mkdirSync } from 'fs';
+import { readFileSync, existsSync, writeFileSync, statSync, mkdirSync, renameSync } from 'fs';
 import { join, dirname } from 'path';
 import { parse as parseIni } from 'ini';
 
@@ -165,10 +165,20 @@ export function parseConfiguration(rawConfig: Record<string, unknown>): ParsedSe
     throw new ConfigValidationError('No databases configured', 'databases');
   }
 
+  const extension = parseExtensionConfig(rawConfig.extension as Record<string, string> | undefined);
+
+  // Propagate global result/timeout limits onto each database so the adapters and
+  // the query-timeout logic actually honor the configured [extension] values
+  // (they read these off the per-database config, not the global one).
+  for (const dbConfig of Object.values(databases)) {
+    if (dbConfig.max_rows === undefined) dbConfig.max_rows = extension.max_rows;
+    if (dbConfig.query_timeout === undefined) dbConfig.query_timeout = extension.query_timeout;
+  }
+
   return {
     databases,
     security: parseSecurityConfig(rawConfig.security as Record<string, string> | undefined),
-    extension: parseExtensionConfig(rawConfig.extension as Record<string, string> | undefined),
+    extension,
   };
 }
 
@@ -196,7 +206,9 @@ export function parseDatabaseConfig(name: string, config: Record<string, string>
 
   const dbConfig: DatabaseConfig = {
     type: config.type.toLowerCase() as DatabaseTypeString,
-    select_only: parseBool(config.select_only),
+    // Fail secure: default to SELECT-only (read-only) unless explicitly disabled.
+    // An omitted select_only must NOT silently grant write access.
+    select_only: config.select_only === undefined ? true : parseBool(config.select_only),
     mcp_configurable: parseBool(config.mcp_configurable),
   };
 
@@ -259,7 +271,11 @@ function validateNetworkedDatabase(
   dbConfig.username = config.username;
   dbConfig.password = config.password;
   dbConfig.ssl = parseBool(config.ssl);
-  dbConfig.ssl_verify = parseBool(config.ssl_verify);
+  // Leave ssl_verify undefined when unset so the adapter default (verify ON) applies.
+  // parseBool(undefined) would return false and silently disable certificate validation.
+  if (config.ssl_verify !== undefined) {
+    dbConfig.ssl_verify = parseBool(config.ssl_verify);
+  }
 
   // Validate timeout
   const timeout = parseInt(config.timeout);
@@ -301,6 +317,14 @@ function parseSSHConfig(
   dbConfig.ssh_private_key = config.ssh_private_key;
   dbConfig.ssh_passphrase = config.ssh_passphrase;
   dbConfig.ssh_local_host = config.ssh_local_host || '127.0.0.1';
+  if (config.ssh_host_fingerprint) {
+    dbConfig.ssh_host_fingerprint = config.ssh_host_fingerprint;
+  }
+  // Fail secure: host key checking is ON unless explicitly disabled.
+  dbConfig.ssh_strict_host_key_checking =
+    config.ssh_strict_host_key_checking === undefined
+      ? true
+      : parseBool(config.ssh_strict_host_key_checking);
 
   // Parse local_port for SSH tunnel (new feature)
   if (config.local_port !== undefined && config.local_port !== '') {
@@ -387,7 +411,7 @@ function parseRedactionRules(rulesString: string): FieldRedactionRule[] {
       );
     }
 
-    const fieldPattern = parts[0].trim();
+    let fieldPattern = parts[0].trim();
     const redactionTypeStr = parts[1].trim();
 
     if (!fieldPattern) {
@@ -410,8 +434,8 @@ function parseRedactionRules(rulesString: string): FieldRedactionRule[] {
       patternType = 'wildcard';
     } else if (fieldPattern.startsWith('/') && fieldPattern.endsWith('/')) {
       patternType = 'regex';
-      // Remove regex delimiters
-      fieldPattern.slice(1, -1);
+      // Remove the surrounding /.../ delimiters so the stored pattern compiles correctly.
+      fieldPattern = fieldPattern.slice(1, -1);
     }
 
     const rule: FieldRedactionRule = {
@@ -630,8 +654,13 @@ export function saveConfigFile(config: ParsedServerConfig, configPath?: string):
               const keyPath = join(keysDir, `${name}_ssh_key`);
               writeFileSync(keyPath, String(value), { mode: 0o600 });
               iniString += `${key}=${keyPath}\n`;
-            } catch {
-              iniString += `${key}=${value}\n`;
+            } catch (keyError) {
+              // Never inline a private key into the (potentially group-readable) INI.
+              // Fail loudly so the operator can fix permissions rather than leak the key.
+              throw new Error(
+                `Failed to write SSH private key for '${name}' to a protected key file: ` +
+                  `${getErrorMessage(keyError)}. Refusing to embed the private key in config.ini.`
+              );
             }
           } else {
             iniString += `${key}=${value}\n`;
@@ -707,7 +736,12 @@ export function saveConfigFile(config: ParsedServerConfig, configPath?: string):
     iniString += '\n';
   }
 
-  writeFileSync(path, iniString, 'utf-8');
+  // Write atomically (temp file + rename) so a concurrent or interrupted save cannot
+  // leave a truncated/corrupt config.ini. 0o600: the file holds plaintext DB/SSH
+  // credentials — restrict to the owner only.
+  const tempPath = `${path}.tmp`;
+  writeFileSync(tempPath, iniString, { encoding: 'utf-8', mode: 0o600 });
+  renameSync(tempPath, path);
 }
 
 /**

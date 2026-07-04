@@ -141,3 +141,6 @@ id_rsa*
 *.bak
 *.backup
 .claude/
+
+# Local security audit report (not committed)
+SECURITY-AUDIT.md

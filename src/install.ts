@@ -126,7 +126,8 @@ max_batch_size=10
 query_timeout=30000
 `;
   ensureConfigDir(path);
-  writeFileSync(path, template, 'utf-8');
+  // Config files are meant to hold DB/SSH credentials — restrict to owner only.
+  writeFileSync(path, template, { encoding: 'utf-8', mode: 0o600 });
 }
 
 // ============================================================================

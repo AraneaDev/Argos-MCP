@@ -474,6 +474,19 @@ debug=true # Enable debug logging
 - **Database Connections**: SSL/TLS encryption required for production
 - **SSH Tunnels**: End-to-end encryption for remote database access
 
+### Transport Model & Client Authentication
+
+This server uses the MCP **stdio transport only** (`StdioServerTransport`): it is spawned as a
+child process by the MCP client and communicates over stdin/stdout. There is no network
+listener, so there is no remote attack surface to authenticate and MCP client authentication
+(OAuth) is intentionally **not** implemented — the trust boundary is OS process ownership.
+
+**Important:** exposing this server over an HTTP/SSE transport is **out of scope and unsupported**.
+Doing so would make several controls that currently assume a local, single-user context
+(plaintext credentials in `config.ini`, host-local logging, fail-open-on-opt-out defaults)
+remotely reachable. If an HTTP transport is ever added, MCP client authentication and
+authorization become a hard prerequisite, not an option.
+
 ### Data at Rest
 - **Configuration Files**: Secure file permissions (600)
 - **Log Files**: Encrypted storage recommended

@@ -101,17 +101,43 @@ export class MSSQLAdapter extends DatabaseAdapter {
         request.input(`param${index}`, param);
       });
 
-      // Replace ? placeholders with named parameters for SQL Server
-      let processedQuery = query;
-      params.forEach((_, index) => {
-        processedQuery = processedQuery.replace('?', `@param${index}`);
-      });
+      // Replace ? placeholders with named parameters for SQL Server, skipping any
+      // '?' that appears inside a string literal so parameter order stays aligned.
+      const processedQuery = this.replacePlaceholders(query);
 
       const result = await request.query(processedQuery);
       return this.normalizeQueryResult(result, startTime);
     } catch (error) {
       throw this.createError('Failed to execute SQL Server query', error as Error);
     }
+  }
+
+  /**
+   * Convert positional '?' placeholders to @paramN, ignoring '?' inside string
+   * literals so a literal question mark in a string does not shift parameter order.
+   */
+  private replacePlaceholders(query: string): string {
+    let out = '';
+    let paramIndex = 0;
+    let inSingle = false;
+    let inDouble = false;
+
+    for (let i = 0; i < query.length; i++) {
+      const ch = query[i];
+      if (ch === "'" && !inDouble) {
+        inSingle = !inSingle;
+      } else if (ch === '"' && !inSingle) {
+        inDouble = !inDouble;
+      }
+
+      if (ch === '?' && !inSingle && !inDouble) {
+        out += `@param${paramIndex++}`;
+      } else {
+        out += ch;
+      }
+    }
+
+    return out;
   }
 
   protected extractRawRows(result: unknown): unknown[] {

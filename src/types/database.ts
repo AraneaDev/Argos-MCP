@@ -63,6 +63,8 @@ export interface DatabaseConfig {
   ssh_passphrase?: string;
   local_port?: number;
   ssh_local_host?: string; // SSH tunnel bind address (default: '127.0.0.1')
+  ssh_host_fingerprint?: string; // Expected SSH host key fingerprint (SHA256:base64, base64, or hex)
+  ssh_strict_host_key_checking?: boolean; // Reject unknown/unpinned host keys (default: true)
 
   // Field Redaction Configuration
   redaction?: DatabaseRedactionConfig;
@@ -76,6 +78,7 @@ export interface DatabaseConfig {
 
   // Query execution
   query_timeout?: number; // Per-query timeout in ms (default: 30000)
+  max_rows?: number; // Max rows returned per query (default: 1000)
 }
 
 export type DatabaseConnection =

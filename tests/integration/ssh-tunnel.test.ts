@@ -128,6 +128,50 @@ describe('SSH tunnel', () => {
     }
   });
 
+  describe('host key verification (hostVerifier)', () => {
+    const { createHash } = require('crypto');
+    const fakeKey = Buffer.from('fake-host-key-bytes');
+    const sha256B64 = createHash('sha256').update(fakeKey).digest('base64').replace(/=+$/, '');
+    const openssh = `SHA256:${sha256B64}`;
+
+    const getVerifier = async (extra: Record<string, unknown>) => {
+      const buildOptions = (tunnelManager as any).buildSSHConnectOptions.bind(tunnelManager);
+      const options = await buildOptions({
+        host: 'bastion.example.com',
+        port: 22,
+        username: 'user',
+        password: 'pass',
+        ...extra,
+      });
+      return options.hostVerifier as (key: Buffer) => boolean;
+    };
+
+    it('always installs a hostVerifier (never accepts any key by default)', async () => {
+      const verify = await getVerifier({});
+      expect(typeof verify).toBe('function');
+    });
+
+    it('accepts a host key matching the pinned SHA256 fingerprint', async () => {
+      const verify = await getVerifier({ hostFingerprint: openssh });
+      expect(verify(fakeKey)).toBe(true);
+    });
+
+    it('rejects a host key that does not match the pinned fingerprint', async () => {
+      const verify = await getVerifier({ hostFingerprint: 'SHA256:not-the-right-fingerprint' });
+      expect(verify(fakeKey)).toBe(false);
+    });
+
+    it('rejects unknown host keys when strict checking is on (default)', async () => {
+      const verify = await getVerifier({});
+      expect(verify(fakeKey)).toBe(false);
+    });
+
+    it('accepts unknown host keys only when strict checking is explicitly disabled', async () => {
+      const verify = await getVerifier({ strictHostKeyChecking: false });
+      expect(verify(fakeKey)).toBe(true);
+    });
+  });
+
   it('uses 45s timeout constant for tunnel establishment', () => {
     // Verify the timeout constant is defined in the source
     // We access the source indirectly via the class — the 45s timeout is used in establishTunnel

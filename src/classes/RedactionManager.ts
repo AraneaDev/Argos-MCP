@@ -262,6 +262,11 @@ export class RedactionManager {
             redactionResult.redaction_count++;
             redactionResult.rules_applied.push(rule.field_pattern);
           } catch (error) {
+            // Fail closed: if redaction throws, do NOT return the original sensitive
+            // value. Replace it with a safe placeholder so nothing leaks.
+            redactedRow[fieldName] = '[REDACTION_ERROR]';
+            redactionResult.fields_redacted.push(fieldName);
+            redactionResult.redaction_count++;
             const errorMsg = `Failed to redact field '${fieldName}': ${getErrorMessage(error)}`;
             redactionResult.warnings = redactionResult.warnings || [];
             redactionResult.warnings.push(errorMsg);

@@ -546,9 +546,19 @@ export function sanitizeError(error: unknown): string {
  * Shared by both sanitizeError and SecurityManager.sanitizeErrorMessage.
  */
 export function sanitizeMessage(message: string): string {
-  // Remove potential sensitive data leaks
+  // Strip PEM key blocks entirely (private keys, certificates).
   message = message.replace(
-    /(password|pwd|token|key|secret|api_key)[=:]\s*[^\s,;]+/gi,
+    /-----BEGIN [^-]+-----[\s\S]*?-----END [^-]+-----/g,
+    '[REDACTED KEY]'
+  );
+
+  // Bearer / authorization tokens (no key=value shape).
+  message = message.replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [REDACTED]');
+
+  // Remove potential sensitive data leaks. Allow whitespace around the separator so
+  // "password = secret" is caught as well as "password=secret".
+  message = message.replace(
+    /(password|passwd|pwd|passphrase|token|secret|key|api[_-]?key|authorization|credentials?)\s*[=:]\s*[^\s,;]+/gi,
     '$1=[REDACTED]'
   );
 

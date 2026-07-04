@@ -33,7 +33,7 @@ import { SecurityManager } from './SecurityManager.js';
 import { SchemaManager } from './SchemaManager.js';
 import { EnhancedSSHTunnelManager } from './EnhancedSSHTunnelManager.js';
 import { Logger } from '../utils/logger.js';
-import { getErrorMessage } from '../utils/error-handler.js';
+import { getErrorMessage, sanitizeError } from '../utils/error-handler.js';
 import { getToolDefinitions } from '../tools/tool-definitions.js';
 import { createToolDispatcher, type ToolDispatchFn } from '../tools/dispatcher.js';
 import type { ToolHandlerContext } from '../tools/handlers/types.js';
@@ -215,7 +215,7 @@ export class SQLMCPServer extends EventEmitter {
             },
           };
         } catch (error) {
-          const errorMessage = getErrorMessage(error);
+          const errorMessage = sanitizeError(error);
           return {
             jsonrpc: '2.0',
             id: id || 0,
@@ -362,7 +362,7 @@ export class SQLMCPServer extends EventEmitter {
         };
       } catch (error) {
         this.logger.error(`Error in tool call ${name}`, { error, args });
-        const errorMessage = getErrorMessage(error);
+        const errorMessage = sanitizeError(error);
         const troubleshooting = [
           '**Troubleshooting:**',
           '- Ensure all required arguments are provided',

@@ -1411,7 +1411,7 @@ describe('EnhancedSSHTunnelManager', () => {
       expect(result.passphrase).toBe('my-passphrase');
     });
 
-    it('should include debug function', async () => {
+    it('includes the debug function only when SSH_DEBUG=true', async () => {
       const config = {
         host: 'bastion.example.com',
         port: 22,
@@ -1419,9 +1419,19 @@ describe('EnhancedSSHTunnelManager', () => {
         password: 'secret',
       };
 
-      const result = await (tunnelManager as any).buildSSHConnectOptions(config);
+      const prev = process.env.SSH_DEBUG;
+      try {
+        delete process.env.SSH_DEBUG;
+        const off = await (tunnelManager as any).buildSSHConnectOptions(config);
+        expect(off.debug).toBeUndefined();
 
-      expect(typeof result.debug).toBe('function');
+        process.env.SSH_DEBUG = 'true';
+        const on = await (tunnelManager as any).buildSSHConnectOptions(config);
+        expect(typeof on.debug).toBe('function');
+      } finally {
+        if (prev === undefined) delete process.env.SSH_DEBUG;
+        else process.env.SSH_DEBUG = prev;
+      }
     });
 
     it('should throw error for unreadable private key file', async () => {

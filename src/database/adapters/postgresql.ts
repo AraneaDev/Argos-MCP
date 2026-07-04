@@ -31,6 +31,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
       const username = this.config.username as string;
       const password = this.config.password as string;
 
+      const statementTimeout =
+        typeof this.config.query_timeout === 'number' ? this.config.query_timeout : 30000;
+
       const poolConfig: pg.PoolConfig = {
         host,
         port: this.parseConfigValue(this.config.port, 'number', 5432),
@@ -39,6 +42,10 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
         password,
         max: 10,
         connectionTimeoutMillis: this.connectionTimeout,
+        // Server-side cancellation: PostgreSQL aborts a query that runs longer than
+        // this, so a runaway query cannot tie up the connection indefinitely.
+        statement_timeout: statementTimeout,
+        query_timeout: statementTimeout,
       };
 
       // Mirror the same SSL branches as the old connect() to avoid behavior change

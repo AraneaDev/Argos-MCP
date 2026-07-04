@@ -67,6 +67,59 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
     'RESTORE',
     'ATTACH',
     'DETACH',
+    'COPY',
+    'PRAGMA',
+    'VACUUM',
+    'REINDEX',
+  ]);
+
+  // Commands that are the ONLY acceptable leading verb in SELECT-only mode.
+  // The leading token of the statement must be one of these (or a db-specific
+  // metadata command); anything else is rejected before deeper analysis.
+  private readonly allowedLeadCommands = new Set<string>([
+    'SELECT',
+    'WITH',
+    'SHOW',
+    'EXPLAIN',
+    'DESCRIBE',
+    'DESC',
+  ]);
+
+  // Write/DDL/privilege keywords that must NOT appear anywhere in a SELECT-only
+  // query. Scanning every token (not just the leading one) blocks data-modifying
+  // CTEs (WITH x AS (DELETE ...)), COPY ... TO PROGRAM, SELECT ... INTO, and
+  // stacked writes that a leading-keyword check alone would miss.
+  private readonly writeCommandKeywords = new Set<string>([
+    'INSERT',
+    'UPDATE',
+    'DELETE',
+    'DROP',
+    'CREATE',
+    'ALTER',
+    'TRUNCATE',
+    'MERGE',
+    'REPLACE',
+    'UPSERT',
+    'GRANT',
+    'REVOKE',
+    'EXEC',
+    'EXECUTE',
+    'CALL',
+    'ATTACH',
+    'DETACH',
+    'LOAD',
+    'IMPORT',
+    'EXPORT',
+    'BACKUP',
+    'RESTORE',
+    'COPY',
+    'PRAGMA',
+    'INTO',
+    'VACUUM',
+    'REINDEX',
+    'SET',
+    'USE',
+    'DECLARE',
   ]);
 
   private readonly allowedKeywords = new Set<string>([
@@ -266,6 +319,18 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
       return {
         allowed: false,
         reason: 'Query is empty or contains no valid SQL tokens',
+        confidence: 1.0,
+      };
+    }
+
+    // Reject stacked / multiple statements even in write mode — use the batch API
+    // for multiple statements. This blocks ';'-separated injection on batch-capable
+    // drivers (e.g. MSSQL) from riding along on a single-query call.
+    if (this.hasMultipleStatements(tokens)) {
+      return {
+        allowed: false,
+        reason:
+          'Multiple SQL statements are not allowed in a single query. Use the batch query tool for multiple statements.',
         confidence: 1.0,
       };
     }
@@ -490,8 +555,21 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
       };
     }
 
-    // Check first meaningful token
-    const firstToken = tokens.find((token) => token.type === 'KEYWORD' && token.value.length > 0);
+    // Reject stacked / multiple statements outright. A leading-keyword check alone
+    // cannot protect drivers that execute ';'-separated batches (e.g. MSSQL).
+    if (this.hasMultipleStatements(tokens)) {
+      return {
+        allowed: false,
+        reason:
+          'Multiple SQL statements are not allowed in SELECT-only mode. Submit a single SELECT statement.',
+        confidence: 1.0,
+      };
+    }
+
+    // The command is the FIRST meaningful word of the raw statement — NOT the first
+    // token that happens to be a known keyword. A leading identifier such as COPY or
+    // PRAGMA must be judged as the command, not skipped over to an embedded FROM/SELECT.
+    const firstToken = tokens.find((token) => /^[A-Za-z_.\\]/.test(token.value));
 
     if (!firstToken) {
       return {
@@ -502,6 +580,7 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
     }
 
     const command = firstToken.value.toUpperCase();
+    const dbAllowed = this.dbSpecificAllowed[_dbType] || [];
 
     // Check if command is explicitly blocked
     if (this.blockedKeywords.has(command)) {
@@ -513,27 +592,55 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
       };
     }
 
-    // Check for allowed commands
-    if (this.allowedKeywords.has(command)) {
-      // Additional validation for allowed commands
-      const deepValidation = this.performDeepValidation(normalizedQuery, tokens);
+    // The leading command must be an explicitly allowed read command (or a
+    // database-specific metadata command). Everything else is rejected.
+    const leadingAllowed =
+      this.allowedLeadCommands.has(command) || dbAllowed.some((cmd) => command.includes(cmd));
+
+    if (!leadingAllowed) {
       return {
-        allowed: deepValidation.allowed,
-        reason: deepValidation.reason,
-        confidence: deepValidation.confidence,
+        allowed: false,
+        reason: `Command '${command}' is not permitted in SELECT-only mode. Allowed commands: SELECT, WITH, SHOW, EXPLAIN, DESCRIBE, and database-specific metadata commands.`,
+        blockedCommand: command,
+        confidence: 1.0,
       };
     }
 
-    // Check database-specific allowed commands
-    const dbAllowed = this.dbSpecificAllowed[_dbType] || [];
-    if (dbAllowed.some((cmd) => command.includes(cmd))) {
+    // Database-specific metadata commands (e.g. sp_help, \d, .schema) are safe as-is.
+    if (!this.allowedLeadCommands.has(command) && dbAllowed.some((cmd) => command.includes(cmd))) {
       return {
         allowed: true,
         confidence: 0.9,
       };
     }
 
-    // Check for dangerous patterns even in allowed commands
+    // No write/DDL/privilege keyword may appear ANYWHERE in the statement. This blocks
+    // data-modifying CTEs, SELECT ... INTO, COPY ... TO PROGRAM, and embedded writes
+    // that slip past a leading-keyword-only check.
+    const embeddedWrite = tokens.find((token) =>
+      this.writeCommandKeywords.has(token.value.toUpperCase())
+    );
+    if (embeddedWrite) {
+      const kw = embeddedWrite.value.toUpperCase();
+      return {
+        allowed: false,
+        reason: `Query contains the write/DDL keyword '${kw}', which is not allowed in SELECT-only mode.`,
+        blockedCommand: kw,
+        confidence: 0.95,
+      };
+    }
+
+    // EXPLAIN ANALYZE actually executes the statement on PostgreSQL — forbid it.
+    if (command === 'EXPLAIN' && tokens.some((token) => token.value.toUpperCase() === 'ANALYZE')) {
+      return {
+        allowed: false,
+        reason:
+          'EXPLAIN ANALYZE executes the underlying statement and is not allowed in SELECT-only mode. Use plain EXPLAIN.',
+        confidence: 0.95,
+      };
+    }
+
+    // Dangerous function / injection / privilege patterns (now reached on the primary path).
     const dangerousPatterns = this.checkDangerousPatterns(normalizedQuery);
     if (dangerousPatterns.length > 0) {
       return {
@@ -543,19 +650,25 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
       };
     }
 
-    // If we get here, it's probably safe but unknown
-    if (command.startsWith('SELECT') || command.startsWith('WITH')) {
-      return {
-        allowed: true,
-        confidence: 0.8,
-      };
-    }
-
+    // Deep validation (nested dangerous ops, complexity limits, suspicious functions).
+    const deepValidation = this.performDeepValidation(normalizedQuery, tokens);
     return {
-      allowed: false,
-      reason: `Command '${command}' is not recognized as safe for SELECT-only mode. Allowed commands include: SELECT, WITH, SHOW, EXPLAIN, DESCRIBE, and database-specific metadata commands.`,
-      confidence: 0.9,
+      allowed: deepValidation.allowed,
+      reason: deepValidation.reason,
+      confidence: deepValidation.confidence,
     };
+  }
+
+  /**
+   * Detect whether the tokenized query contains more than one top-level statement.
+   * String literals are single tokens, so a ';' operator token followed by any
+   * further word token indicates a stacked statement.
+   */
+  private hasMultipleStatements(tokens: SQLToken[]): boolean {
+    const semicolonIndex = tokens.findIndex((t) => t.value === ';');
+    if (semicolonIndex === -1) return false;
+    // A trailing semicolon (optionally followed by nothing) is fine.
+    return tokens.slice(semicolonIndex + 1).some((t) => /^[A-Za-z_.\\]|^\d/.test(t.value));
   }
 
   /**
@@ -972,25 +1085,45 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
   private checkDangerousPatterns(query: string): string[] {
     const dangerous: string[] = [];
 
-    // Enhanced dangerous function patterns
-    const dangerousFunctions = [
+    // Function-style dangerous calls. Require a following "(" and a leading word
+    // boundary so we don't match substrings inside legitimate identifiers
+    // (e.g. "description" contains "script", "ecosystem" contains "system").
+    const dangerousFunctionNames = [
       'LOAD_FILE',
-      'INTO OUTFILE',
-      'INTO DUMPFILE',
       'SYSTEM',
       'SHELL',
       'EXEC',
       'EVAL',
       'SCRIPT',
       'BENCHMARK',
-      'SLEEP\\(',
-      'WAITFOR DELAY',
+      'SLEEP',
+      // PostgreSQL file / process / DoS surface
+      'PG_READ_FILE',
+      'PG_READ_BINARY_FILE',
+      'PG_LS_DIR',
+      'LO_IMPORT',
+      'LO_EXPORT',
+      'PG_SLEEP',
+      'DBLINK',
     ];
 
-    for (const func of dangerousFunctions) {
-      const pattern = new RegExp(func, 'i');
-      if (pattern.test(query)) {
-        dangerous.push(`Function: ${func}`);
+    for (const name of dangerousFunctionNames) {
+      if (new RegExp(`\\b${name}\\s*\\(`, 'i').test(query)) {
+        dangerous.push(`Function: ${name}`);
+      }
+    }
+
+    // Phrase / construct patterns (not function-call shaped).
+    const dangerousConstructs: Array<[string, RegExp]> = [
+      ['INTO OUTFILE', /\bINTO\s+OUTFILE\b/i],
+      ['INTO DUMPFILE', /\bINTO\s+DUMPFILE\b/i],
+      ['WAITFOR DELAY', /\bWAITFOR\s+DELAY\b/i],
+      ['COPY ... PROGRAM', /\bCOPY\b[\s\S]*\bPROGRAM\b/i],
+    ];
+
+    for (const [label, re] of dangerousConstructs) {
+      if (re.test(query)) {
+        dangerous.push(`Function: ${label}`);
       }
     }
 

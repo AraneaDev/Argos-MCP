@@ -3,6 +3,7 @@
  */
 
 import { Client as SSHClient, type ConnectConfig } from 'ssh2';
+import { createHash } from 'crypto';
 import * as net from 'net';
 import * as fs from 'fs';
 import { stat } from 'node:fs/promises';
@@ -618,6 +619,12 @@ export class EnhancedSSHTunnelManager extends EventEmitter implements ISSHTunnel
         // Listen on the assigned port
         const localPort = options.localPort || 0;
         const bindAddress = options.localHost ?? '127.0.0.1';
+        if (bindAddress !== '127.0.0.1' && bindAddress !== 'localhost' && bindAddress !== '::1') {
+          this.logger.warning(
+            `SSH tunnel for '${dbName}' is binding to non-loopback address ${bindAddress}. ` +
+              `This exposes the unauthenticated tunnel entrance to the network; use 127.0.0.1 unless intentional.`
+          );
+        }
         server.listen(localPort, bindAddress, () => {
           const address = server.address();
           assignedPort = typeof address === 'object' && address ? address.port : localPort;
@@ -710,7 +717,6 @@ export class EnhancedSSHTunnelManager extends EventEmitter implements ISSHTunnel
           'ecdh-sha2-nistp521',
           'diffie-hellman-group14-sha256',
           'diffie-hellman-group16-sha512',
-          'diffie-hellman-group14-sha1',
         ],
         cipher: [
           'aes128-gcm',
@@ -721,14 +727,57 @@ export class EnhancedSSHTunnelManager extends EventEmitter implements ISSHTunnel
           'aes192-ctr',
           'aes256-ctr',
         ],
-        hmac: ['hmac-sha2-256', 'hmac-sha2-512', 'hmac-sha1'],
+        // SHA-1 HMACs dropped — they are downgrade-attack fodder and no longer needed.
+        hmac: ['hmac-sha2-256', 'hmac-sha2-512'],
       },
     };
 
-    // Add connection debugging
-    connectOptions.debug = (message: string) => {
-      this.logger.debug(`SSH Debug: ${message}`);
+    // Verify the remote host key. Without a hostVerifier, ssh2 accepts ANY host key,
+    // leaving the tunnel open to a man-in-the-middle. Fail secure by default.
+    connectOptions.hostVerifier = (key: Buffer): boolean => {
+      const sha256Hex = createHash('sha256').update(key).digest('hex');
+      const sha256B64 = createHash('sha256').update(key).digest('base64').replace(/=+$/, '');
+      const openssh = `SHA256:${sha256B64}`;
+
+      const pinned = config.hostFingerprint?.trim();
+      if (pinned) {
+        const norm = (s: string) => s.trim().replace(/^SHA256:/i, '').replace(/[:=]/g, '').toLowerCase();
+        const candidates = [openssh, sha256B64, sha256Hex].map(norm);
+        if (candidates.includes(norm(pinned))) {
+          return true;
+        }
+        this.logger.error(
+          `SSH host key for '${config.host}' does NOT match the pinned ssh_host_fingerprint. ` +
+            `Presented key: ${openssh}. Rejecting connection (possible MITM).`
+        );
+        return false;
+      }
+
+      // No fingerprint pinned. Strict checking (the default) refuses to proceed.
+      if (config.strictHostKeyChecking === false) {
+        this.logger.warning(
+          `SSH host key verification is DISABLED for '${config.host}' ` +
+            `(ssh_strict_host_key_checking=false). Accepting host key ${openssh} without verification — INSECURE.`
+        );
+        return true;
+      }
+
+      this.logger.error(
+        `SSH host key for '${config.host}' is not verified. ` +
+          `After confirming it out-of-band, set ssh_host_fingerprint=${openssh}, ` +
+          `or set ssh_strict_host_key_checking=false to disable verification (insecure). Rejecting connection.`
+      );
+      return false;
     };
+
+    // Connection debugging — opt-in only. The ssh2 handshake trace (usernames,
+    // host-key fingerprints, algorithm negotiation) is verbose and must not be
+    // written to the log at the default level. Enable with SSH_DEBUG=true.
+    if (process.env.SSH_DEBUG === 'true') {
+      connectOptions.debug = (message: string) => {
+        this.logger.debug(`SSH Debug: ${message}`);
+      };
+    }
 
     if (config.password) {
       connectOptions.password = config.password;

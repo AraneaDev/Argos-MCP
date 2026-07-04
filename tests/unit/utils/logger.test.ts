@@ -15,6 +15,7 @@ jest.mock('fs', () => ({
   createWriteStream: jest.fn(),
   existsSync: jest.fn(),
   unlinkSync: jest.fn(),
+  renameSync: jest.fn(),
 }));
 
 jest.mock('path', () => ({
@@ -546,6 +547,50 @@ describe('Logger', () => {
     it('logDebug should call debug on global logger', () => {
       logDebug('debug msg');
       expect(console.log).toHaveBeenCalledWith(expect.stringContaining('[DEBUG] debug msg'));
+    });
+  });
+
+  describe('secret redaction in file output', () => {
+    it('redacts secret-looking context fields before writing to the log file', async () => {
+      const writes: string[] = [];
+      const fakeStream = {
+        write: (s: string) => {
+          writes.push(s);
+          return true;
+        },
+        on: jest.fn(),
+        end: (cb?: () => void) => {
+          if (cb) cb();
+        },
+      };
+      (createWriteStream as jest.Mock).mockReturnValue(fakeStream);
+      (existsSync as jest.Mock).mockReturnValue(false);
+
+      const logger = new Logger({
+        enableConsole: false,
+        enableFile: true,
+        rotateOnStart: false,
+        logFile: '/mock/project/secret-test.log',
+      });
+      await logger.initialize();
+
+      logger.info('Handling tool call: sql_add_database', {
+        args: {
+          name: 'prod',
+          password: 'hunter2',
+          ssh_private_key: '-----BEGIN KEY-----abc',
+          nested: { ssh_passphrase: 'topsecret', token: 'xyz' },
+        },
+      });
+
+      const joined = writes.join('');
+      expect(joined).not.toContain('hunter2');
+      expect(joined).not.toContain('BEGIN KEY');
+      expect(joined).not.toContain('topsecret');
+      expect(joined).not.toContain('xyz');
+      expect(joined).toContain('[REDACTED]');
+      // Non-secret fields survive.
+      expect(joined).toContain('prod');
     });
   });
 });

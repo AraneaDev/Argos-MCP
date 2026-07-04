@@ -16,6 +16,10 @@ export interface SSHConnectionConfig {
   password?: string;
   privateKey?: Buffer | string;
   passphrase?: string;
+  /** Expected host key fingerprint (SHA256:base64, bare base64, or hex). When set, the host key is pinned. */
+  hostFingerprint?: string;
+  /** Reject unknown/unpinned host keys (default true = fail secure). */
+  strictHostKeyChecking?: boolean;
 }
 
 export interface SSHForwardConfig {

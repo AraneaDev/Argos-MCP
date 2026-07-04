@@ -280,6 +280,8 @@ export class ConnectionManager extends EventEmitter {
                 password: config.ssh_password,
                 privateKey: config.ssh_private_key,
                 passphrase: config.ssh_passphrase,
+                hostFingerprint: config.ssh_host_fingerprint,
+                strictHostKeyChecking: config.ssh_strict_host_key_checking,
               },
               forwardConfig: {
                 sourceHost: '127.0.0.1',
@@ -976,10 +978,10 @@ export class ConnectionManager extends EventEmitter {
         const queryStartTime = Date.now();
 
         try {
-          const result = await adapter.executeQuery(
-            connectionInfo.connection,
-            queryObj.query,
-            queryObj.params || []
+          const result = await this.withQueryTimeout(
+            dbName,
+            () => adapter.executeQuery(connectionInfo.connection, queryObj.query, queryObj.params || []),
+            'Batch query'
           );
 
           results.push({
@@ -1047,6 +1049,30 @@ export class ConnectionManager extends EventEmitter {
   }
 
   /**
+   * Race an operation against the configured per-database query timeout.
+   * Note: this stops the client from waiting; server-side cancellation additionally
+   * depends on the adapter (e.g. PostgreSQL statement_timeout).
+   */
+  private async withQueryTimeout<T>(
+    dbName: string,
+    op: () => Promise<T>,
+    label = 'Operation'
+  ): Promise<T> {
+    const queryTimeout = this.getDatabaseConfig(dbName)?.query_timeout ?? 30000;
+    let timeoutHandle: ReturnType<typeof setTimeout>;
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(
+        () => reject(new Error(`${label} timed out after ${queryTimeout}ms`)),
+        queryTimeout
+      );
+      timeoutHandle.unref();
+    });
+    return Promise.race([op(), timeoutPromise]).finally(() =>
+      clearTimeout(timeoutHandle)
+    ) as Promise<T>;
+  }
+
+  /**
    * Analyze query performance with database-specific recommendations
    */
   async analyzePerformance(
@@ -1071,13 +1097,21 @@ export class ConnectionManager extends EventEmitter {
     try {
       // Execute the actual query to get timing and row info
       const startTime = Date.now();
-      const result = await adapter.executeQuery(connectionInfo.connection, query);
+      const result = await this.withQueryTimeout(
+        dbName,
+        () => adapter.executeQuery(connectionInfo.connection, query),
+        'Performance analysis'
+      );
       const executionTime = Date.now() - startTime;
 
       // Get execution plan
       const explainStartTime = Date.now();
       const explainQuery = adapter.buildExplainQuery(query);
-      const explainResult = await adapter.executeQuery(connectionInfo.connection, explainQuery);
+      const explainResult = await this.withQueryTimeout(
+        dbName,
+        () => adapter.executeQuery(connectionInfo.connection, explainQuery),
+        'Performance analysis (explain)'
+      );
       const explainTime = Date.now() - explainStartTime;
 
       // Format execution plan based on database type

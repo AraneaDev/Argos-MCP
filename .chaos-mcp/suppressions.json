@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "entries": {
+    "src/utils/circuit-breaker.ts": [
+      {
+        "line": 47,
+        "mutator": "ConditionalExpression",
+        "reason": "equivalent: when failures===0, effectiveWindowStart===now so the window term is always false; forcing failures>0 to true cannot change windowExpired",
+        "addedAt": 1783180601640
+      },
+      {
+        "line": 47,
+        "mutator": "EqualityOperator",
+        "reason": "equivalent: failures>0 vs failures>=0 differ only at failures===0, where effectiveWindowStart===now makes windowExpired false either way",
+        "addedAt": 1783180601640
+      }
+    ],
+    "src/utils/error-handler.ts": [
+      {
+        "line": 561,
+        "mutator": "Regex",
+        "reason": "equivalent: mutations to the api[_-]?key alternative are masked by the standalone 'key' alternative — the tail 'key=...' is redacted either way and $1=[REDACTED] preserves the prefix, so output is identical for all inputs",
+        "addedAt": 1783182471827
+      }
+    ]
+  }
+}

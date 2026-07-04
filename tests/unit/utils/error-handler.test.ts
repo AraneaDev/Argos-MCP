@@ -16,7 +16,9 @@ import {
   ErrorCategory,
   ErrorSeverity,
   ErrorHandler,
+  ErrorInfo,
   sanitizeError,
+  sanitizeMessage,
   withErrorHandling,
   createErrorResponse,
 } from '../../../src/utils/error-handler.js';
@@ -533,6 +535,571 @@ describe('error-handler', () => {
       expect(ErrorSeverity.MEDIUM).toBe('medium');
       expect(ErrorSeverity.HIGH).toBe('high');
       expect(ErrorSeverity.CRITICAL).toBe('critical');
+    });
+  });
+
+  // ============================================================================
+  // Full classification tables — the exact ErrorInfo each error type produces
+  // ============================================================================
+
+  describe('classification tables (full ErrorInfo shape)', () => {
+    let handler: ErrorHandler;
+
+    beforeEach(() => {
+      handler = new ErrorHandler(mockLogger as any);
+    });
+
+    const cases: Array<[string, unknown, ErrorInfo]> = [
+      [
+        'SecurityViolationError',
+        new SecurityViolationError('sec msg'),
+        {
+          category: ErrorCategory.SECURITY,
+          severity: ErrorSeverity.HIGH,
+          userMessage: 'Security policy violation',
+          technicalMessage: 'sec msg',
+          recoverable: true,
+          retryable: false,
+          troubleshooting: [
+            'Review the query for prohibited operations',
+            'Check if the database is configured for SELECT-only mode',
+            'Ensure the query complies with security limits',
+            'Contact administrator for full access permissions if needed',
+          ],
+        },
+      ],
+      [
+        'ConnectionError',
+        new ConnectionError('conn msg'),
+        {
+          category: ErrorCategory.CONNECTION,
+          severity: ErrorSeverity.HIGH,
+          userMessage: 'Database connection failed',
+          technicalMessage: 'conn msg',
+          recoverable: true,
+          retryable: true,
+          troubleshooting: [
+            'Check database server is running',
+            'Verify connection credentials',
+            'Confirm network connectivity',
+            'Check SSH tunnel configuration if applicable',
+            'Review firewall settings',
+          ],
+        },
+      ],
+      [
+        'QueryExecutionError',
+        new QueryExecutionError('query msg'),
+        {
+          category: ErrorCategory.QUERY,
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'Query execution failed',
+          technicalMessage: 'query msg',
+          recoverable: true,
+          retryable: false,
+          troubleshooting: [
+            'Review SQL syntax',
+            'Check table and column names exist',
+            'Verify data types in conditions',
+            'Check for sufficient permissions',
+            'Review query complexity limits',
+          ],
+        },
+      ],
+      [
+        'ConfigurationError',
+        new ConfigurationError('config msg'),
+        {
+          category: ErrorCategory.CONFIGURATION,
+          severity: ErrorSeverity.CRITICAL,
+          userMessage: 'Configuration error',
+          technicalMessage: 'config msg',
+          recoverable: true,
+          retryable: false,
+          troubleshooting: [
+            'Check config.ini file syntax',
+            'Verify all required fields are present',
+            'Validate configuration values',
+            'Run setup wizard to reconfigure',
+            'Check file permissions',
+          ],
+        },
+      ],
+      [
+        'SchemaError',
+        new SchemaError('schema msg'),
+        {
+          category: ErrorCategory.SCHEMA,
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'Schema operation failed',
+          technicalMessage: 'schema msg',
+          recoverable: true,
+          retryable: true,
+          troubleshooting: [
+            'Ensure database connection is active',
+            'Check database permissions for schema access',
+            'Verify table names and structures',
+            'Clear schema cache and retry',
+            'Check for database structure changes',
+          ],
+        },
+      ],
+      [
+        'SSHTunnelError',
+        new SSHTunnelError('ssh msg'),
+        {
+          category: ErrorCategory.SSH,
+          severity: ErrorSeverity.HIGH,
+          userMessage: 'SSH tunnel connection failed',
+          technicalMessage: 'ssh msg',
+          recoverable: true,
+          retryable: true,
+          troubleshooting: [
+            'Check SSH server accessibility',
+            'Verify SSH credentials',
+            'Confirm SSH key permissions',
+            'Check SSH port configuration',
+            'Verify network connectivity to SSH host',
+          ],
+        },
+      ],
+      [
+        'ValidationError',
+        new ValidationError('validation msg', 'email'),
+        {
+          category: ErrorCategory.VALIDATION,
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'Invalid input provided',
+          technicalMessage: 'validation msg',
+          recoverable: true,
+          retryable: false,
+          troubleshooting: [
+            "Check the 'email' field",
+            'Verify input format and constraints',
+            'Review parameter requirements',
+            'Check for required vs optional fields',
+          ],
+        },
+      ],
+      [
+        'TimeoutError',
+        new TimeoutError('timeout msg', 5000),
+        {
+          category: ErrorCategory.TIMEOUT,
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'Operation timed out',
+          technicalMessage: 'timeout msg',
+          recoverable: true,
+          retryable: true,
+          troubleshooting: [
+            'Operation exceeded 5000ms limit',
+            'Simplify the query to reduce execution time',
+            'Check database performance',
+            'Increase timeout limit if appropriate',
+            'Review query optimization opportunities',
+          ],
+        },
+      ],
+      [
+        'ECONNREFUSED',
+        new Error('connect ECONNREFUSED 127.0.0.1'),
+        {
+          category: ErrorCategory.CONNECTION,
+          severity: ErrorSeverity.HIGH,
+          userMessage: 'Connection refused',
+          technicalMessage: 'connect ECONNREFUSED 127.0.0.1',
+          recoverable: true,
+          retryable: true,
+          troubleshooting: [
+            'Check if database server is running',
+            'Verify correct host and port',
+            'Check firewall settings',
+            'Confirm network connectivity',
+          ],
+        },
+      ],
+      [
+        'ENOTFOUND',
+        new Error('getaddrinfo ENOTFOUND dbhost'),
+        {
+          category: ErrorCategory.CONNECTION,
+          severity: ErrorSeverity.HIGH,
+          userMessage: 'Host not found',
+          technicalMessage: 'getaddrinfo ENOTFOUND dbhost',
+          recoverable: true,
+          retryable: true,
+          troubleshooting: [
+            'Check hostname spelling',
+            'Verify DNS resolution',
+            'Check network connectivity',
+            'Try using IP address instead of hostname',
+          ],
+        },
+      ],
+      [
+        'ETIMEDOUT',
+        new Error('connect ETIMEDOUT'),
+        {
+          category: ErrorCategory.TIMEOUT,
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'Connection timed out',
+          technicalMessage: 'connect ETIMEDOUT',
+          recoverable: true,
+          retryable: true,
+          troubleshooting: [
+            'Check network connectivity',
+            'Verify server responsiveness',
+            'Increase timeout values',
+            'Check for network latency issues',
+          ],
+        },
+      ],
+      [
+        'EACCES',
+        new Error('EACCES: cannot open file'),
+        {
+          category: ErrorCategory.CONFIGURATION,
+          severity: ErrorSeverity.HIGH,
+          userMessage: 'Permission denied',
+          technicalMessage: 'EACCES: cannot open file',
+          recoverable: true,
+          retryable: false,
+          troubleshooting: [
+            'Check file permissions',
+            'Verify user has required access',
+            'Check SSH key permissions',
+            'Run with appropriate privileges',
+          ],
+        },
+      ],
+      [
+        'unknown Error',
+        new Error('mystery'),
+        {
+          category: ErrorCategory.UNKNOWN,
+          severity: ErrorSeverity.MEDIUM,
+          userMessage: 'An unexpected error occurred',
+          technicalMessage: 'mystery',
+          recoverable: true,
+          retryable: false,
+          troubleshooting: [
+            'Check server logs for more details',
+            'Verify all configuration settings',
+            'Try the operation again',
+            'Contact support if the issue persists',
+          ],
+        },
+      ],
+    ];
+
+    it.each(cases)('%s produces the exact ErrorInfo', (_name, error, expected) => {
+      expect(handler.handleError(error)).toEqual(expected);
+    });
+  });
+
+  // ============================================================================
+  // Logging switch — exact message per severity, with and without context
+  // ============================================================================
+
+  describe('handleError logging', () => {
+    let handler: ErrorHandler;
+
+    beforeEach(() => {
+      handler = new ErrorHandler(mockLogger as any);
+    });
+
+    it('logs CRITICAL via error with exact message including context', () => {
+      handler.handleError(new ConfigurationError('x'), 'setup');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Critical error in setup',
+        expect.objectContaining({ context: 'setup', severity: ErrorSeverity.CRITICAL })
+      );
+    });
+
+    it('logs CRITICAL with unknown context when context is omitted', () => {
+      handler.handleError(new ConfigurationError('x'));
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'Critical error in unknown context',
+        expect.any(Object)
+      );
+    });
+
+    it('logs HIGH via error with exact message including context', () => {
+      handler.handleError(new ConnectionError('x'), 'connecting');
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'High severity error in connecting',
+        expect.any(Object)
+      );
+    });
+
+    it('logs HIGH with unknown context when context is omitted', () => {
+      handler.handleError(new ConnectionError('x'));
+      expect(mockLogger.error).toHaveBeenCalledWith(
+        'High severity error in unknown context',
+        expect.any(Object)
+      );
+    });
+
+    it('logs MEDIUM via warning with exact message including context', () => {
+      handler.handleError(new SchemaError('x'), 'schema-load');
+      expect(mockLogger.warning).toHaveBeenCalledWith(
+        'Medium severity error in schema-load',
+        expect.any(Object)
+      );
+    });
+
+    it('logs LOW via info with exact message including context', () => {
+      const lowInfo: ErrorInfo = {
+        category: ErrorCategory.UNKNOWN,
+        severity: ErrorSeverity.LOW,
+        userMessage: 'minor',
+        technicalMessage: 'minor',
+        recoverable: true,
+        retryable: false,
+      };
+      (handler as unknown as { classifyError: () => ErrorInfo }).classifyError = () => lowInfo;
+      handler.handleError(new Error('x'), 'background');
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Low severity error in background',
+        expect.any(Object)
+      );
+      expect(mockLogger.error).not.toHaveBeenCalled();
+      expect(mockLogger.warning).not.toHaveBeenCalled();
+    });
+
+    it('logs LOW with unknown context when context is omitted', () => {
+      const lowInfo: ErrorInfo = {
+        category: ErrorCategory.UNKNOWN,
+        severity: ErrorSeverity.LOW,
+        userMessage: 'minor',
+        technicalMessage: 'minor',
+        recoverable: true,
+        retryable: false,
+      };
+      (handler as unknown as { classifyError: () => ErrorInfo }).classifyError = () => lowInfo;
+      handler.handleError(new Error('x'));
+      expect(mockLogger.info).toHaveBeenCalledWith(
+        'Low severity error in unknown context',
+        expect.any(Object)
+      );
+    });
+  });
+
+  // ============================================================================
+  // Formatters — exact output
+  // ============================================================================
+
+  describe('formatter exact output', () => {
+    let handler: ErrorHandler;
+
+    beforeEach(() => {
+      handler = new ErrorHandler(mockLogger as any);
+    });
+
+    it('formatUserError renders the complete message exactly', () => {
+      const msg = handler.formatUserError(new SecurityViolationError('nope'), 'q');
+      expect(msg).toBe(
+        ' **Error**: Security policy violation\n' +
+          ' **Details**: nope\n' +
+          '\n **Troubleshooting:**\n' +
+          ' - Review the query for prohibited operations\n' +
+          ' - Check if the database is configured for SELECT-only mode\n' +
+          ' - Ensure the query complies with security limits\n' +
+          ' - Contact administrator for full access permissions if needed\n'
+      );
+    });
+
+    it('formatUserError appends the exact retry note for retryable errors', () => {
+      const msg = handler.formatUserError(new SchemaError('s'), 'q');
+      expect(msg.endsWith('\n This operation can be retried.')).toBe(true);
+    });
+
+    it('formatUserError omits the troubleshooting section for an empty list', () => {
+      const info: ErrorInfo = {
+        category: ErrorCategory.UNKNOWN,
+        severity: ErrorSeverity.MEDIUM,
+        userMessage: 'u',
+        technicalMessage: 't',
+        recoverable: true,
+        retryable: false,
+        troubleshooting: [],
+      };
+      (handler as unknown as { classifyError: () => ErrorInfo }).classifyError = () => info;
+      expect(handler.formatUserError(new Error('x'))).not.toContain('Troubleshooting');
+    });
+
+    it('formatUserError omits the troubleshooting section when absent', () => {
+      const info: ErrorInfo = {
+        category: ErrorCategory.UNKNOWN,
+        severity: ErrorSeverity.MEDIUM,
+        userMessage: 'u',
+        technicalMessage: 't',
+        recoverable: true,
+        retryable: false,
+      };
+      (handler as unknown as { classifyError: () => ErrorInfo }).classifyError = () => info;
+      expect(handler.formatUserError(new Error('x'))).not.toContain('Troubleshooting');
+    });
+
+    it('formatToolError renders the complete message exactly and logs the tool context', () => {
+      const msg = handler.formatToolError(new QueryExecutionError('bad sql'), 'sql_query');
+      expect(msg).toBe(
+        ' **sql_query Failed**\n\n' +
+          ' **Error**: Query execution failed\n' +
+          ' **Details**: bad sql\n' +
+          '\n **Troubleshooting Steps:**\n' +
+          ' - Review SQL syntax\n' +
+          ' - Check table and column names exist\n' +
+          ' - Verify data types in conditions\n' +
+          ' - Check for sufficient permissions\n' +
+          ' - Review query complexity limits\n'
+      );
+      expect(mockLogger.warning).toHaveBeenCalledWith(
+        'Medium severity error in tool:sql_query',
+        expect.any(Object)
+      );
+    });
+
+    it('formatToolError omits the troubleshooting section for an empty list', () => {
+      const info: ErrorInfo = {
+        category: ErrorCategory.UNKNOWN,
+        severity: ErrorSeverity.MEDIUM,
+        userMessage: 'u',
+        technicalMessage: 't',
+        recoverable: true,
+        retryable: false,
+        troubleshooting: [],
+      };
+      (handler as unknown as { classifyError: () => ErrorInfo }).classifyError = () => info;
+      expect(handler.formatToolError(new Error('x'), 'tool')).not.toContain('Troubleshooting');
+    });
+
+    it('formatToolError omits the troubleshooting section when absent', () => {
+      const info: ErrorInfo = {
+        category: ErrorCategory.UNKNOWN,
+        severity: ErrorSeverity.MEDIUM,
+        userMessage: 'u',
+        technicalMessage: 't',
+        recoverable: true,
+        retryable: false,
+      };
+      (handler as unknown as { classifyError: () => ErrorInfo }).classifyError = () => info;
+      expect(handler.formatToolError(new Error('x'), 'tool')).not.toContain('Troubleshooting');
+    });
+  });
+
+  // ============================================================================
+  // sanitizeMessage — exact redaction behavior
+  // ============================================================================
+
+  describe('sanitizeMessage', () => {
+    it('redacts bearer tokens exactly, including base64 padding', () => {
+      expect(sanitizeMessage('auth failed: Bearer eyJhbGciOi.abc-123==')).toBe(
+        'auth failed: Bearer [REDACTED]'
+      );
+    });
+
+    it('redacts colon-separated credentials and normalizes to key=[REDACTED]', () => {
+      expect(sanitizeMessage('login token: abc123 rest')).toBe('login token=[REDACTED] rest');
+    });
+
+    it('redacts bearer tokens case-insensitively and repeatedly', () => {
+      expect(sanitizeMessage('bearer tok123 and Bearer tok456')).toBe(
+        'Bearer [REDACTED] and Bearer [REDACTED]'
+      );
+    });
+
+    it('redacts bearer tokens separated by multiple spaces', () => {
+      expect(sanitizeMessage('Bearer  tok123')).toBe('Bearer [REDACTED]');
+    });
+
+    it('does not redact when Bearer is part of another word', () => {
+      expect(sanitizeMessage('XBearer tok123')).toBe('XBearer tok123');
+    });
+
+    it.each([
+      ['passwd=x1 y', 'passwd=[REDACTED] y'],
+      ['key=x1 y', 'key=[REDACTED] y'],
+      ['api_key=x1 y', 'api_key=[REDACTED] y'],
+      ['api-key=x1 y', 'api-key=[REDACTED] y'],
+      ['apikey=x1 y', 'apikey=[REDACTED] y'],
+      ['authorization=x1 y', 'authorization=[REDACTED] y'],
+      ['credential=x1 y', 'credential=[REDACTED] y'],
+      ['credentials=x1 y', 'credentials=[REDACTED] y'],
+    ])('redacts %s', (input, expected) => {
+      expect(sanitizeMessage(input)).toBe(expected);
+    });
+
+    it('redacts uppercase PASSWORD assignments preserving the matched keyword', () => {
+      expect(sanitizeMessage('PASSWORD=hunter2 z')).toBe('PASSWORD=[REDACTED] z');
+    });
+
+    it('redacts multiple credential assignments in one message', () => {
+      expect(sanitizeMessage('password=a token=b')).toBe(
+        'password=[REDACTED] token=[REDACTED]'
+      );
+    });
+
+    it('stops secret redaction at semicolons', () => {
+      expect(sanitizeMessage('secret=abc;tail')).toBe('secret=[REDACTED];tail');
+    });
+
+    it('stops redaction at delimiters', () => {
+      expect(sanitizeMessage('secret=s3cr3t,visible')).toBe('secret=[REDACTED],visible');
+    });
+
+    it('replaces connection strings exactly', () => {
+      expect(sanitizeMessage('at mysql://root:pw@host:3306/db end')).toBe(
+        'at <connection_string> end'
+      );
+    });
+
+    it('replaces Windows drive paths', () => {
+      expect(sanitizeMessage('read D:\\data\\file.txt failed')).toBe('read <file_path> failed');
+    });
+
+    it('leaves single-segment unix paths alone', () => {
+      expect(sanitizeMessage('mount /data failed')).toBe('mount /data failed');
+    });
+
+    it('masks credit card numbers exactly', () => {
+      expect(sanitizeMessage('card 1234-5678-9012-3456 declined')).toBe(
+        'card XXXX-XXXX-XXXX-XXXX declined'
+      );
+    });
+
+    it('masks SSNs exactly', () => {
+      expect(sanitizeMessage('ssn 123-45-6789 found')).toBe('ssn XXX-XX-XXXX found');
+    });
+
+    it('truncates messages to 500 characters', () => {
+      const long = 'a'.repeat(600);
+      expect(sanitizeMessage(long)).toBe('a'.repeat(500));
+    });
+  });
+
+  describe('sanitizeError security-violation passthrough', () => {
+    it('returns SecurityViolationError messages verbatim without sanitization', () => {
+      const raw = 'Blocked query containing password=abc123';
+      expect(sanitizeError(new SecurityViolationError(raw))).toBe(raw);
+    });
+  });
+
+  // ============================================================================
+  // createErrorResponse — exact text
+  // ============================================================================
+
+  describe('createErrorResponse exact text', () => {
+    it('renders the exact error text with the troubleshooting block', () => {
+      const response = createErrorResponse(new Error('boom'), 'sql_query');
+      expect(response.content[0].text).toBe(
+        ' Error in sql_query: boom\n\n' +
+          '**Troubleshooting:**\n' +
+          '- Check that all required parameters are provided\n' +
+          '- Verify database connection is working\n' +
+          '- Review server logs for more details\n' +
+          '- Ensure proper permissions are configured'
+      );
     });
   });
 });

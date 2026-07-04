@@ -19,6 +19,10 @@ describe('hashQuery', () => {
   it('different SQL produces different hash', () => {
     expect(hashQuery('SELECT 1')).not.toBe(hashQuery('SELECT 2'));
   });
+  it('normalises to the exact lowercased single-spaced trimmed form', () => {
+    // sha256('select 1').slice(0, 8) — pins lowercase, space collapsing, and trim
+    expect(hashQuery('  SELECT \n\t 1  ')).toBe('822ae07d');
+  });
 });
 
 describe('writeAuditLog', () => {

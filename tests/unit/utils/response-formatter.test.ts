@@ -211,6 +211,58 @@ describe('response-formatter', () => {
       expect(result).toContain('true');
       expect(result).toContain('false');
     });
+
+    it('should render the exact markdown table', () => {
+      const data: QueryResult = {
+        rows: [{ id: 1, name: 'Alice' }],
+        rowCount: 1,
+        fields: ['id', 'name'],
+        truncated: false,
+        execution_time_ms: 10,
+      };
+
+      expect(formatTableResults(data)).toBe('| id | name |\n|---|---|\n| 1 | Alice |\n');
+    });
+
+    it('should not truncate strings of exactly 50 chars', () => {
+      const s = 'b'.repeat(50);
+      const data: QueryResult = {
+        rows: [{ text: s }],
+        rowCount: 1,
+        fields: ['text'],
+        truncated: false,
+        execution_time_ms: 10,
+      };
+
+      const result = formatTableResults(data);
+      expect(result).toContain(`| ${s} |`);
+      expect(result).not.toContain('...');
+    });
+
+    it('should truncate a 51-char string to 47 chars plus ellipsis', () => {
+      const data: QueryResult = {
+        rows: [{ text: 'b'.repeat(51) }],
+        rowCount: 1,
+        fields: ['text'],
+        truncated: false,
+        execution_time_ms: 10,
+      };
+
+      expect(formatTableResults(data)).toContain(`| ${'b'.repeat(47)}... |`);
+    });
+
+    it('should stringify long array values instead of string-truncating them', () => {
+      const arr = Array.from({ length: 60 }, (_, i) => i);
+      const data: QueryResult = {
+        rows: [{ data: arr }],
+        rowCount: 1,
+        fields: ['data'],
+        truncated: false,
+        execution_time_ms: 10,
+      };
+
+      expect(formatTableResults(data)).toContain(JSON.stringify(arr));
+    });
   });
 
   // ============================================================================
@@ -349,6 +401,98 @@ describe('response-formatter', () => {
 
       const result = formatCondensedTableResults(data);
       expect(result).not.toContain('more rows');
+    });
+
+    it('should render the exact condensed table for 4 or fewer fields', () => {
+      const data: QueryResult = {
+        rows: [{ a: 'x', b: 2 }],
+        rowCount: 1,
+        fields: ['a', 'b'],
+        truncated: false,
+        execution_time_ms: 10,
+      };
+
+      expect(formatCondensedTableResults(data)).toBe('| a | b |\n|---|---|\n| x | 2 |\n\n');
+    });
+
+    it('should render the exact condensed table at exactly 4 fields (boundary)', () => {
+      const data: QueryResult = {
+        rows: [{ a: 'x', b: 2, c: 3, d: 4 }],
+        rowCount: 1,
+        fields: ['a', 'b', 'c', 'd'],
+        truncated: false,
+        execution_time_ms: 10,
+      };
+
+      expect(formatCondensedTableResults(data)).toBe(
+        '| a | b | c | d |\n|---|---|---|---|\n| x | 2 | 3 | 4 |\n\n'
+      );
+    });
+
+    it('should render the exact condensed table for more than 4 fields', () => {
+      const data: QueryResult = {
+        rows: [{ a: 'v1', b: 2, c: 3, d: 4, e: 5 }],
+        rowCount: 1,
+        fields: ['a', 'b', 'c', 'd', 'e'],
+        truncated: false,
+        execution_time_ms: 10,
+      };
+
+      expect(formatCondensedTableResults(data)).toBe(
+        '| a | b | c | d | ... |\n|---|---|---|---|---|\n| v1 | 2 | 3 | 4 | ... |\n\n'
+      );
+    });
+
+    it('should not truncate strings of exactly 20 chars', () => {
+      const s = 'c'.repeat(20);
+      const data: QueryResult = {
+        rows: [{ text: s }],
+        rowCount: 1,
+        fields: ['text'],
+        truncated: false,
+        execution_time_ms: 10,
+      };
+
+      const result = formatCondensedTableResults(data);
+      expect(result).toContain(`| ${s} |`);
+      expect(result).not.toContain('...');
+    });
+
+    it('should truncate a 21-char string to 17 chars plus ellipsis', () => {
+      const data: QueryResult = {
+        rows: [{ text: 'c'.repeat(21) }],
+        rowCount: 1,
+        fields: ['text'],
+        truncated: false,
+        execution_time_ms: 10,
+      };
+
+      expect(formatCondensedTableResults(data)).toContain(`| ${'c'.repeat(17)}... |`);
+    });
+
+    it('should render NULL for undefined values', () => {
+      const data: QueryResult = {
+        rows: [{ id: 1 }],
+        rowCount: 1,
+        fields: ['id', 'name'],
+        truncated: false,
+        execution_time_ms: 10,
+      };
+
+      expect(formatCondensedTableResults(data)).toContain('| 1 | NULL |');
+    });
+
+    it('should stringify long array values instead of string-truncating them', () => {
+      const arr = Array.from({ length: 25 }, (_, i) => i);
+      const data: QueryResult = {
+        rows: [{ data: arr }],
+        rowCount: 1,
+        fields: ['data'],
+        truncated: false,
+        execution_time_ms: 10,
+      };
+
+      expect(formatCondensedTableResults(data)).toContain(JSON.stringify(arr));
     });
   });
 
@@ -505,6 +649,26 @@ describe('response-formatter', () => {
 
       const result = formatDatabaseSummary(db);
       expect(result).toContain('Schema not yet captured');
+    });
+
+    it('should render the exact minimal summary with no optional lines', () => {
+      const db: DatabaseListItem = {
+        name: 'mydb',
+        type: 'mysql',
+        ssh_enabled: false,
+        ssl_enabled: false,
+        select_only_mode: false,
+        mcp_configurable: false,
+        schema_cached: false,
+      };
+
+      expect(formatDatabaseSummary(db)).toBe(
+        ' **mydb** (mysql)\n' +
+          ' Security: Full access mode (use with caution)\n' +
+          ' MCP configurable: no (manual config only)\n' +
+          ' Schema not yet captured\n' +
+          '\n'
+      );
     });
 
     it('should format all features together', () => {

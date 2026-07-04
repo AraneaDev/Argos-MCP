@@ -547,10 +547,7 @@ export function sanitizeError(error: unknown): string {
  */
 export function sanitizeMessage(message: string): string {
   // Strip PEM key blocks entirely (private keys, certificates).
-  message = message.replace(
-    /-----BEGIN [^-]+-----[\s\S]*?-----END [^-]+-----/g,
-    '[REDACTED KEY]'
-  );
+  message = message.replace(/-----BEGIN [^-]+-----[\s\S]*?-----END [^-]+-----/g, '[REDACTED KEY]');
 
   // Bearer / authorization tokens (no key=value shape).
   message = message.replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [REDACTED]');

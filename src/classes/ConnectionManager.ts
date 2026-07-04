@@ -980,7 +980,12 @@ export class ConnectionManager extends EventEmitter {
         try {
           const result = await this.withQueryTimeout(
             dbName,
-            () => adapter.executeQuery(connectionInfo.connection, queryObj.query, queryObj.params || []),
+            () =>
+              adapter.executeQuery(
+                connectionInfo.connection,
+                queryObj.query,
+                queryObj.params || []
+              ),
             'Batch query'
           );
 

@@ -741,7 +741,12 @@ export class EnhancedSSHTunnelManager extends EventEmitter implements ISSHTunnel
 
       const pinned = config.hostFingerprint?.trim();
       if (pinned) {
-        const norm = (s: string) => s.trim().replace(/^SHA256:/i, '').replace(/[:=]/g, '').toLowerCase();
+        const norm = (s: string) =>
+          s
+            .trim()
+            .replace(/^SHA256:/i, '')
+            .replace(/[:=]/g, '')
+            .toLowerCase();
         const candidates = [openssh, sha256B64, sha256Hex].map(norm);
         if (candidates.includes(norm(pinned))) {
           return true;

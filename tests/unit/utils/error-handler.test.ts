@@ -1035,9 +1035,7 @@ describe('error-handler', () => {
     });
 
     it('redacts multiple credential assignments in one message', () => {
-      expect(sanitizeMessage('password=a token=b')).toBe(
-        'password=[REDACTED] token=[REDACTED]'
-      );
+      expect(sanitizeMessage('password=a token=b')).toBe('password=[REDACTED] token=[REDACTED]');
     });
 
     it('stops secret redaction at semicolons', () => {

@@ -7,6 +7,55 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Follow-up security audit of v2.6.3 (see `SECURITY-AUDIT.md`): 24 findings remediated
+(1 critical, 3 high, 8 medium, plus low/info), with real-database verification of the
+streaming and timeout work.
+
+### Security
+- Fixed a **critical** SELECT-only bypass on PostgreSQL: the validator stripped `#` line
+  comments for all engines (a MySQL-only rule), hiding a stacked `; DROP …` that pg's simple
+  query protocol then executed. `#` is now only treated as a comment for MySQL/MariaDB.
+- Blocked additional MSSQL write/admin statement verbs (`UPDATETEXT`, `WRITETEXT`, `DBCC`,
+  `KILL`, `RECONFIGURE`, `CHECKPOINT`, `SHUTDOWN`, `WAITFOR`, `OPENROWSET`, …) that could ride
+  after a leading `SELECT` via T-SQL's optional semicolons.
+- Schema/connection tools (`sql_test_connection`, `sql_get_schema`, `sql_refresh_schema`,
+  `sql_list_databases`) now sanitize driver errors before returning them, so DB usernames and
+  internal host/IP details no longer reach the client.
+- Field redaction resolves aliased/expression columns to their source column, so
+  `SELECT ssn AS x` can no longer bypass a redaction rule; `sql_get_config` no longer discloses
+  the redaction ruleset.
+- Error sanitizer now masks email addresses, internal `host:port`, and DB usernames.
+- Standalone `ANALYZE` is no longer allowed on PostgreSQL in SELECT-only mode.
+- SELECT-only SQLite databases are opened read-only; an optional `SQL_MCP_SQLITE_BASE_DIR`
+  rooted allowlist constrains model-supplied file/key paths.
+- `ssl_verify=false` is rejected from the MCP config tools (disabling TLS verification requires
+  a manual `config.ini` edit).
+- Hardened logging: log/audit files created `0600` (and tightened on pre-existing files),
+  tool-call query text/params and secret-shaped strings scrubbed before writing.
+- Config-mutating MCP tools are serialized with a mutex; `config.ini` is written atomically
+  via a unique temp filename.
+- Removed the stray `peerDependencies.node` entry that caused npm to install a userland `node`
+  package with a network-fetching preinstall script.
+
+### Added
+- Server-side statement timeouts: MySQL sets `SET SESSION max_execution_time`
+  (`max_statement_time` fallback on MariaDB); SQLite calls `db.interrupt()` on the query
+  timeout to abort a runaway statement instead of only abandoning it client-side.
+- Pre-materialization row bounding: MySQL and SQLite stream results and retain only `max_rows`,
+  so a large result set no longer fully materializes in the Node heap; the true `rowCount` and
+  a `truncated` flag are still reported.
+- Live-database integration tests (`tests/integration/live-adapters.test.ts`, env-gated) and a
+  real-DB SQLite verification script (`scripts/verify-sqlite-streaming.cjs`).
+
+### Fixed
+- **SQLite and MSSQL adapters crashed on connect under the ESM build** — `sqlite3`/`mssql` are
+  CommonJS modules whose value exports (`Database`, `ConnectionPool`) are reachable only via
+  `.default` under Node ESM, so `import * as x; x.Foo` was `undefined`. Two of the four database
+  backends were non-functional in the production build; fixed by resolving the CJS `.default`.
+- MSSQL positional-placeholder (`?` → `@paramN`) conversion now correctly handles `''`/`""`
+  escaped quotes and `[…]` bracket identifiers, so a literal `?` inside a string/identifier no
+  longer shifts parameter numbering.
+
 ## [2.6.3] - 2026-07-04
 
 ### Changed

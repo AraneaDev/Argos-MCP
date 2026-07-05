@@ -28,8 +28,16 @@ export class SQLiteAdapter extends DatabaseAdapter {
 
     const file = this.config.file as string;
 
+    // Fail secure: for SELECT-only databases, open READONLY. This prevents the default
+    // OPEN_READWRITE|OPEN_CREATE behaviour from (a) creating a new database file at an
+    // attacker-supplied path and (b) writing to an existing file (see FIND-110). Non
+    // SELECT-only databases keep the default read/write/create mode.
+    const mode = this.config.select_only
+      ? sqlite3.OPEN_READONLY
+      : sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE;
+
     return new Promise<DatabaseConnection>((resolve, reject) => {
-      const db = new Database(file, (err) => {
+      const db = new Database(file, mode, (err) => {
         if (err) {
           reject(this.createError('Failed to connect to SQLite database', err));
         } else {
@@ -84,7 +92,7 @@ export class SQLiteAdapter extends DatabaseAdapter {
         if (err) {
           reject(this.createError('Failed to execute SQLite query', err));
         } else {
-          const result = this.normalizeQueryResult({ rows }, startTime);
+          const result = this.normalizeQueryResult({ rows }, startTime, undefined, query);
           resolve(result);
         }
       });

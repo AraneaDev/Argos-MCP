@@ -354,6 +354,23 @@ describe('schema-handlers', () => {
       expect(result.content[0].text).toContain('Connection lost');
     });
 
+    it('sanitizes sensitive driver errors before returning to the client (FIND-103)', async () => {
+      const ctx = createMockContext({
+        testdb: { type: 'postgresql', host: 'localhost', select_only: true } as DatabaseConfig,
+      });
+      // A driver error carrying credentials in a connection string must not reach the LLM.
+      (ctx.connectionManager.getConnection as jest.Mock).mockRejectedValue(
+        new Error('connection failed: postgresql://admin:s3cr3tP4ss@10.0.0.5:5432/prod')
+      );
+
+      const result = await handleTestConnection(ctx, { database: 'testdb' });
+
+      expect(result.isError).toBe(true);
+      expect(result.content[0].text).toContain('Connection test failed');
+      expect(result.content[0].text).not.toContain('s3cr3tP4ss');
+      expect(result.content[0].text).toContain('<connection_string>');
+    });
+
     it('should succeed even when schema capture fails', async () => {
       const ctx = createMockContext({
         testdb: { type: 'mysql', host: 'localhost', select_only: false } as DatabaseConfig,

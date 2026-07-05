@@ -181,8 +181,9 @@ export function getToolDefinitions() {
           ssl: { type: 'boolean', description: 'Enable SSL', default: false },
           ssl_verify: {
             type: 'boolean',
-            description: 'Verify SSL certificates (set true for CA-signed certs)',
-            default: false,
+            description:
+              'Verify SSL certificates. Defaults to true when SSL is enabled. Cannot be set to false via MCP (disabling verification requires a manual config.ini edit).',
+            default: true,
           },
           select_only: {
             type: 'boolean',

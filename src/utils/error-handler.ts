@@ -464,7 +464,8 @@ export class ErrorHandler {
     const errorInfo = this.handleError(error, context);
 
     let message = ` **Error**: ${errorInfo.userMessage}\n`;
-    message += ` **Details**: ${errorInfo.technicalMessage}\n`;
+    // Sanitize the technical detail — it may carry raw driver text (FIND-119).
+    message += ` **Details**: ${sanitizeMessage(errorInfo.technicalMessage)}\n`;
 
     if (errorInfo.troubleshooting && errorInfo.troubleshooting.length > 0) {
       message += `\n **Troubleshooting:**\n`;
@@ -488,7 +489,8 @@ export class ErrorHandler {
 
     let message = ` **${toolName} Failed**\n\n`;
     message += ` **Error**: ${errorInfo.userMessage}\n`;
-    message += ` **Details**: ${errorInfo.technicalMessage}\n`;
+    // Sanitize the technical detail — it may carry raw driver text (FIND-119).
+    message += ` **Details**: ${sanitizeMessage(errorInfo.technicalMessage)}\n`;
 
     if (errorInfo.troubleshooting && errorInfo.troubleshooting.length > 0) {
       message += `\n **Troubleshooting Steps:**\n`;
@@ -562,6 +564,21 @@ export function sanitizeMessage(message: string): string {
   // Remove potential connection strings
   message = message.replace(/[a-zA-Z0-9]+:\/\/[^\s]+/g, '<connection_string>');
 
+  // Mask email addresses (PII commonly surfaced in unique-constraint violations, e.g.
+  // `Key (email)=(jane@corp.com) already exists`).
+  message = message.replace(/\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b/g, '<email>');
+
+  // Mask database usernames disclosed in driver auth errors
+  // (`for user "readonly_user"`, `user 'root'@'10.0.0.5'`).
+  message = message.replace(/\b(for\s+user|user)\s+["']([^"']+)["']/gi, '$1 <user>');
+
+  // Mask bare host:port / IPv4:port tokens that leak internal network topology
+  // (`ECONNREFUSED 10.0.0.5:5432`, `connect ETIMEDOUT db.internal.corp:3306`).
+  message = message.replace(
+    /\b(?:\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}|[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+):\d{2,5}\b/g,
+    '<host:port>'
+  );
+
   // Remove file paths that might contain sensitive info
   message = message.replace(/[C-Z]:\\[^\s,;]+/gi, '<file_path>');
   message = message.replace(/(?<![a-zA-Z0-9._-])(?:\/[a-zA-Z0-9._-]+){2,}/g, '<file_path>');
@@ -607,7 +624,9 @@ export function createErrorResponse(
   isError: boolean;
   _meta: { progressToken: null };
 } {
-  const errorMessage = error instanceof Error ? error.message : String(error);
+  // Sanitize before surfacing — this helper builds client-facing text from a raw error
+  // message and must not leak driver detail if it is ever wired into a response (FIND-119).
+  const errorMessage = sanitizeMessage(error instanceof Error ? error.message : String(error));
   const troubleshooting = [
     '**Troubleshooting:**',
     '- Check that all required parameters are provided',

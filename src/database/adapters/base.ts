@@ -218,7 +218,8 @@ export abstract class DatabaseAdapter {
   protected normalizeQueryResult(
     rawResult: unknown,
     startTime: number,
-    maxRows?: number
+    maxRows?: number,
+    query?: string
   ): QueryResult {
     const executionTime = Date.now() - startTime;
     const cap = maxRows ?? this.getMaxRows();
@@ -241,7 +242,7 @@ export abstract class DatabaseAdapter {
 
     // Apply redaction if configured
     if (this.redactionManager) {
-      const redactedResult = this.redactionManager.redactResults(baseResult);
+      const redactedResult = this.redactionManager.redactResults(baseResult, query);
       return redactedResult;
     }
 

@@ -739,7 +739,9 @@ export function saveConfigFile(config: ParsedServerConfig, configPath?: string):
   // Write atomically (temp file + rename) so a concurrent or interrupted save cannot
   // leave a truncated/corrupt config.ini. 0o600: the file holds plaintext DB/SSH
   // credentials — restrict to the owner only.
-  const tempPath = `${path}.tmp`;
+  // Unique temp filename so overlapping/concurrent saves (or a second process) cannot
+  // collide on a shared `${path}.tmp` and corrupt each other (FIND-117).
+  const tempPath = `${path}.${process.pid}.${Date.now()}.tmp`;
   writeFileSync(tempPath, iniString, { encoding: 'utf-8', mode: 0o600 });
   renameSync(tempPath, path);
 }

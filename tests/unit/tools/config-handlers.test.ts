@@ -498,20 +498,31 @@ describe('config-handlers', () => {
       expect(result.content[0].text).not.toContain('mypass');
     });
 
-    it('should format redaction object as JSON', async () => {
+    it('reports redaction status without disclosing the ruleset (FIND-105)', async () => {
       const ctx = createMockContext({
         mydb: {
           type: 'mysql',
           host: 'localhost',
           mcp_configurable: true,
           select_only: true,
-          redaction: { patterns: ['email'] },
+          redaction: {
+            enabled: true,
+            rules: [{ field_pattern: 'ssn', pattern_type: 'exact', redaction_type: 'full_mask' }],
+          },
         } as unknown as DatabaseConfig,
       });
 
       const result = await handleGetConfig(ctx, 'mydb');
+      const text = result.content[0].text;
 
-      expect(result.content[0].text).toContain('redaction');
+      // Status + count are shown, but the actual protected column names must NOT be —
+      // disclosing them would let the model alias around redaction (see FIND-104).
+      expect(text).toContain('redaction');
+      expect(text).toContain('enabled');
+      expect(text).toContain('1 rule');
+      expect(text).toContain('details hidden');
+      expect(text).not.toContain('ssn');
+      expect(text).not.toContain('field_pattern');
     });
 
     it('should omit undefined values from output', async () => {

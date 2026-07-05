@@ -11,7 +11,7 @@ import type {
   DatabaseListItem,
 } from '../../types/index.js';
 import { formatDatabaseSummary, createToolResponse } from '../../utils/response-formatter.js';
-import { getErrorMessage, ConnectionError } from '../../utils/error-handler.js';
+import { getErrorMessage, sanitizeError, ConnectionError } from '../../utils/error-handler.js';
 import type { ToolHandlerContext } from './types.js';
 import { requireDbConfig } from './types.js';
 
@@ -33,7 +33,7 @@ export async function handleGetSchema(
 
     return createToolResponse(schemaText);
   } catch (error) {
-    const errorMessage = getErrorMessage(error);
+    const errorMessage = sanitizeError(error);
     return createToolResponse(` Failed to get schema for ${database}: ${errorMessage}`, true);
   }
 }
@@ -66,7 +66,7 @@ export async function handleRefreshSchema(
       ` Schema refreshed for ${database}\n Captured: ${schema.summary.table_count} tables, ${schema.summary.total_columns} columns`
     );
   } catch (error) {
-    const errorMessage = getErrorMessage(error);
+    const errorMessage = sanitizeError(error);
     return createToolResponse(` Failed to refresh schema for ${database}: ${errorMessage}`, true);
   }
 }
@@ -116,7 +116,7 @@ export async function handleListDatabases(ctx: ToolHandlerContext): Promise<MCPT
 
     return createToolResponse(responseText);
   } catch (error) {
-    const errorMessage = getErrorMessage(error);
+    const errorMessage = sanitizeError(error);
     return createToolResponse(` Failed to list databases: ${errorMessage}`, true);
   }
 }
@@ -160,7 +160,7 @@ export async function handleTestConnection(
 
     return createToolResponse(responseText);
   } catch (error) {
-    const errorMessage = getErrorMessage(error);
+    const errorMessage = sanitizeError(error);
     return createToolResponse(` Connection test failed for ${database}: ${errorMessage}`, true);
   }
 }

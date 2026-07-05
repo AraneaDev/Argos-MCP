@@ -190,6 +190,38 @@ describe('RedactionManager', () => {
       expect(result.rows).toEqual([]);
     });
 
+    it('redacts aliased/expression-wrapped protected columns via the query (FIND-104)', () => {
+      const queryResult: QueryResult = {
+        rows: [{ x: '123-45-6789', c: '111-22-3333' }],
+        rowCount: 1,
+        fields: ['x', 'c'],
+        truncated: false,
+        execution_time_ms: 10,
+      };
+      // Neither output field name ('x','c') matches a rule, but both source expressions
+      // reference the protected 'ssn' column — so redaction must still apply.
+      const result = redactionManager.redactResults(
+        queryResult,
+        'SELECT ssn AS x, substr(ssn,1,9) AS c FROM users'
+      );
+      expect(result.rows[0].x).toBe('[SSN_REDACTED]');
+      expect(result.rows[0].c).toBe('[SSN_REDACTED]');
+      expect(result.redaction?.fields_redacted).toEqual(expect.arrayContaining(['x', 'c']));
+    });
+
+    it('does not over-redact aliases of non-sensitive columns (FIND-104)', () => {
+      const queryResult: QueryResult = {
+        rows: [{ y: 'hello' }],
+        rowCount: 1,
+        fields: ['y'],
+        truncated: false,
+        execution_time_ms: 10,
+      };
+      const result = redactionManager.redactResults(queryResult, 'SELECT name AS y FROM users');
+      expect(result.rows[0].y).toBe('hello');
+      expect(result.redaction).toBeUndefined();
+    });
+
     it('should preserve null and undefined values', () => {
       const queryResult: QueryResult = {
         rows: [

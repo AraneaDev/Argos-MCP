@@ -106,7 +106,7 @@ export class MSSQLAdapter extends DatabaseAdapter {
       const processedQuery = this.replacePlaceholders(query);
 
       const result = await request.query(processedQuery);
-      return this.normalizeQueryResult(result, startTime);
+      return this.normalizeQueryResult(result, startTime, undefined, query);
     } catch (error) {
       throw this.createError('Failed to execute SQL Server query', error as Error);
     }
@@ -121,16 +121,63 @@ export class MSSQLAdapter extends DatabaseAdapter {
     let paramIndex = 0;
     let inSingle = false;
     let inDouble = false;
+    let inBracket = false;
 
     for (let i = 0; i < query.length; i++) {
       const ch = query[i];
-      if (ch === "'" && !inDouble) {
-        inSingle = !inSingle;
-      } else if (ch === '"' && !inSingle) {
-        inDouble = !inDouble;
+      const next = query[i + 1];
+
+      // Inside a single-quoted string literal: '' is an escaped quote (stays in string).
+      if (inSingle) {
+        out += ch;
+        if (ch === "'") {
+          if (next === "'") {
+            out += next;
+            i++;
+          } else {
+            inSingle = false;
+          }
+        }
+        continue;
+      }
+      // Inside a double-quoted identifier: "" is an escaped quote.
+      if (inDouble) {
+        out += ch;
+        if (ch === '"') {
+          if (next === '"') {
+            out += next;
+            i++;
+          } else {
+            inDouble = false;
+          }
+        }
+        continue;
+      }
+      // Inside a [bracketed identifier]: ]] is an escaped bracket.
+      if (inBracket) {
+        out += ch;
+        if (ch === ']') {
+          if (next === ']') {
+            out += next;
+            i++;
+          } else {
+            inBracket = false;
+          }
+        }
+        continue;
       }
 
-      if (ch === '?' && !inSingle && !inDouble) {
+      // Not inside any quoted/bracketed context.
+      if (ch === "'") {
+        inSingle = true;
+        out += ch;
+      } else if (ch === '"') {
+        inDouble = true;
+        out += ch;
+      } else if (ch === '[') {
+        inBracket = true;
+        out += ch;
+      } else if (ch === '?') {
         out += `@param${paramIndex++}`;
       } else {
         out += ch;

@@ -77,9 +77,43 @@ export class MySQLAdapter extends DatabaseAdapter {
     this.validateConfig(['host', 'database', 'username', 'password']);
     try {
       const conn: MySQLPoolConnection = await this.getPool().getConnection();
+      await this.applyStatementTimeout(conn);
       return conn as DatabaseConnection;
     } catch (error) {
       throw this.createError('Failed to acquire MySQL connection from pool', error as Error);
+    }
+  }
+
+  /**
+   * Resolve the per-statement timeout (ms) from config, defaulting to 30s.
+   */
+  private getStatementTimeoutMs(): number {
+    const raw = this.config.query_timeout ?? this.config.timeout;
+    const n = typeof raw === 'number' ? raw : parseInt(String(raw ?? ''), 10);
+    return Number.isFinite(n) && n > 0 ? n : 30000;
+  }
+
+  /**
+   * Enforce a server-side statement timeout so a runaway query is cancelled by the DB
+   * itself, not just by the client-side race (FIND-108). MySQL 5.7.8+ uses
+   * `max_execution_time` (ms, SELECT statements); MariaDB uses `max_statement_time` (s).
+   * Best-effort: a server supporting neither falls back to the client-side timeout.
+   * @param conn - a freshly acquired pool connection
+   */
+  private async applyStatementTimeout(conn: MySQLPoolConnection): Promise<void> {
+    const timeoutMs = this.getStatementTimeoutMs();
+    if (timeoutMs <= 0) return;
+    const runner = conn as unknown as {
+      query: (sql: string, values?: unknown[]) => Promise<unknown>;
+    };
+    try {
+      await runner.query('SET SESSION max_execution_time = ?', [timeoutMs]);
+    } catch {
+      try {
+        await runner.query('SET SESSION max_statement_time = ?', [Math.ceil(timeoutMs / 1000)]);
+      } catch {
+        /* server supports neither — rely on the client-side timeout in ConnectionManager */
+      }
     }
   }
 
@@ -131,7 +165,7 @@ export class MySQLAdapter extends DatabaseAdapter {
         (params ?? []) as (string | number | boolean | null)[]
       );
 
-      return this.normalizeQueryResult({ rows, fields }, startTime);
+      return this.normalizeQueryResult({ rows, fields }, startTime, undefined, query);
     } catch (error) {
       throw this.createError('Failed to execute MySQL query', error as Error);
     }

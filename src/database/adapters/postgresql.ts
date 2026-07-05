@@ -117,7 +117,7 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
       const pgClient = connection as PgClient;
       const result = await pgClient.query(query, params);
 
-      return this.normalizeQueryResult(result, startTime);
+      return this.normalizeQueryResult(result, startTime, undefined, query);
     } catch (error) {
       throw this.createError('Failed to execute PostgreSQL query', error as Error);
     }

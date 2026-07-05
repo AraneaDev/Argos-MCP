@@ -21,8 +21,10 @@ export async function writeAuditLog(
   outcome: 'success' | string
 ): Promise<void> {
   const dir = join(homedir(), '.sql-ts', 'audit');
-  await mkdir(dir, { recursive: true });
+  // Owner-only dir/file (FIND-114): the audit log holds query metadata/timing. It carries no
+  // secrets or plaintext SQL, but keep it consistent with the rest of the 0600 hardening.
+  await mkdir(dir, { recursive: true, mode: 0o700 });
   const ts = new Date().toISOString();
   const line = `${ts}  ${dbName}  ${hashQuery(sql)}  ${durationMs}ms  ${outcome}\n`;
-  await appendFile(join(dir, `${dbName}.log`), line, 'utf8');
+  await appendFile(join(dir, `${dbName}.log`), line, { encoding: 'utf8', mode: 0o600 });
 }

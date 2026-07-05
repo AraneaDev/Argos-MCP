@@ -27,9 +27,12 @@ const mockDatabase = {
   open: true,
 };
 
-// Mock the 'sqlite3' module
+// Mock the 'sqlite3' module (OPEN_* constants mirror the real numeric flags)
 jest.mock('sqlite3', () => ({
   Database: jest.fn(),
+  OPEN_READONLY: 1,
+  OPEN_READWRITE: 2,
+  OPEN_CREATE: 4,
 }));
 
 import * as sqlite3 from 'sqlite3';
@@ -107,7 +110,13 @@ describe('SQLiteAdapter', () => {
     it('should connect to SQLite database successfully', async () => {
       const connection = await adapter.connect();
 
-      expect(mockSqlite3Database).toHaveBeenCalledWith('/tmp/test.db', expect.any(Function));
+      // Now called with an explicit open mode (FIND-110): readwrite/create for non
+      // SELECT-only DBs, readonly for SELECT-only.
+      expect(mockSqlite3Database).toHaveBeenCalledWith(
+        '/tmp/test.db',
+        expect.any(Number),
+        expect.any(Function)
+      );
       expect(connection).toBe(mockDatabase);
     });
 
@@ -141,7 +150,29 @@ describe('SQLiteAdapter', () => {
 
       await memoryAdapter.connect();
 
-      expect(mockSqlite3Database).toHaveBeenCalledWith(':memory:', expect.any(Function));
+      expect(mockSqlite3Database).toHaveBeenCalledWith(
+        ':memory:',
+        expect.any(Number),
+        expect.any(Function)
+      );
+    });
+
+    it('opens SELECT-only databases READONLY, others READWRITE|CREATE (FIND-110)', async () => {
+      const roAdapter = new SQLiteAdapter({ ...config, select_only: true });
+      await roAdapter.connect();
+      expect((mockSqlite3Database as any).mock.calls[0][1]).toBe(sqlite3.OPEN_READONLY);
+
+      jest.clearAllMocks();
+      (mockSqlite3Database as any).mockImplementation((...args: any[]) => {
+        const cb = args.find((a) => typeof a === 'function');
+        if (cb) process.nextTick(() => cb(null));
+        return mockDatabase;
+      });
+      const rwAdapter = new SQLiteAdapter({ ...config, select_only: false });
+      await rwAdapter.connect();
+      expect((mockSqlite3Database as any).mock.calls[0][1]).toBe(
+        sqlite3.OPEN_READWRITE | sqlite3.OPEN_CREATE
+      );
     });
   });
 

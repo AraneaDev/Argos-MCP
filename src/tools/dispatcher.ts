@@ -37,6 +37,21 @@ export type ToolDispatchFn = (
   args: Record<string, unknown>
 ) => Promise<MCPToolResponse>;
 
+// Serialize config-mutating tool calls (add/update/remove/set_mcp_configurable). Each does a
+// read-modify-write of the shared config object and config.ini; running them one-at-a-time
+// prevents interleaving from corrupting the registry or the file (FIND-117). Read-only tools
+// are unaffected.
+let configMutationChain: Promise<unknown> = Promise.resolve();
+function withConfigLock<T>(fn: () => Promise<T>): Promise<T> {
+  const run = configMutationChain.then(fn, fn);
+  // Keep the chain alive regardless of success/failure of the prior mutation.
+  configMutationChain = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
+}
+
 /**
  *
  */
@@ -95,19 +110,19 @@ export function createToolDispatcher(ctx: ToolHandlerContext): ToolDispatchFn {
         if (!args.name || !args.type) {
           throw new ValidationError("Missing required arguments: 'name' and 'type' are required");
         }
-        return handleAddDatabase(ctx, args);
+        return withConfigLock(() => handleAddDatabase(ctx, args));
 
       case 'sql_update_database':
         if (!args.database) {
           throw new ValidationError("Missing required argument: 'database' is required");
         }
-        return handleUpdateDatabase(ctx, args);
+        return withConfigLock(() => handleUpdateDatabase(ctx, args));
 
       case 'sql_remove_database':
         if (!args.database) {
           throw new ValidationError("Missing required argument: 'database' is required");
         }
-        return handleRemoveDatabase(ctx, args.database as string);
+        return withConfigLock(() => handleRemoveDatabase(ctx, args.database as string));
 
       case 'sql_get_config':
         if (!args.database) {
@@ -121,7 +136,9 @@ export function createToolDispatcher(ctx: ToolHandlerContext): ToolDispatchFn {
             "Missing required arguments: 'database' and 'enabled' are required"
           );
         }
-        return handleSetMcpConfigurable(ctx, args.database as string, args.enabled as boolean);
+        return withConfigLock(() =>
+          handleSetMcpConfigurable(ctx, args.database as string, args.enabled as boolean)
+        );
 
       case 'sql_get_metrics':
         return handleGetMetrics(args as { database?: string }, ctx);

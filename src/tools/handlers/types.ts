@@ -7,7 +7,7 @@ import type { SecurityManager } from '../../classes/SecurityManager.js';
 import type { SchemaManager } from '../../classes/SchemaManager.js';
 import type { EnhancedSSHTunnelManager } from '../../classes/EnhancedSSHTunnelManager.js';
 import type { MetricsManager } from '../../classes/MetricsManager.js';
-import type { ParsedServerConfig, MCPToolResponse, DatabaseConfig } from '../../types/index.js';
+import type { ParsedServerConfig, DatabaseConfig } from '../../types/index.js';
 import type { Logger } from '../../utils/logger.js';
 import { ConfigurationError } from '../../utils/error-handler.js';
 

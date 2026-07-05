@@ -4,7 +4,7 @@
  * sql_get_config, sql_set_mcp_configurable
  */
 
-import { resolve } from 'node:path';
+import { resolve, sep } from 'node:path';
 import type { DatabaseConfig, DatabaseTypeString, MCPToolResponse } from '../../types/index.js';
 import { DEFAULT_DATABASE_PORTS } from '../../types/index.js';
 import { saveConfigFile, validateDatabaseConfig } from '../../utils/config.js';
@@ -26,6 +26,23 @@ function validatePathNoTraversal(filePath: string, fieldName: string): void {
       `${fieldName} path '${resolved}' is not allowed — must be a regular file path`,
       fieldName
     );
+  }
+
+  // Opt-in allowlist (FIND-110): when SQL_MCP_SQLITE_BASE_DIR is configured, model-supplied
+  // file/key paths must resolve INSIDE that directory. The prefix denylist above is only a
+  // weak backstop; a rooted allowlist is the robust control against opening/creating files
+  // anywhere on the host. Operators editing config.ini directly are unaffected — this guards
+  // only the MCP add/update tool paths.
+  const baseDir = process.env.SQL_MCP_SQLITE_BASE_DIR;
+  if (baseDir) {
+    const root = resolve(baseDir);
+    const withinRoot = resolved === root || resolved.startsWith(root + sep);
+    if (!withinRoot) {
+      throw new ValidationError(
+        `${fieldName} path '${resolved}' is outside the permitted base directory '${root}'.`,
+        fieldName
+      );
+    }
   }
 }
 
@@ -88,6 +105,15 @@ export async function handleAddDatabase(
     dbConfig.password = args.password as string;
     dbConfig.ssl = (args.ssl as boolean) || false;
     if (args.ssl_verify !== undefined) {
+      // Fail secure: the model must not be able to DISABLE TLS certificate verification
+      // (that would enable MITM). Disabling requires a manual config.ini edit.
+      if (args.ssl_verify === false) {
+        throw new ValidationError(
+          'ssl_verify cannot be set to false via MCP tools (it would disable TLS certificate ' +
+            'verification and enable MITM). To disable verification, edit config.ini manually.',
+          'ssl_verify'
+        );
+      }
       dbConfig.ssl_verify = args.ssl_verify as boolean;
     }
     dbConfig.timeout = 30000;
@@ -176,6 +202,13 @@ export async function handleUpdateDatabase(
     updated.push('ssl');
   }
   if (args.ssl_verify !== undefined) {
+    if (args.ssl_verify === false) {
+      throw new ValidationError(
+        'ssl_verify cannot be set to false via MCP tools (it would disable TLS certificate ' +
+          'verification and enable MITM). To disable verification, edit config.ini manually.',
+        'ssl_verify'
+      );
+    }
     dbConfig.ssl_verify = args.ssl_verify as boolean;
     updated.push('ssl_verify');
   }
@@ -287,17 +320,22 @@ export async function handleGetConfig(
   if (redactedConfig.ssh_private_key) redactedConfig.ssh_private_key = '***REDACTED***';
   if (redactedConfig.ssh_passphrase) redactedConfig.ssh_passphrase = '***REDACTED***';
 
+  // Do NOT disclose the redaction ruleset to the client: it is an exact map of which
+  // columns are protected, which an untrusted model could use to alias around them
+  // (see FIND-104/FIND-105). Report only whether redaction is enabled and a rule count.
+  if (redactedConfig.redaction && typeof redactedConfig.redaction === 'object') {
+    const r = redactedConfig.redaction as { enabled?: boolean; rules?: unknown[] };
+    const ruleCount = Array.isArray(r.rules) ? r.rules.length : 0;
+    redactedConfig.redaction = `${r.enabled ? 'enabled' : 'disabled'} (${ruleCount} rule(s) — details hidden)`;
+  }
+
   for (const key of Object.keys(redactedConfig)) {
     if (redactedConfig[key] === undefined) delete redactedConfig[key];
   }
 
   let responseText = ` Configuration for '${database}':\n\n`;
   for (const [key, value] of Object.entries(redactedConfig)) {
-    if (key === 'redaction' && typeof value === 'object') {
-      responseText += ` ${key}: ${JSON.stringify(value, null, 2)}\n`;
-    } else {
-      responseText += ` ${key}: ${value}\n`;
-    }
+    responseText += ` ${key}: ${value}\n`;
   }
   responseText += `\n MCP configurable: ${dbConfig.mcp_configurable ? 'yes' : 'no'}`;
 

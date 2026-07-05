@@ -1017,6 +1017,27 @@ describe('error-handler', () => {
       expect(sanitizeMessage('XBearer tok123')).toBe('XBearer tok123');
     });
 
+    // FIND-106: email PII, internal host:port, and DB usernames must be masked.
+    it('masks email addresses (e.g. Postgres unique-constraint PII)', () => {
+      expect(sanitizeMessage('Key (email)=(jane.doe@corp.com) already exists')).not.toContain(
+        'jane.doe@corp.com'
+      );
+      expect(sanitizeMessage('duplicate: alice@example.org')).toContain('<email>');
+    });
+
+    it('masks internal host:port and IPv4:port tokens', () => {
+      expect(sanitizeMessage('connect ECONNREFUSED 10.0.0.5:5432')).toBe(
+        'connect ECONNREFUSED <host:port>'
+      );
+      expect(sanitizeMessage('ETIMEDOUT db.internal.corp:3306')).toContain('<host:port>');
+    });
+
+    it('masks disclosed database usernames', () => {
+      expect(sanitizeMessage('password authentication failed for user "readonly_user"')).toBe(
+        'password authentication failed for user <user>'
+      );
+    });
+
     it.each([
       ['passwd=x1 y', 'passwd=[REDACTED] y'],
       ['key=x1 y', 'key=[REDACTED] y'],

@@ -120,6 +120,22 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
     'SET',
     'USE',
     'DECLARE',
+    // T-SQL statement verbs — semicolons are optional in T-SQL, so these can be chained
+    // after a leading SELECT with only whitespace. Blocking them anywhere in the token
+    // stream prevents `SELECT 1 UPDATETEXT ...` / `SELECT 1 DBCC ...` style bypasses.
+    'WRITETEXT',
+    'UPDATETEXT',
+    'DBCC',
+    'KILL',
+    'RECONFIGURE',
+    'CHECKPOINT',
+    'SHUTDOWN',
+    'DENY',
+    'WAITFOR',
+    'OPENROWSET',
+    'OPENQUERY',
+    'OPENDATASOURCE',
+    'BULK',
   ]);
 
   private readonly allowedKeywords = new Set<string>([
@@ -188,7 +204,10 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
 
   private readonly dbSpecificAllowed: Record<string, string[]> = {
     mysql: ['SHOW', 'DESCRIBE', 'DESC', 'EXPLAIN'],
-    postgresql: ['\\d', '\\dt', '\\l', 'EXPLAIN', 'ANALYZE'],
+    // Note: 'ANALYZE' is intentionally NOT allowed as a standalone lead command — it is a
+    // write/maintenance statement (locks + updates pg_statistic). `EXPLAIN ANALYZE` is
+    // handled and rejected explicitly in validateSelectOnlyQuery.
+    postgresql: ['\\d', '\\dt', '\\l', 'EXPLAIN'],
     mssql: ['sp_help', 'sp_columns', 'sp_tables'],
     sqlite: ['.schema', '.tables', '.indices'],
   };
@@ -282,7 +301,7 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
   /**
    * Validate any query (not just SELECT-only)
    */
-  validateAnyQuery(query: string, _dbType = 'mysql'): SecurityValidation {
+  validateAnyQuery(query: string, dbType = 'mysql'): SecurityValidation {
     if (!query || typeof query !== 'string') {
       return {
         allowed: false,
@@ -303,7 +322,7 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
     // Clean and normalize query
     let normalizedQuery: string;
     try {
-      normalizedQuery = this.normalizeQuery(query);
+      normalizedQuery = this.normalizeQuery(query, dbType);
     } catch (e) {
       return {
         allowed: false,
@@ -514,7 +533,7 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
   /**
    * Validate a single SELECT-only query with enhanced feedback
    */
-  validateSelectOnlyQuery(query: string, _dbType = 'mysql'): SecurityValidation {
+  validateSelectOnlyQuery(query: string, dbType = 'mysql'): SecurityValidation {
     if (!query || typeof query !== 'string') {
       return {
         allowed: false,
@@ -535,7 +554,7 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
     // Clean and normalize query
     let normalizedQuery: string;
     try {
-      normalizedQuery = this.normalizeQuery(query);
+      normalizedQuery = this.normalizeQuery(query, dbType);
     } catch (e) {
       return {
         allowed: false,
@@ -580,7 +599,7 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
     }
 
     const command = firstToken.value.toUpperCase();
-    const dbAllowed = this.dbSpecificAllowed[_dbType] || [];
+    const dbAllowed = this.dbSpecificAllowed[dbType] || [];
 
     // Check if command is explicitly blocked
     if (this.blockedKeywords.has(command)) {
@@ -1035,7 +1054,7 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
     return 'CRITICAL';
   }
 
-  private normalizeQuery(query: string): string {
+  private normalizeQuery(query: string, dbType = 'mysql'): string {
     // Block MySQL version-conditional comments that execute as SQL
     if (/\/\*!/.test(query)) {
       throw new Error(
@@ -1043,10 +1062,20 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
       );
     }
 
-    return query
+    let normalized = query
       .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
-      .replace(/--[^\r\n]*/g, '') // Remove -- comments
-      .replace(/#[^\r\n]*/g, '') // Remove # comments (MySQL)
+      .replace(/--[^\r\n]*/g, ''); // Remove -- comments
+
+    // '#' begins a line comment ONLY in MySQL/MariaDB. In PostgreSQL (and others) '#' is
+    // a valid operator (integer bitwise XOR, geometric ops), so stripping '#'-to-EOL there
+    // would delete a stacked '; DROP ...' from the validator's view while the pg simple
+    // query protocol still executes it — a full SELECT-only bypass. Only strip for MySQL.
+    const t = (dbType || '').toLowerCase();
+    if (t === 'mysql' || t === 'mariadb') {
+      normalized = normalized.replace(/#[^\r\n]*/g, ''); // Remove # comments (MySQL only)
+    }
+
+    return normalized
       .replace(/\s+/g, ' ') // Normalize whitespace
       .trim();
   }

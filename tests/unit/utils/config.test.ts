@@ -886,13 +886,18 @@ describe('config', () => {
 
       saveConfigFile(config, '/test/config.ini');
 
-      // Atomic write: content goes to a temp file (0600) then is renamed into place.
+      // Atomic write: content goes to a unique temp file (0600) then is renamed into place.
+      // The temp name includes pid + timestamp to avoid collisions (FIND-117).
+      const tempPathRe = /^\/test\/config\.ini\.\d+\.\d+\.tmp$/;
       expect(mockFs.writeFileSync).toHaveBeenCalledWith(
-        '/test/config.ini.tmp',
+        expect.stringMatching(tempPathRe),
         expect.stringContaining('[database.mydb]'),
         { encoding: 'utf-8', mode: 0o600 }
       );
-      expect(mockFs.renameSync).toHaveBeenCalledWith('/test/config.ini.tmp', '/test/config.ini');
+      expect(mockFs.renameSync).toHaveBeenCalledWith(
+        expect.stringMatching(tempPathRe),
+        '/test/config.ini'
+      );
     });
 
     it('should write security section', () => {
@@ -1095,9 +1100,9 @@ describe('config', () => {
         { mode: 0o600 }
       );
 
-      // Verify INI content uses the key file path (config is written atomically to .tmp)
-      const written = (mockFs.writeFileSync as jest.Mock).mock.calls.find(
-        (call) => call[0] === '/test/config.ini.tmp'
+      // Verify INI content uses the key file path (config is written atomically to a unique .tmp)
+      const written = (mockFs.writeFileSync as jest.Mock).mock.calls.find((call) =>
+        /^\/test\/config\.ini\.\d+\.\d+\.tmp$/.test(call[0] as string)
       )[1] as string;
       expect(written).toContain('ssh_private_key=/test/keys/mydb_ssh_key');
       expect(written).not.toContain(privateKeyContent);

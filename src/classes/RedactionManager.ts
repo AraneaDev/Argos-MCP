@@ -198,9 +198,12 @@ export class RedactionManager {
   }
 
   /**
-   * Apply redaction rules to a query result
+   * Apply redaction rules to a query result.
+   * @param results - the query result to redact
+   * @param query - the executed SQL (optional); used to resolve aliased/expression columns
+   *   back to their source column so `SELECT ssn AS x` cannot bypass a rule keyed on `ssn`.
    */
-  redactResults(results: QueryResult): QueryResultWithRedaction {
+  redactResults(results: QueryResult, query?: string): QueryResultWithRedaction {
     if (!results.rows || results.rows.length === 0) {
       return results;
     }
@@ -212,9 +215,13 @@ export class RedactionManager {
       warnings: [],
     };
 
+    // Map any output alias whose source expression references a protected column to the
+    // matching rule, so aliasing/wrapping a redacted column still redacts the output.
+    const aliasedRules = this.computeAliasedRules(query);
+
     // Process each row
     const redactedRows = results.rows.map((row) =>
-      this.redactRow(row, results.fields, redactionResult)
+      this.redactRow(row, results.fields, redactionResult, aliasedRules)
     );
 
     // Remove duplicates from tracking arrays
@@ -238,17 +245,89 @@ export class RedactionManager {
   }
 
   /**
+   * Build a map of output-alias -> redaction rule for any top-level SELECT-list item whose
+   * source expression references a protected column. Defeats the `SELECT ssn AS x` /
+   * `SELECT substr(ssn,1,9) AS c` alias bypass (FIND-104). Best-effort regex parsing: it
+   * covers explicit `AS` aliases and expression aliases in the outer select list. It does
+   * NOT resolve columns renamed inside subqueries/CTEs — a documented residual limitation;
+   * database column-level GRANTs remain the robust control.
+   * @param query - the executed SQL (may be undefined)
+   * @returns map of aliased output field name to the rule that should redact it
+   */
+  private computeAliasedRules(query?: string): Map<string, FieldRedactionRule> {
+    const map = new Map<string, FieldRedactionRule>();
+    if (!query || typeof query !== 'string') return map;
+
+    // Isolate the top-level SELECT list (between the first SELECT and its FROM).
+    const m = query.match(/\bSELECT\b(?:\s+(?:ALL|DISTINCT))?([\s\S]*?)\bFROM\b/i);
+    if (!m || !m[1]) return map;
+
+    // Split the list on top-level commas (ignore commas nested inside parentheses).
+    const items: string[] = [];
+    let depth = 0;
+    let current = '';
+    for (const ch of m[1]) {
+      if (ch === '(') depth++;
+      else if (ch === ')') depth = Math.max(0, depth - 1);
+      if (ch === ',' && depth === 0) {
+        items.push(current);
+        current = '';
+      } else {
+        current += ch;
+      }
+    }
+    if (current.trim()) items.push(current);
+
+    for (const raw of items) {
+      const item = raw.trim();
+      if (!item || item === '*') continue;
+
+      let alias: string | undefined;
+      let source = item;
+      const asMatch = item.match(/^([\s\S]*?)\s+AS\s+["'`[]?([A-Za-z_]\w*)["'`\]]?\s*$/i);
+      if (asMatch) {
+        source = asMatch[1];
+        alias = asMatch[2];
+      } else {
+        // Bare alias only when the item is clearly an expression (operator/call/paren/dot)
+        // followed by a trailing identifier — avoids misreading a plain column name.
+        const bare = item.match(/^([\s\S]*[\s)])([A-Za-z_]\w*)$/);
+        if (bare && /[()+\-*/%.]|\bCASE\b|\bWHEN\b/i.test(bare[1])) {
+          source = bare[1];
+          alias = bare[2];
+        }
+      }
+      if (!alias) continue;
+
+      // If any identifier in the source expression matches a redaction rule, redact the alias.
+      const identifiers = source.match(/[A-Za-z_]\w*/g) || [];
+      for (const id of identifiers) {
+        const rule = this.shouldRedactField(id);
+        if (rule) {
+          map.set(alias, rule);
+          break;
+        }
+      }
+    }
+
+    return map;
+  }
+
+  /**
    * Apply redaction rules to a single row
    */
   private redactRow(
     row: Record<string, unknown>,
     fieldNames: string[],
-    redactionResult: RedactionResult
+    redactionResult: RedactionResult,
+    aliasedRules?: Map<string, FieldRedactionRule>
   ): Record<string, unknown> {
     const redactedRow = { ...row };
 
     for (const fieldName of fieldNames) {
-      const rule = this.shouldRedactField(fieldName);
+      // Match on the output field name, OR — when the query aliased/wrapped a protected
+      // source column under this output name — the rule resolved from that source (FIND-104).
+      const rule = this.shouldRedactField(fieldName) ?? aliasedRules?.get(fieldName) ?? null;
       if (rule && fieldName in row) {
         const originalValue = row[fieldName];
 

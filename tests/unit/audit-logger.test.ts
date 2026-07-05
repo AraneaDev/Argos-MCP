@@ -31,11 +31,12 @@ describe('writeAuditLog', () => {
     await writeAuditLog('mydb', 'SELECT 1', 42, 'success');
     expect(mkdir).toHaveBeenCalledWith(expect.stringContaining('.sql-ts/audit'), {
       recursive: true,
+      mode: 0o700,
     });
     expect(appendFile).toHaveBeenCalledWith(
       expect.stringContaining('mydb.log'),
       expect.stringContaining('success'),
-      'utf8'
+      { encoding: 'utf8', mode: 0o600 }
     );
   });
   it('log line contains timestamp, dbName, hash, duration, and outcome', async () => {

@@ -33,10 +33,29 @@ import { SecurityManager } from './SecurityManager.js';
 import { SchemaManager } from './SchemaManager.js';
 import { EnhancedSSHTunnelManager } from './EnhancedSSHTunnelManager.js';
 import { Logger } from '../utils/logger.js';
-import { getErrorMessage, sanitizeError } from '../utils/error-handler.js';
+import { getErrorMessage, sanitizeError, sanitizeMessage } from '../utils/error-handler.js';
 import { getToolDefinitions } from '../tools/tool-definitions.js';
 import { createToolDispatcher, type ToolDispatchFn } from '../tools/dispatcher.js';
 import type { ToolHandlerContext } from '../tools/handlers/types.js';
+
+/**
+ * Build a log-safe copy of tool-call arguments (FIND-116). Secret-named keys (password,
+ * ssh_*) are already redacted by the logger, but `query`/`queries`/`params` are not — they
+ * can carry inline PII or literal secrets. Scrub the SQL through the error sanitizer and
+ * replace bound params with a count so nothing sensitive is written to the log file.
+ * @param args - raw tool-call arguments
+ * @returns a shallow copy safe to log
+ */
+function safeToolArgs(args: unknown): unknown {
+  if (!args || typeof args !== 'object') return args;
+  const copy: Record<string, unknown> = { ...(args as Record<string, unknown>) };
+  if (typeof copy.query === 'string') copy.query = sanitizeMessage(copy.query);
+  if ('params' in copy) {
+    copy.params = Array.isArray(copy.params) ? `[${copy.params.length} param(s)]` : '[params]';
+  }
+  if (Array.isArray(copy.queries)) copy.queries = `[${copy.queries.length} query/queries]`;
+  return copy;
+}
 
 /**
  * Main SQL MCP Server class that coordinates all operations
@@ -342,7 +361,7 @@ export class SQLMCPServer extends EventEmitter {
 
     this.mcpServer.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
-      this.logger.info(`Handling tool call: ${name}`, { args });
+      this.logger.info(`Handling tool call: ${name}`, { args: safeToolArgs(args) });
 
       try {
         if (!args || typeof args !== 'object') {
@@ -361,7 +380,7 @@ export class SQLMCPServer extends EventEmitter {
           isError: result.isError || false,
         };
       } catch (error) {
-        this.logger.error(`Error in tool call ${name}`, { error, args });
+        this.logger.error(`Error in tool call ${name}`, { error, args: safeToolArgs(args) });
         const errorMessage = sanitizeError(error);
         const troubleshooting = [
           '**Troubleshooting:**',

@@ -1,10 +1,27 @@
 /**
  * Enhanced logging utilities for SQL MCP Server
  */
-import { createWriteStream, existsSync, unlinkSync, renameSync } from 'fs';
+import { createWriteStream, existsSync, unlinkSync, renameSync, chmodSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import type { WriteStream } from 'fs';
+
+/**
+ * Scrub only secret-shaped substrings from a log MESSAGE string (defense in depth,
+ * FIND-120). Unlike the error sanitizer, this deliberately leaves file paths / IPs / host
+ * names intact — those are legitimate operational detail in an owner-only (0600) log — and
+ * only removes PEM blocks, bearer tokens, and `key=value` secret pairs that must never be
+ * written even if accidentally interpolated into a message.
+ */
+function scrubSecretsFromMessage(message: string): string {
+  return message
+    .replace(/-----BEGIN [^-]+-----[\s\S]*?-----END [^-]+-----/g, '[REDACTED KEY]')
+    .replace(/\bBearer\s+[A-Za-z0-9._~+/-]+=*/gi, 'Bearer [REDACTED]')
+    .replace(
+      /(password|passwd|pwd|passphrase|token|secret|api[_-]?key|authorization|credentials?)\s*[=:]\s*[^\s,;]+/gi,
+      '$1=[REDACTED]'
+    );
+}
 
 const _currentFile = fileURLToPath(import.meta.url);
 const _currentDir = dirname(_currentFile);
@@ -252,7 +269,9 @@ export class Logger {
 
   private formatLogEntry(entry: LogEntry): string {
     const timestamp = this.formatTimestamp(entry.timestamp);
-    let formatted = `[${timestamp}] [${entry.level}] ${entry.message}`;
+    // Defense in depth (FIND-120): scrub secret/PII patterns from the message string too,
+    // not just the structured context — in case a secret is ever interpolated into a message.
+    let formatted = `[${timestamp}] [${entry.level}] ${scrubSecretsFromMessage(entry.message)}`;
 
     if (entry.context && Object.keys(entry.context).length > 0) {
       formatted += ` | Context: ${JSON.stringify(redactSecretsDeep(entry.context))}`;
@@ -329,6 +348,11 @@ export class Logger {
           /* ignore */
         }
         renameSync(this.config.logFile, previous);
+        try {
+          chmodSync(previous, 0o600);
+        } catch {
+          /* best effort */
+        }
       }
     } catch (error) {
       try {
@@ -363,6 +387,14 @@ export class Logger {
     try {
       // 0o600: the log can contain query text and connection context — owner-only.
       this.logStream = createWriteStream(this.config.logFile, { flags: 'a', mode: 0o600 });
+      // createWriteStream's `mode` only applies when the file is newly created. A log left
+      // world-readable (0644) by a pre-fix version or prior umask keeps its old perms on
+      // append, so explicitly tighten it (FIND-113).
+      try {
+        chmodSync(this.config.logFile, 0o600);
+      } catch {
+        /* best effort — file may not exist yet on some platforms */
+      }
       this.bytesWritten = 0;
 
       this.logStream.on('error', (error) => {

@@ -608,6 +608,14 @@ describe('SecurityManager', () => {
       ['stacked GRANT', 'SELECT 1; GRANT ALL ON DATABASE x TO evil'],
       ['pg_sleep DoS', 'SELECT * FROM t WHERE id = pg_sleep(10)'],
       ['pg_read_file exfiltration', "SELECT pg_read_file('/etc/passwd')"],
+      // FIND-101: '#' is a valid operator (not a comment) in PostgreSQL, so the validator
+      // must NOT strip '#'-to-EOL there — otherwise the stacked ';DROP' becomes invisible
+      // while pg's simple query protocol still executes it.
+      ['# hides stacked DROP (pg)', 'SELECT 1 # 2; DROP TABLE users'],
+      ['# hides stacked DELETE (pg)', 'SELECT id # 0; DELETE FROM users'],
+      ['# hides stacked COPY..PROGRAM (pg)', "SELECT 1 # 0; COPY (SELECT 1) TO PROGRAM 'id'"],
+      // FIND-107: standalone ANALYZE is a write/maintenance statement, not a read.
+      ['standalone ANALYZE (pg)', 'ANALYZE users'],
     ];
 
     test.each(cases)('blocks %s', (_label, query) => {
@@ -622,6 +630,36 @@ describe('SecurityManager', () => {
         'postgresql'
       );
       expect(result.allowed).toBe(true);
+    });
+
+    test('allows a legitimate SELECT using the # (XOR) operator on postgres', () => {
+      // Regression for FIND-101: '#' must be treated as an operator on pg, not stripped,
+      // and a single-statement query using it must still pass.
+      const result = securityManager.validateSelectOnlyQuery(
+        'SELECT id, flags # 4 AS toggled FROM widgets WHERE id = 1',
+        'postgresql'
+      );
+      expect(result.allowed).toBe(true);
+    });
+
+    // FIND-102: T-SQL makes statement-terminating semicolons optional, so write/admin verbs
+    // can be chained after a leading SELECT with only whitespace. They must be blocked by
+    // the embedded write-keyword scan regardless of the missing ';'.
+    const mssqlCases: Array<[string, string]> = [
+      ['semicolon-less UPDATETEXT', "SELECT 1 UPDATETEXT pub.pr_info @ptr 0 0 'x'"],
+      ['semicolon-less WRITETEXT', "SELECT 1 WRITETEXT pub.pr_info @ptr 'x'"],
+      ['semicolon-less DBCC', 'SELECT 1 DBCC FREEPROCCACHE'],
+      ['semicolon-less KILL', 'SELECT 1 KILL 55'],
+      ['semicolon-less CHECKPOINT', 'SELECT 1 CHECKPOINT'],
+      ['semicolon-less RECONFIGURE', 'SELECT 1 RECONFIGURE'],
+      ['semicolon-less SHUTDOWN', 'SELECT 1 SHUTDOWN'],
+      ['WAITFOR TIME hang', "SELECT 1 WAITFOR TIME '23:59:59'"],
+      ['OPENROWSET external read', "SELECT 1 OPENROWSET('SQLNCLI','','SELECT 1')"],
+    ];
+
+    test.each(mssqlCases)('blocks %s (mssql)', (_label, query) => {
+      const result = securityManager.validateSelectOnlyQuery(query, 'mssql');
+      expect(result.allowed).toBe(false);
     });
   });
 

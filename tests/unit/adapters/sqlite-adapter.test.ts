@@ -18,14 +18,32 @@ const mockAll = jest.fn();
 const mockRun = jest.fn();
 const mockGet = jest.fn();
 const mockClose = jest.fn();
+const mockEach = jest.fn();
+const mockInterrupt = jest.fn();
 
 const mockDatabase = {
   all: mockAll,
   run: mockRun,
   get: mockGet,
   close: mockClose,
+  each: mockEach,
+  interrupt: mockInterrupt,
   open: true,
 };
+
+// Helper: drive the db.each streaming callbacks (rowCallback per row, then completeCallback).
+function eachEmits(rows: unknown[] | null, err: Error | null = null) {
+  return (_sql: string, _params: unknown, rowCb: Function, completeCb: Function) => {
+    process.nextTick(() => {
+      if (err) {
+        completeCb(err);
+        return;
+      }
+      for (const r of rows ?? []) rowCb(null, r);
+      completeCb(null, (rows ?? []).length);
+    });
+  };
+}
 
 // Mock the 'sqlite3' module (OPEN_* constants mirror the real numeric flags)
 jest.mock('sqlite3', () => ({
@@ -72,6 +90,8 @@ describe('SQLiteAdapter', () => {
     mockAll.mockImplementation((query: string, params: any, callback: Function) => {
       process.nextTick(() => callback(null, [{ id: 1, name: 'test' }]));
     });
+
+    mockEach.mockImplementation(eachEmits([{ id: 1, name: 'test' }]));
 
     mockRun.mockImplementation((query: string, callbackOrParams: any, maybeCallback?: Function) => {
       const callback = typeof callbackOrParams === 'function' ? callbackOrParams : maybeCallback;
@@ -239,18 +259,21 @@ describe('SQLiteAdapter', () => {
       connection = await adapter.connect();
     });
 
-    it('should execute query successfully', async () => {
+    it('should execute query successfully (streamed via db.each)', async () => {
       const mockRows = [
         { id: 1, name: 'John' },
         { id: 2, name: 'Jane' },
       ];
-      mockAll.mockImplementation((query: string, params: any, callback: Function) => {
-        process.nextTick(() => callback(null, mockRows));
-      });
+      mockEach.mockImplementation(eachEmits(mockRows));
 
       const result = await adapter.executeQuery(connection, 'SELECT * FROM users');
 
-      expect(mockAll).toHaveBeenCalledWith('SELECT * FROM users', [], expect.any(Function));
+      expect(mockEach).toHaveBeenCalledWith(
+        'SELECT * FROM users',
+        [],
+        expect.any(Function),
+        expect.any(Function)
+      );
       expect(result.rows).toEqual(mockRows);
       expect(result.fields).toEqual(['id', 'name']);
       expect(result.rowCount).toBe(2);
@@ -259,25 +282,21 @@ describe('SQLiteAdapter', () => {
     });
 
     it('should execute query with parameters', async () => {
-      const mockRows = [{ id: 1, name: 'John' }];
-      mockAll.mockImplementation((query: string, params: any, callback: Function) => {
-        process.nextTick(() => callback(null, mockRows));
-      });
+      mockEach.mockImplementation(eachEmits([{ id: 1, name: 'John' }]));
 
       await adapter.executeQuery(connection, 'SELECT * FROM users WHERE id = ?', [1]);
 
-      expect(mockAll).toHaveBeenCalledWith(
+      expect(mockEach).toHaveBeenCalledWith(
         'SELECT * FROM users WHERE id = ?',
         [1],
+        expect.any(Function),
         expect.any(Function)
       );
     });
 
     it('should handle query execution errors', async () => {
       const queryError = new Error('Query execution failed');
-      mockAll.mockImplementation((query: string, params: any, callback: Function) => {
-        process.nextTick(() => callback(queryError, null));
-      });
+      mockEach.mockImplementation(eachEmits(null, queryError));
 
       await expect(adapter.executeQuery(connection, 'INVALID SQL')).rejects.toThrow(
         'sqlite adapter error: Failed to execute SQLite query - Query execution failed'
@@ -285,9 +304,7 @@ describe('SQLiteAdapter', () => {
     });
 
     it('should handle empty result sets', async () => {
-      mockAll.mockImplementation((query: string, params: any, callback: Function) => {
-        process.nextTick(() => callback(null, []));
-      });
+      mockEach.mockImplementation(eachEmits([]));
 
       const result = await adapter.executeQuery(connection, 'SELECT * FROM empty_table');
 
@@ -297,41 +314,48 @@ describe('SQLiteAdapter', () => {
       expect(result.truncated).toBe(false);
     });
 
-    it('should handle result truncation', async () => {
-      // Create mock result with more rows than the limit
+    it('bounds retained rows to max_rows but reports the true count (FIND-109)', async () => {
+      // More rows than max_rows (default 1000): the heap must hold only the cap.
       const largeRowSet = Array(1500)
         .fill(0)
         .map((_, i) => ({ id: i + 1, name: `User${i + 1}` }));
-      mockAll.mockImplementation((query: string, params: any, callback: Function) => {
-        process.nextTick(() => callback(null, largeRowSet));
-      });
+      mockEach.mockImplementation(eachEmits(largeRowSet));
 
       const result = await adapter.executeQuery(connection, 'SELECT * FROM large_table');
 
-      expect(result.rows).toHaveLength(1000); // Should be truncated to max_rows
-      expect(result.rowCount).toBe(1500); // Original count before truncation
+      expect(result.rows).toHaveLength(1000); // retained rows capped at max_rows
+      expect(result.rowCount).toBe(1500); // true observed count
       expect(result.truncated).toBe(true);
     });
 
     it('should extract field names from first row', async () => {
-      const mockRows = [{ user_id: 1, full_name: 'John', email: 'john@example.com' }];
-      mockAll.mockImplementation((query: string, params: any, callback: Function) => {
-        process.nextTick(() => callback(null, mockRows));
-      });
+      mockEach.mockImplementation(
+        eachEmits([{ user_id: 1, full_name: 'John', email: 'john@example.com' }])
+      );
 
       const result = await adapter.executeQuery(connection, 'SELECT * FROM users');
 
       expect(result.fields).toEqual(['user_id', 'full_name', 'email']);
     });
 
-    it('should handle null results gracefully', async () => {
-      mockAll.mockImplementation((query: string, params: any, callback: Function) => {
-        process.nextTick(() => callback(null, null));
+    it('interrupts a runaway query at the statement timeout (FIND-108)', async () => {
+      // Simulate a query that never completes: db.each emits nothing and never calls the
+      // completion callback, so only the statement-timeout can settle the promise.
+      mockEach.mockImplementation(() => {
+        /* never invokes any callback */
       });
+      const slowAdapter = new SQLiteAdapter({
+        type: 'sqlite',
+        file: '/tmp/test.db',
+        select_only: true,
+        query_timeout: 40,
+      } as unknown as DatabaseConfig);
+      const conn = await slowAdapter.connect();
 
-      const result = await adapter.executeQuery(connection, 'SELECT * FROM test');
-      expect(result.rows).toEqual([]);
-      expect(result.fields).toEqual([]);
+      await expect(slowAdapter.executeQuery(conn, 'SELECT * FROM huge')).rejects.toThrow(
+        /timed out after 40ms/i
+      );
+      expect(mockInterrupt).toHaveBeenCalled();
     });
   });
 
@@ -591,13 +615,11 @@ describe('SQLiteAdapter', () => {
   // ============================================================================
 
   describe('error handling and edge cases', () => {
-    it('should handle malformed query results gracefully', async () => {
+    it('should handle a query that yields no rows gracefully', async () => {
       const connection = await adapter.connect();
 
-      // Mock a result that's not an array
-      mockAll.mockImplementation((query: string, params: any, callback: Function) => {
-        process.nextTick(() => callback(null, 'not an array'));
-      });
+      // db.each emits no rows and completes cleanly.
+      mockEach.mockImplementation(eachEmits([]));
 
       const result = await adapter.executeQuery(connection, 'SELECT 1');
       expect(result.rows).toEqual([]);
@@ -607,9 +629,7 @@ describe('SQLiteAdapter', () => {
     it('should handle empty rows when extracting field names', async () => {
       const connection = await adapter.connect();
 
-      mockAll.mockImplementation((query: string, params: any, callback: Function) => {
-        process.nextTick(() => callback(null, []));
-      });
+      mockEach.mockImplementation(eachEmits([]));
 
       const result = await adapter.executeQuery(connection, 'SELECT * FROM empty_table');
       expect(result.fields).toEqual([]);

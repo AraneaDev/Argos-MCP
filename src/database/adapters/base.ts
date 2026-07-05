@@ -213,6 +213,48 @@ export abstract class DatabaseAdapter {
   }
 
   /**
+   * Resolve the per-statement timeout in ms from configuration (default 30000, 0 disables).
+   */
+  protected getStatementTimeoutMs(): number {
+    const raw = this.config.query_timeout ?? this.config.timeout;
+    const n = typeof raw === 'number' ? raw : parseInt(String(raw ?? ''), 10);
+    return Number.isFinite(n) && n >= 0 ? n : 30000;
+  }
+
+  /**
+   * Build a normalized QueryResult from rows collected via a streaming/cursor path that
+   * stops at maxRows+1 (FIND-109), so the full result set is never materialized in the Node
+   * heap. The caller supplies the true observed row count and truncation flag because the
+   * driver result was consumed incrementally rather than buffered.
+   * @param rows - the retained rows (already capped at maxRows)
+   * @param observedRowCount - number of rows actually seen (>= rows.length)
+   * @param truncated - whether more rows existed beyond the cap
+   * @param startTime - Date.now() captured at query start
+   * @param query - the executed SQL (for alias-aware redaction)
+   * @returns the normalized, optionally-redacted result
+   */
+  protected buildStreamedResult(
+    rows: Record<string, unknown>[],
+    observedRowCount: number,
+    truncated: boolean,
+    startTime: number,
+    query?: string
+  ): QueryResult {
+    const fields = rows.length > 0 ? Object.keys(rows[0] ?? {}) : [];
+    const baseResult: QueryResult = {
+      rows,
+      rowCount: observedRowCount,
+      fields,
+      truncated,
+      execution_time_ms: Date.now() - startTime,
+    };
+    if (this.redactionManager) {
+      return this.redactionManager.redactResults(baseResult, query);
+    }
+    return baseResult;
+  }
+
+  /**
    * Normalize query result to standard format with optional redaction
    */
   protected normalizeQueryResult(

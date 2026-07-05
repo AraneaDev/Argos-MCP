@@ -21,6 +21,14 @@ import type {
 // MySQL Adapter Implementation
 // ============================================================================
 
+/**
+ * Minimal shape of the underlying (non-promise) mysql2 core connection used for row
+ * streaming — exposed as `.connection` on a promise pool connection.
+ */
+interface MySQLStreamingConnection {
+  query: (sql: string, values?: unknown[]) => { stream: (opts?: unknown) => NodeJS.ReadableStream };
+}
+
 export class MySQLAdapter extends DatabaseAdapter {
   private _pool?: MySQLPool;
 
@@ -82,15 +90,6 @@ export class MySQLAdapter extends DatabaseAdapter {
     } catch (error) {
       throw this.createError('Failed to acquire MySQL connection from pool', error as Error);
     }
-  }
-
-  /**
-   * Resolve the per-statement timeout (ms) from config, defaulting to 30s.
-   */
-  private getStatementTimeoutMs(): number {
-    const raw = this.config.query_timeout ?? this.config.timeout;
-    const n = typeof raw === 'number' ? raw : parseInt(String(raw ?? ''), 10);
-    return Number.isFinite(n) && n > 0 ? n : 30000;
   }
 
   /**
@@ -157,18 +156,59 @@ export class MySQLAdapter extends DatabaseAdapter {
     params: unknown[] = []
   ): Promise<QueryResult> {
     const startTime = Date.now();
+    const cap = this.getMaxRows();
+    const mysqlConn = connection as MySQLConnection;
 
-    try {
-      const mysqlConn = connection as MySQLConnection;
-      const [rows, fields] = await mysqlConn.execute(
-        query,
-        (params ?? []) as (string | number | boolean | null)[]
-      );
+    // Stream rows and retain only up to maxRows so a huge result set never fully
+    // materializes in the Node heap (FIND-109). Uses the underlying (non-promise) core
+    // connection, which exposes the row stream. Falls back to the buffered `execute`
+    // path when streaming is unavailable (e.g. a mocked connection in unit tests).
+    const core = (mysqlConn as unknown as { connection?: MySQLStreamingConnection }).connection;
 
-      return this.normalizeQueryResult({ rows, fields }, startTime, undefined, query);
-    } catch (error) {
-      throw this.createError('Failed to execute MySQL query', error as Error);
+    if (!core || typeof core.query !== 'function') {
+      try {
+        const [rows, fields] = await mysqlConn.execute(
+          query,
+          (params ?? []) as (string | number | boolean | null)[]
+        );
+        return this.normalizeQueryResult({ rows, fields }, startTime, undefined, query);
+      } catch (error) {
+        throw this.createError('Failed to execute MySQL query', error as Error);
+      }
     }
+
+    return new Promise<QueryResult>((resolve, reject) => {
+      const kept: Record<string, unknown>[] = [];
+      let observed = 0;
+      let truncated = false;
+      let settled = false;
+
+      const finish = (err?: Error): void => {
+        if (settled) return;
+        settled = true;
+        if (err) {
+          reject(this.createError('Failed to execute MySQL query', err));
+          return;
+        }
+        resolve(this.buildStreamedResult(kept, observed, truncated, startTime, query));
+      };
+
+      let stream: NodeJS.ReadableStream;
+      try {
+        stream = core.query(query, (params ?? []) as unknown[]).stream();
+      } catch (err) {
+        finish(err as Error);
+        return;
+      }
+
+      stream.on('data', (row: Record<string, unknown>) => {
+        observed++;
+        if (kept.length < cap) kept.push(row);
+        else truncated = true;
+      });
+      stream.on('error', (err: Error) => finish(err));
+      stream.on('end', () => finish());
+    });
   }
 
   protected extractRawRows(result: unknown): unknown[] {

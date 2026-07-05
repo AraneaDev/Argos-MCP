@@ -2,9 +2,16 @@
  * SQLite Database Adapter
  */
 
-import * as sqlite3 from 'sqlite3';
-const { Database } = sqlite3;
+import * as sqlite3Ns from 'sqlite3';
 import type { Database as SQLiteDatabase } from 'sqlite3';
+// sqlite3 is a CommonJS native module. Under real Node ESM its exports are reachable only
+// via `.default` (Node's cjs-module-lexer does not detect its dynamically-assigned named
+// exports), so `import * as sqlite3; sqlite3.Database` is `undefined` at runtime and connect
+// crashes with "Database is not a constructor". Resolve the concrete module object — this
+// works for the real package (uses `.default`) and for the jest mock (no `.default`).
+const sqlite3 = ((sqlite3Ns as unknown as { default?: typeof import('sqlite3') }).default ??
+  sqlite3Ns) as typeof import('sqlite3');
+const { Database } = sqlite3;
 import { DatabaseAdapter } from './base.js';
 import type {
   DatabaseConnection,
@@ -84,18 +91,60 @@ export class SQLiteAdapter extends DatabaseAdapter {
     params: unknown[] = []
   ): Promise<QueryResult> {
     const startTime = Date.now();
+    const cap = this.getMaxRows();
+    const timeoutMs = this.getStatementTimeoutMs();
 
     return new Promise<QueryResult>((resolve, reject) => {
       const sqliteDb = connection as SQLiteDatabase;
+      const kept: Record<string, unknown>[] = [];
+      let observed = 0;
+      let truncated = false;
+      let settled = false;
+      let timer: ReturnType<typeof setTimeout> | undefined;
 
-      sqliteDb.all(query, params, (err, rows) => {
+      const finish = (err?: Error | null): void => {
+        if (settled) return;
+        settled = true;
+        if (timer) clearTimeout(timer);
         if (err) {
           reject(this.createError('Failed to execute SQLite query', err));
-        } else {
-          const result = this.normalizeQueryResult({ rows }, startTime, undefined, query);
-          resolve(result);
+          return;
         }
-      });
+        resolve(this.buildStreamedResult(kept, observed, truncated, startTime, query));
+      };
+
+      if (timeoutMs > 0) {
+        timer = setTimeout(() => {
+          // Abort the in-flight statement server-side (FIND-108) instead of only giving up
+          // client-side. interrupt() cancels the running query on this connection; queries
+          // are serialized per connection so no other statement is affected.
+          try {
+            sqliteDb.interrupt();
+          } catch {
+            /* ignore — connection may already be closing */
+          }
+          finish(new Error(`Query timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+        if (timer.unref) timer.unref();
+      }
+
+      // Stream rows one at a time, retaining only up to maxRows so a huge result set never
+      // fully materializes in the Node heap (FIND-109). The observed count and truncation
+      // flag are tracked independently of what is retained.
+      sqliteDb.each(
+        query,
+        params,
+        (err: Error | null, row: Record<string, unknown>) => {
+          if (err) {
+            finish(err);
+            return;
+          }
+          observed++;
+          if (kept.length < cap) kept.push(row);
+          else truncated = true;
+        },
+        (err: Error | null) => finish(err)
+      );
     });
   }
 

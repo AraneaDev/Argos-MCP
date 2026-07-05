@@ -2,8 +2,14 @@
  * SQL Server (MSSQL) Database Adapter
  */
 
-import * as sql from 'mssql';
-import type { ConnectionPool as MSSQLConnectionPool, IResult } from 'mssql';
+import * as sqlNs from 'mssql';
+import type { ConnectionPool as MSSQLConnectionPool, IResult, config as MSSQLConfig } from 'mssql';
+// mssql is a CommonJS module whose value exports (ConnectionPool, Request, TYPES, …) are
+// reachable only via `.default` under real Node ESM — `import * as sql; sql.ConnectionPool`
+// is `undefined` at runtime and connect crashes. Resolve the concrete module object (works
+// for the real package via `.default` and for the jest mock, which has no `.default`).
+const sql = ((sqlNs as unknown as { default?: typeof import('mssql') }).default ??
+  sqlNs) as typeof import('mssql');
 import { DatabaseAdapter } from './base.js';
 import type {
   DatabaseConnection,
@@ -30,7 +36,7 @@ export class MSSQLAdapter extends DatabaseAdapter {
     const username = this.config.username as string;
     const password = this.config.password as string;
 
-    const connectionConfig: sql.config = {
+    const connectionConfig: MSSQLConfig = {
       server: host,
       port: this.parseConfigValue(this.config.port, 'number', 1433),
       database,

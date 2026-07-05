@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.0] - 2026-07-05
+
 Follow-up security audit of v2.6.3 (see `SECURITY-AUDIT.md`): 24 findings remediated
 (1 critical, 3 high, 8 medium, plus low/info), with real-database verification of the
 streaming and timeout work.

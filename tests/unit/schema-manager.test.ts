@@ -186,7 +186,12 @@ describe('SchemaManager', () => {
     it('should load cached schemas during initialization', async () => {
       mockFs.existsSync.mockReturnValue(true);
       mockFs.readdirSync.mockReturnValue(['testdb.json', 'otherdb.json', 'invalid.txt'] as any);
-      mockFs.readFileSync.mockReturnValue(JSON.stringify(mockSchema));
+      // After M4, loadCachedSchemas keys by schema.database, not the filename.
+      // Return a schema whose `database` field matches the file being read.
+      mockFs.readFileSync.mockImplementation((filePath: string) => {
+        const dbName = filePath.replace(/.*\//, '').replace('.json', '');
+        return JSON.stringify({ ...mockSchema, database: dbName });
+      });
 
       await schemaManager.initialize();
 

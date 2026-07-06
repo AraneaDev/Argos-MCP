@@ -912,7 +912,9 @@ describe('ConnectionManager', () => {
       expect(commitSpy).toHaveBeenCalled();
     });
 
-    test('should rollback transaction on batch query failure', async () => {
+    test('should rollback transaction on batch query failure and return partial results', async () => {
+      // Audit H6: previously executeBatch threw on transaction failure, discarding
+      // the partial `results` array. Now it rolls back and returns partial results.
       const mockAdapter = MockDatabaseFactory.createPostgresAdapter(
         TestConfigFixtures.validPostgresConfig
       );
@@ -929,18 +931,28 @@ describe('ConnectionManager', () => {
 
       connectionManager.registerDatabase('test_db', TestConfigFixtures.validPostgresConfig);
 
-      await expect(
-        connectionManager.executeBatch(
-          'test_db',
-          [
-            { query: 'SELECT 1', label: 'Q1' },
-            { query: 'INVALID', label: 'Q2' },
-          ],
-          true
-        )
-      ).rejects.toThrow('Query 2 failed');
+      const result = await connectionManager.executeBatch(
+        'test_db',
+        [
+          { query: 'SELECT 1', label: 'Q1' },
+          { query: 'INVALID', label: 'Q2' },
+          { query: 'SELECT 3', label: 'Q3' },
+        ],
+        true // useTransaction
+      );
 
+      // Rollback was called
       expect(rollbackSpy).toHaveBeenCalled();
+
+      // Partial results are returned (not thrown away)
+      expect(result.results).toHaveLength(2); // Q1 succeeded, Q2 failed, Q3 never ran
+      expect(result.results[0].success).toBe(true);
+      expect(result.results[0].label).toBe('Q1');
+      expect(result.results[1].success).toBe(false);
+      expect(result.results[1].error).toBe('Query 2 failed');
+      expect(result.successCount).toBe(1);
+      expect(result.failureCount).toBe(1);
+      expect(result.transactionUsed).toBe(true);
     });
 
     test('should continue batch without transaction on partial failure', async () => {
@@ -1584,6 +1596,68 @@ describe('ConnectionManager', () => {
   // ============================================================================
 
   describe('query cache integration', () => {
+    test('unregisterDatabase invalidates query cache (H2)', async () => {
+      // Audit H2: after unregistering/re-registering a database (e.g. on config
+      // update), stale cached SELECT results must not be served.
+      const { QueryCache } = await import('../../src/classes/QueryCache.js');
+      const cache = new QueryCache();
+      const cmWithCache = new ConnectionManager(mockSSHTunnelManager, undefined, cache);
+
+      const mockAdapter = MockDatabaseFactory.createPostgresAdapter(
+        TestConfigFixtures.validPostgresConfig
+      );
+      jest.spyOn(cmWithCache as any, 'createAdapter').mockReturnValue(mockAdapter);
+
+      cmWithCache.registerDatabase('test_db', TestConfigFixtures.validPostgresConfig);
+      await cmWithCache.getConnection('test_db');
+
+      // Cache a SELECT result
+      const execSpy = jest.spyOn(mockAdapter, 'executeQuery');
+      await cmWithCache.executeQuery('test_db', 'SELECT * FROM users');
+      expect(execSpy).toHaveBeenCalledTimes(1);
+
+      // Second call comes from cache
+      await cmWithCache.executeQuery('test_db', 'SELECT * FROM users');
+      expect(execSpy).toHaveBeenCalledTimes(1);
+
+      // Unregister should invalidate the cache
+      cmWithCache.unregisterDatabase('test_db');
+
+      // Re-register and reconnect — the next SELECT must hit the DB, not cache
+      cmWithCache.registerDatabase('test_db', TestConfigFixtures.validPostgresConfig);
+      jest.spyOn(cmWithCache as any, 'createAdapter').mockReturnValue(mockAdapter);
+      await cmWithCache.getConnection('test_db');
+
+      await cmWithCache.executeQuery('test_db', 'SELECT * FROM users');
+      expect(execSpy).toHaveBeenCalledTimes(2); // cache was invalidated
+
+      await cmWithCache.closeAll();
+    });
+
+    test('closeAllConnections destroys connection pools (H3)', async () => {
+      // Audit H3: closeAllConnections must call destroyPool() on each adapter.
+      // Previously adapters were deleted from the map before the destroy loop.
+      const { QueryCache } = await import('../../src/classes/QueryCache.js');
+      const cache = new QueryCache();
+      const cmWithCache = new ConnectionManager(mockSSHTunnelManager, undefined, cache);
+
+      const mockAdapter = MockDatabaseFactory.createPostgresAdapter(
+        TestConfigFixtures.validPostgresConfig
+      );
+      // The mock adapter doesn't have destroyPool natively; add a spyable stub.
+      const destroyPoolSpy = jest.fn().mockResolvedValue(undefined);
+      (mockAdapter as any).destroyPool = destroyPoolSpy;
+      jest.spyOn(cmWithCache as any, 'createAdapter').mockReturnValue(mockAdapter);
+
+      cmWithCache.registerDatabase('test_db', TestConfigFixtures.validPostgresConfig);
+      await cmWithCache.getConnection('test_db');
+
+      await cmWithCache.closeAllConnections();
+
+      // destroyPool should have been called (previously it was never called)
+      expect(destroyPoolSpy).toHaveBeenCalled();
+    });
+
     test('returns cached result on second identical SELECT', async () => {
       // Create a ConnectionManager WITH a QueryCache
       const { QueryCache } = await import('../../src/classes/QueryCache.js');

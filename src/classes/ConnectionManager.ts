@@ -155,6 +155,10 @@ export class ConnectionManager extends EventEmitter {
   public unregisterDatabase(name: string): void {
     delete this.databases[name];
 
+    // Audit H2: invalidate the query cache for this database so stale results
+    // from the old config/host are not served after an update or removal.
+    this.queryCache?.invalidate(name);
+
     // Close connection if it exists
     if (this.connections.has(name)) {
       this.closeConnection(name).catch((error) => {
@@ -483,6 +487,11 @@ export class ConnectionManager extends EventEmitter {
    */
   async closeAllConnections(): Promise<void> {
     const dbNames = Array.from(this.connections.keys());
+    // Audit H3: capture the adapters BEFORE closeConnection deletes them from
+    // this.adapters. The previous code iterated this.adapters *after* the close
+    // loop, by which point the map was empty, so destroyPool() was never called
+    // and connection pools (with their TCP connections) were leaked on shutdown.
+    const adaptersToDestroy = Array.from(this.adapters.values());
 
     const PER_CONNECTION_TIMEOUT = 5000;
     const results = await Promise.allSettled(
@@ -510,8 +519,8 @@ export class ConnectionManager extends EventEmitter {
 
     this.logger.info('All database connections closed');
 
-    // Destroy connection pools on shutdown
-    for (const adapter of this.adapters.values()) {
+    // Destroy connection pools on shutdown using the captured list.
+    for (const adapter of adaptersToDestroy) {
       const poolable = adapter as unknown as { destroyPool?: () => Promise<void> };
       if (typeof poolable.destroyPool === 'function') {
         await poolable.destroyPool();
@@ -1012,11 +1021,17 @@ export class ConnectionManager extends EventEmitter {
             execution_time_ms: Date.now() - queryStartTime,
           });
 
-          // If transaction is active and a query fails, rollback
+          // If transaction is active and a query fails, rollback. Audit H6:
+          // previously this branch did `throw error`, which discarded the partial
+          // `results` array and gave the caller no per-query breakdown (inconsistent
+          // with non-transaction mode, which continues and returns all results).
+          // Now we roll back and STOP the loop, then return the partial results so
+          // the caller can see exactly which queries succeeded (and were rolled
+          // back) and which one failed.
           if (transactionStarted) {
             await adapter.rollbackTransaction(connectionInfo.connection);
             transactionStarted = false;
-            throw error;
+            break; // stop the loop, fall through to return partial results
           }
         }
       }

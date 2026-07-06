@@ -818,6 +818,43 @@ describe('MySQLAdapter', () => {
       expect(result.rows).toEqual([]);
     });
   });
+
+  // ============================================================================
+  // isConnected - dead connection detection (H4)
+  // ============================================================================
+
+  describe('isConnected - dead connection detection (H4)', () => {
+    // Audit H4: isConnected previously only checked `typeof execute === 'function'`,
+    // which is true even after the underlying socket is dead. Now it inspects
+    // the core connection's stream.destroyed state.
+    it('should return false when the underlying stream is destroyed', () => {
+      const mockConn = {
+        execute: jest.fn(),
+        connection: {
+          stream: { destroyed: true },
+        },
+      };
+      expect(adapter.isConnected(mockConn as any)).toBe(false);
+    });
+
+    it('should return true when stream is alive and execute is a function', () => {
+      const mockConn = {
+        execute: jest.fn(),
+        connection: {
+          stream: { destroyed: false },
+        },
+      };
+      expect(adapter.isConnected(mockConn as any)).toBe(true);
+    });
+
+    it('should return true when no stream info is present but execute exists', () => {
+      // Fallback for mocked connections without the internal .connection property
+      const mockConn = {
+        execute: jest.fn(),
+      };
+      expect(adapter.isConnected(mockConn as any)).toBe(true);
+    });
+  });
 });
 
 describe('MySQLAdapter - connection pooling', () => {

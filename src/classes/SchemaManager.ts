@@ -409,8 +409,13 @@ export class SchemaManager extends EventEmitter {
       const schemaFiles = readdirSync(this.schemaPath).filter((file) => file.endsWith('.json'));
 
       for (const file of schemaFiles) {
-        const dbName = file.replace('.json', '');
-
+        // Audit M4: previously the in-memory key was derived from the sanitized
+        // filename (`file.replace('.json', '')`), which does NOT match the
+        // original database name used by captureSchema/refreshSchema (those key
+        // by the real `dbName`). A database named `db/prod` is saved as
+        // `db_prod.json`, so after a restart `getSchema('db/prod')` returned null
+        // even though the file existed. Now we key by the `schema.database` field
+        // stored inside the JSON, which is the original database name.
         try {
           const filePath = join(this.schemaPath, file);
           const schemaContent = readFileSync(filePath, 'utf-8');
@@ -418,6 +423,9 @@ export class SchemaManager extends EventEmitter {
 
           // Validate schema structure
           if (this.isValidSchema(schema)) {
+            // Use the original database name stored in the schema, falling back
+            // to the filename only if the field is missing (legacy files).
+            const dbName = schema.database || file.replace('.json', '');
             this.schemas.set(dbName, schema);
             this.logger.debug(`Loaded cached schema for '${dbName}'`, {
               tables: schema.summary.table_count,
@@ -519,11 +527,20 @@ export class SchemaManager extends EventEmitter {
           const age = Date.now() - stats.mtime.getTime();
 
           if (age > maxAgeMs) {
+            // Read the file BEFORE deleting it to extract the correct in-memory
+            // cache key (schema.database). After M4, the cache is keyed by the
+            // original DB name, not the sanitized filename.
+            let dbName = file.replace('.json', '');
+            try {
+              const content = readFileSync(filePath, 'utf-8');
+              const schema = JSON.parse(content) as DatabaseSchema;
+              if (schema.database) dbName = schema.database;
+            } catch {
+              // Fall back to filename-based key for legacy/corrupt files
+            }
+
             unlinkSync(filePath);
             removed.push(file);
-
-            // Also remove from memory cache
-            const dbName = file.replace('.json', '');
             this.schemas.delete(dbName);
           }
         } catch (error) {

@@ -171,46 +171,27 @@ export async function handleUpdateDatabase(
     );
   }
 
-  const updated: string[] = [];
+  // Audit H1: validate ALL inputs BEFORE mutating the live config object.
+  // dbConfig is a reference to ctx.config.databases[database]; previously, fields
+  // were assigned directly and path validation ran afterwards, so a thrown
+  // ValidationError left the in-memory config poisoned (pointing at a traversal
+  // path or invalid value) until the server restarted. Now we run every validator
+  // first; only if all pass do we touch dbConfig.
 
-  if (args.host !== undefined) {
-    dbConfig.host = args.host as string;
-    updated.push('host');
+  // 1. Validate path-related fields before any mutation.
+  if (args.file !== undefined && dbConfig.type === 'sqlite') {
+    validatePathNoTraversal(args.file as string, 'file');
   }
-  if (args.port !== undefined) {
-    dbConfig.port = args.port as number;
-    updated.push('port');
+  if (args.ssh_private_key !== undefined) {
+    validatePathNoTraversal(args.ssh_private_key as string, 'ssh_private_key');
   }
-  if (args.database_name !== undefined) {
-    dbConfig.database = args.database_name as string;
-    updated.push('database');
-  }
-  if (args.username !== undefined) {
-    dbConfig.username = args.username as string;
-    updated.push('username');
-  }
-  if (args.password !== undefined) {
-    dbConfig.password = args.password as string;
-    updated.push('password');
-  }
-  if (args.file !== undefined) {
-    dbConfig.file = args.file as string;
-    updated.push('file');
-  }
-  if (args.ssl !== undefined) {
-    dbConfig.ssl = args.ssl as boolean;
-    updated.push('ssl');
-  }
-  if (args.ssl_verify !== undefined) {
-    if (args.ssl_verify === false) {
-      throw new ValidationError(
-        'ssl_verify cannot be set to false via MCP tools (it would disable TLS certificate ' +
-          'verification and enable MITM). To disable verification, edit config.ini manually.',
-        'ssl_verify'
-      );
-    }
-    dbConfig.ssl_verify = args.ssl_verify as boolean;
-    updated.push('ssl_verify');
+  // Fail secure: ssl_verify=false is rejected before mutation.
+  if (args.ssl_verify !== undefined && args.ssl_verify === false) {
+    throw new ValidationError(
+      'ssl_verify cannot be set to false via MCP tools (it would disable TLS certificate ' +
+        'verification and enable MITM). To disable verification, edit config.ini manually.',
+      'ssl_verify'
+    );
   }
   if (args.select_only !== undefined) {
     throw new ConfigurationError(
@@ -220,46 +201,82 @@ export async function handleUpdateDatabase(
     );
   }
 
+  // 2. Build a staging copy with the requested changes, then validate it as a
+  //    whole. Only if validation passes do we apply the changes to dbConfig.
+  const staged: DatabaseConfig = { ...dbConfig };
+  const updated: string[] = [];
+
+  if (args.host !== undefined) {
+    staged.host = args.host as string;
+    updated.push('host');
+  }
+  if (args.port !== undefined) {
+    staged.port = args.port as number;
+    updated.push('port');
+  }
+  if (args.database_name !== undefined) {
+    staged.database = args.database_name as string;
+    updated.push('database');
+  }
+  if (args.username !== undefined) {
+    staged.username = args.username as string;
+    updated.push('username');
+  }
+  if (args.password !== undefined) {
+    staged.password = args.password as string;
+    updated.push('password');
+  }
+  if (args.file !== undefined) {
+    staged.file = args.file as string;
+    updated.push('file');
+  }
+  if (args.ssl !== undefined) {
+    staged.ssl = args.ssl as boolean;
+    updated.push('ssl');
+  }
+  if (args.ssl_verify !== undefined) {
+    staged.ssl_verify = args.ssl_verify as boolean;
+    updated.push('ssl_verify');
+  }
+
   if (args.ssh_host !== undefined) {
-    dbConfig.ssh_host = args.ssh_host as string;
+    staged.ssh_host = args.ssh_host as string;
     updated.push('ssh_host');
   }
   if (args.ssh_port !== undefined) {
-    dbConfig.ssh_port = args.ssh_port as number;
+    staged.ssh_port = args.ssh_port as number;
     updated.push('ssh_port');
   }
   if (args.ssh_username !== undefined) {
-    dbConfig.ssh_username = args.ssh_username as string;
+    staged.ssh_username = args.ssh_username as string;
     updated.push('ssh_username');
   }
   if (args.ssh_password !== undefined) {
-    dbConfig.ssh_password = args.ssh_password as string;
+    staged.ssh_password = args.ssh_password as string;
     updated.push('ssh_password');
   }
   if (args.ssh_private_key !== undefined) {
-    dbConfig.ssh_private_key = args.ssh_private_key as string;
+    staged.ssh_private_key = args.ssh_private_key as string;
     updated.push('ssh_private_key');
-  }
-
-  // Validate SQLite file path when updated
-  if (args.file !== undefined && dbConfig.type === 'sqlite') {
-    validatePathNoTraversal(args.file as string, 'file');
-  }
-
-  // Validate SSH private key path
-  if (args.ssh_private_key !== undefined) {
-    validatePathNoTraversal(args.ssh_private_key as string, 'ssh_private_key');
   }
 
   if (updated.length === 0) {
     return createToolResponse(`No changes provided for database '${database}'.`);
   }
 
-  // Re-validate the full config after applying updates
-  const validationResult = validateDatabaseConfig(dbConfig);
+  // 3. Validate the complete staged config (shell metacharacters, embedded
+  //    credentials, port range, newlines). If this throws, dbConfig is untouched.
+  const validationResult = validateDatabaseConfig(staged);
   if (!validationResult.valid) {
     const messages = validationResult.errors.map((e) => `${e.field}: ${e.message}`).join(', ');
     throw new ValidationError(`Invalid configuration after update: ${messages}`, 'database');
+  }
+
+  // 4. All validators passed — now apply the staged changes to the live config.
+  for (const field of updated) {
+    (dbConfig as unknown as Record<string, unknown>)[field] = (
+      staged as unknown as Record<string, unknown>
+    )[field];
   }
 
   ctx.connectionManager.unregisterDatabase(database);

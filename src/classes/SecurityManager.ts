@@ -39,6 +39,12 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
     'EXPORT',
     'BACKUP',
     'RESTORE',
+    // Added per audit H5: COPY is PostgreSQL server-side file I/O / FROM PROGRAM
+    // RCE primitive — must be blocked even in full-access mode. MERGE and UPSERT
+    // are legitimate DML (like INSERT/UPDATE/DELETE, which are allowed in
+    // full-access mode), so they are NOT here — they remain in blockedKeywords
+    // (for SELECT-only mode) and in MUTATION_RE (for cache invalidation).
+    'COPY',
   ]);
 
   private readonly blockedKeywords = new Set<string>([
@@ -612,9 +618,14 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
     }
 
     // The leading command must be an explicitly allowed read command (or a
-    // database-specific metadata command). Everything else is rejected.
+    // database-specific metadata command matched by EXACT name). Everything else
+    // is rejected. Use exact equality — a substring match (command.includes(cmd))
+    // would let stored procs whose names merely contain an allowed fragment
+    // (e.g. sp_helpdesk_reset contains sp_help) bypass all subsequent security
+    // checks via an early return (audit C1).
     const leadingAllowed =
-      this.allowedLeadCommands.has(command) || dbAllowed.some((cmd) => command.includes(cmd));
+      this.allowedLeadCommands.has(command) ||
+      dbAllowed.some((cmd) => command === cmd.toUpperCase());
 
     if (!leadingAllowed) {
       return {
@@ -625,13 +636,11 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
       };
     }
 
-    // Database-specific metadata commands (e.g. sp_help, \d, .schema) are safe as-is.
-    if (!this.allowedLeadCommands.has(command) && dbAllowed.some((cmd) => command.includes(cmd))) {
-      return {
-        allowed: true,
-        confidence: 0.9,
-      };
-    }
+    // NOTE: the unconditional early return for db-specific metadata commands was
+    // removed (audit C1). Metadata commands (e.g. sp_help, \d, .schema) now fall
+    // through to the write-keyword scan, dangerous-pattern checks, and complexity
+    // limits below — so a proc like sp_help cannot be used to smuggle embedded
+    // write keywords or dangerous patterns past the validator.
 
     // No write/DDL/privilege keyword may appear ANYWHERE in the statement. This blocks
     // data-modifying CTEs, SELECT ... INTO, COPY ... TO PROGRAM, and embedded writes

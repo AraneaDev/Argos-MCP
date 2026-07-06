@@ -3,7 +3,12 @@ import { createHash } from 'node:crypto';
 import type { QueryResult } from '../types/index.js';
 
 const NON_DETERMINISTIC_RE = /\b(now|rand|uuid|current_timestamp|sysdate|newid|random)\s*\(/i;
-const MUTATION_RE = /^\s*(insert|update|delete|drop|truncate|alter|create|replace)\b/i;
+// Audit H5: extended to cover MERGE, UPSERT, GRANT, REVOKE, ATTACH, DETACH,
+// VACUUM, REINDEX, and COPY — all of which modify data or schema and therefore
+// must invalidate cached SELECT results. Without these, a MERGE could leave
+// cached SELECTs stale for up to cache_ttl_seconds.
+const MUTATION_RE =
+  /^\s*(insert|update|delete|drop|truncate|alter|create|replace|merge|upsert|grant|revoke|attach|detach|vacuum|reindex|copy)\b/i;
 const SELECT_RE = /^\s*select\b/i;
 
 interface CacheEntry {

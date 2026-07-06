@@ -1215,6 +1215,43 @@ describe('SecurityManager', () => {
     });
   });
 
+  describe('SELECT-only bypass: stored proc name substring (C1)', () => {
+    // Audit C1: dbSpecificAllowed used command.includes(cmd) (substring match)
+    // for MSSQL, so a stored proc named e.g. sp_helpdesk_reset passed validation
+    // because 'SP_HELPDESK_RESET'.includes('SP_HELP') is true, and the early
+    // return skipped ALL further security checks. Now exact equality is used.
+    test('blocks stored proc whose name contains sp_help as substring (mssql)', () => {
+      const result = securityManager.validateSelectOnlyQuery('sp_helpdesk_reset', 'mssql');
+      expect(result.allowed).toBe(false);
+    });
+
+    test('blocks stored proc whose name contains sp_columns as substring (mssql)', () => {
+      const result = securityManager.validateSelectOnlyQuery(
+        'sp_columns_audit_purge',
+        'mssql'
+      );
+      expect(result.allowed).toBe(false);
+    });
+
+    test('blocks stored proc whose name contains sp_tables as substring (mssql)', () => {
+      const result = securityManager.validateSelectOnlyQuery('sp_tablespace_drop', 'mssql');
+      expect(result.allowed).toBe(false);
+    });
+
+    test('real sp_help still works but falls through to security checks (mssql)', () => {
+      // The exact name sp_help is still allowed as a lead command, but it
+      // now falls through to the write-keyword scan and dangerous-pattern check.
+      const result = securityManager.validateSelectOnlyQuery('sp_help', 'mssql');
+      expect(result.allowed).toBe(true);
+    });
+
+    test('blocks sp_help with embedded write keyword (mssql)', () => {
+      // Even though sp_help is allowed, an embedded DROP must be caught.
+      const result = securityManager.validateSelectOnlyQuery('sp_help; DROP TABLE users', 'mssql');
+      expect(result.allowed).toBe(false);
+    });
+  });
+
   describe('MySQL version-conditional comment bypass', () => {
     test('should block queries with /*! version-conditional comments', async () => {
       const result = await securityManager.validateQuery('SELECT 1 /*!50000 ; DROP TABLE users */');

@@ -138,9 +138,18 @@ export class MySQLAdapter extends DatabaseAdapter {
         return false;
       }
       const mysqlConn = connection as MySQLConnection;
-      // MySQL connection doesn't have a direct isConnected method
-      // We'll use a simple approach - if the connection exists and hasn't been destroyed
-      return mysqlConn && typeof mysqlConn.execute === 'function';
+      // Audit H4: `typeof execute === 'function'` is true even after the underlying
+      // socket is closed (a mysql2 PoolConnection keeps its methods). Inspect the
+      // core connection's socket state instead, so dead connections are detected
+      // and ConnectionManager.getConnection recreates them transparently.
+      const core = (mysqlConn as unknown as {
+        connection?: { stream?: { destroyed?: boolean } };
+      }).connection;
+      if (core?.stream) {
+        // If the stream is explicitly destroyed, the connection is dead.
+        if (core.stream.destroyed === true) return false;
+      }
+      return typeof mysqlConn.execute === 'function';
     } catch {
       return false;
     }

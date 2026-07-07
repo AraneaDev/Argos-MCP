@@ -7,6 +7,39 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Follow-up remediation of audit findings C1, H1–H6, and M4, with the full unit
+suite (1340 tests) passing.
+
+### Security
+- **C1**: `SecurityManager` now matches database-specific metadata commands by
+  exact name instead of substring, and no longer early-returns them past the
+  write-keyword and dangerous-pattern scans. A stored proc whose name merely
+  contains an allowed fragment (e.g. `sp_helpdesk_reset` containing `sp_help`)
+  can no longer bypass validation.
+- **H1**: Config-mutating tools validate all inputs before touching the live
+  config object, so a validation failure can no longer leave the in-memory
+  config poisoned (pointing at a traversal path or invalid value) until restart.
+- **H5**: Extended the cache mutation regex (`MERGE`, `UPSERT`, `GRANT`,
+  `REVOKE`, `ATTACH`, `DETACH`, `VACUUM`, `REINDEX`, `COPY`) so these no longer
+  leave cached SELECT results stale, and blocked `COPY` (a PostgreSQL server-side
+  file-I/O / `FROM PROGRAM` RCE primitive) even in full-access mode.
+
+### Fixed
+- **H2**: Unregistering a database now invalidates its query cache, so stale
+  results from the old config/host are not served after an update or removal.
+- **H3**: Connection pools are now captured before the close loop, so
+  `destroyPool()` actually runs on shutdown instead of iterating an
+  already-emptied map and leaking pools/TCP connections.
+- **H4**: The MySQL adapter inspects the underlying socket state to detect dead
+  connections (`typeof execute === 'function'` stayed true on a closed socket),
+  so `getConnection` transparently recreates them.
+- **H6**: A failed query inside a transaction now rolls back, stops, and returns
+  the partial per-query results (consistent with non-transaction mode) instead
+  of throwing and discarding the breakdown.
+- **M4**: `SchemaManager` keys cached schemas by the original database name
+  stored in the schema JSON rather than the sanitized filename, so a database
+  named e.g. `db/prod` is found after a restart.
+
 ## [2.7.0] - 2026-07-05
 
 Follow-up security audit of v2.6.3 (see `SECURITY-AUDIT.md`): 24 findings remediated

@@ -6,7 +6,7 @@ This document provides comprehensive TypeScript API documentation for the SQL MC
 
 ## Implementation Status Guide
 
-This documentation reflects the **actual implementation** as of v2.7.0. Status indicators show the current state:
+This documentation reflects the **actual implementation** as of v2.7.1. Status indicators show the current state:
 
 - **Fully Implemented** - Complete and ready for use (90%+ test coverage)
 - **Partially Implemented** - Basic functionality available, advanced features planned

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.1] - 2026-07-07
+
 Follow-up remediation of audit findings C1, H1–H6, and M4, with the full unit
 suite (1340 tests) passing.
 

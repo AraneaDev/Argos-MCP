@@ -1226,10 +1226,7 @@ describe('SecurityManager', () => {
     });
 
     test('blocks stored proc whose name contains sp_columns as substring (mssql)', () => {
-      const result = securityManager.validateSelectOnlyQuery(
-        'sp_columns_audit_purge',
-        'mssql'
-      );
+      const result = securityManager.validateSelectOnlyQuery('sp_columns_audit_purge', 'mssql');
       expect(result.allowed).toBe(false);
     });
 

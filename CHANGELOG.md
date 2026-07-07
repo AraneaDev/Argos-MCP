@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.7.2] - 2026-07-07
+
+Tooling and supply-chain follow-up to the 2.7.1 release, which failed CI on an
+unformatted diff. No runtime/behaviour changes; the full unit suite (1340 tests)
+passes and `npm audit` reports 0 vulnerabilities.
+
+### Fixed
+- Reformatted `src/database/adapters/mysql.ts` and
+  `tests/unit/security-manager.test.ts` with Prettier so `format:check`
+  (and the release pipeline) passes.
+
+### Security
+- Bumped the `esbuild` dev dependency to `0.28.1`, clearing the dev-server
+  arbitrary-file-read advisory (GHSA-g7r4-m6w7-qqqr).
+- Added a `qs` override (`^6.15.2`) to lift the transitive dev-only copy pulled
+  in via `@stryker-mutator/core` past the `qs.stringify` DoS
+  (GHSA-q8mj-m7cp-5q26).
+
+### Added
+- Husky + lint-staged pre-commit hook that runs Prettier on staged
+  `src`/`tests` TypeScript and ESLint `--fix` on staged `src`, so unformatted
+  code can no longer reach CI. Installs automatically via the `prepare` script.
+
 ## [2.7.1] - 2026-07-07
 
 Follow-up remediation of audit findings C1, H1–H6, and M4, with the full unit

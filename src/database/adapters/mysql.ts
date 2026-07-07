@@ -29,6 +29,9 @@ interface MySQLStreamingConnection {
   query: (sql: string, values?: unknown[]) => { stream: (opts?: unknown) => NodeJS.ReadableStream };
 }
 
+/**
+ *
+ */
 export class MySQLAdapter extends DatabaseAdapter {
   private _pool?: MySQLPool;
 
@@ -81,6 +84,9 @@ export class MySQLAdapter extends DatabaseAdapter {
     return this._pool;
   }
 
+  /**
+   *
+   */
   async connect(): Promise<DatabaseConnection> {
     this.validateConfig(['host', 'database', 'username', 'password']);
     try {
@@ -116,6 +122,9 @@ export class MySQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   async disconnect(connection: DatabaseConnection): Promise<void> {
     try {
       const poolConn = connection as MySQLPoolConnection;
@@ -125,6 +134,9 @@ export class MySQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   async destroyPool(): Promise<void> {
     if (this._pool) {
       await this._pool.end();
@@ -132,6 +144,9 @@ export class MySQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   isConnected(connection: DatabaseConnection): boolean {
     try {
       if (!connection) {
@@ -142,9 +157,11 @@ export class MySQLAdapter extends DatabaseAdapter {
       // socket is closed (a mysql2 PoolConnection keeps its methods). Inspect the
       // core connection's socket state instead, so dead connections are detected
       // and ConnectionManager.getConnection recreates them transparently.
-      const core = (mysqlConn as unknown as {
-        connection?: { stream?: { destroyed?: boolean } };
-      }).connection;
+      const core = (
+        mysqlConn as unknown as {
+          connection?: { stream?: { destroyed?: boolean } };
+        }
+      ).connection;
       if (core?.stream) {
         // If the stream is explicitly destroyed, the connection is dead.
         if (core.stream.destroyed === true) return false;
@@ -159,6 +176,9 @@ export class MySQLAdapter extends DatabaseAdapter {
   // Query Execution
   // ============================================================================
 
+  /**
+   *
+   */
   async executeQuery(
     connection: DatabaseConnection,
     query: string,
@@ -234,6 +254,9 @@ export class MySQLAdapter extends DatabaseAdapter {
   // Transaction Management
   // ============================================================================
 
+  /**
+   *
+   */
   async beginTransaction(connection: DatabaseConnection): Promise<void> {
     try {
       const mysqlConn = connection as MySQLConnection;
@@ -243,6 +266,9 @@ export class MySQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   async commitTransaction(connection: DatabaseConnection): Promise<void> {
     try {
       const mysqlConn = connection as MySQLConnection;
@@ -252,6 +278,9 @@ export class MySQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   async rollbackTransaction(connection: DatabaseConnection): Promise<void> {
     try {
       const mysqlConn = connection as MySQLConnection;
@@ -265,6 +294,9 @@ export class MySQLAdapter extends DatabaseAdapter {
   // Performance Analysis
   // ============================================================================
 
+  /**
+   *
+   */
   buildExplainQuery(query: string): string {
     // Use JSON format for structured analysis (MySQL 5.7+)
     return `EXPLAIN FORMAT=JSON ${query}`;
@@ -274,6 +306,9 @@ export class MySQLAdapter extends DatabaseAdapter {
   // Schema Capture
   // ============================================================================
 
+  /**
+   *
+   */
   async captureSchema(connection: DatabaseConnection): Promise<DatabaseSchema> {
     try {
       const schema = this.createBaseSchema(this.config.database ?? '');

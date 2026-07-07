@@ -1,6 +1,6 @@
 {
   "name": "sql-access",
-  "version": "2.7.1",
+  "version": "2.7.2",
   "description": "MCP server for accessing SQL databases, with support for PostgreSQL, MySQL, SQLite, MSSQL, and SSH tunnels",
   "type": "module",
   "main": "dist/index.js",
@@ -34,7 +34,15 @@
     "validate-docs": "node scripts/validate-documentation.js",
     "prepack": "npm run build:production",
     "generate-template": "node dist/setup.js --template",
-    "install-mcp": "node dist/install.js"
+    "install-mcp": "node dist/install.js",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "{src,tests}/**/*.ts": "prettier --write",
+    "src/**/*.ts": "eslint --fix"
+  },
+  "overrides": {
+    "qs": "^6.15.2"
   },
   "keywords": [
     "claude",
@@ -71,10 +79,12 @@
     "@types/ssh2": "1.15.5",
     "@typescript-eslint/eslint-plugin": "8.58.0",
     "@typescript-eslint/parser": "8.58.0",
-    "esbuild": "0.28.0",
+    "esbuild": "0.28.1",
     "eslint": "8.57.1",
     "eslint-plugin-jsdoc": "62.9.0",
+    "husky": "^9.1.7",
     "jest": "29.7.0",
+    "lint-staged": "^17.0.8",
     "prettier": "3.8.1",
     "supertest": "7.2.2",
     "ts-jest": "29.4.9",

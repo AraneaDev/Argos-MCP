@@ -19,7 +19,7 @@ There are many ways to contribute to this project:
 
 ### Prerequisites
 
-- **Node.js 16+** and **npm 8+**
+- **Node.js 22+** and **npm 10+**
 - **Git** for version control
 - **TypeScript** knowledge for code contributions
 - Access to test databases (PostgreSQL, MySQL, SQLite, SQL Server)

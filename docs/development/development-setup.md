@@ -8,7 +8,7 @@ This guide provides a comprehensive development environment setup for contributi
 
 ### Prerequisites
 
-- Node.js 18+ with npm or yarn
+- Node.js 22+ with npm
 - Docker and Docker Compose
 - Git with proper SSH keys
 - VS Code or preferred IDE

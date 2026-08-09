@@ -40,7 +40,7 @@
 
 ## Quick Start
 
-**Requirements:** Node.js >= 16 and the [Claude Code CLI](https://docs.claude.com/en/docs/claude-code).
+**Requirements:** Node.js >= 22 and the [Claude Code CLI](https://docs.claude.com/en/docs/claude-code).
 
 ### 1. Build
 ```bash

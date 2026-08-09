@@ -6,7 +6,7 @@ This tutorial walks you through installing and setting up the Argos-MCP from sta
 
 ### System Requirements
 
-- **Node.js**: Version 16.0.0 or higher
+- **Node.js**: Version 22.0.0 or higher
 - **npm**: Version 8.0.0 or higher 
 - **Operating System**: Windows, macOS, or Linux
 - **Memory**: At least 512MB RAM available
@@ -278,10 +278,10 @@ Error: Node.js version 14.x is not supported
 # Check Node.js version
 node --version
 
-# Install Node.js 16+ using nvm (Linux/macOS)
+# Install Node.js 22+ using nvm (Linux/macOS)
 curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
-nvm install 18
-nvm use 18
+nvm install 22
+nvm use 22
 
 # Or download from nodejs.org for Windows
 ```

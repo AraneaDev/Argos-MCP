@@ -5,6 +5,13 @@ All notable changes to the Argos-MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.1](https://github.com/AraneaDev/Argos-MCP/compare/v3.0.0...v3.0.1) (2026-08-09)
+
+
+### Bug Fixes
+
+* **performance:** stop discarding MySQL EXPLAIN columns ([#5](https://github.com/AraneaDev/Argos-MCP/issues/5)) ([65e234f](https://github.com/AraneaDev/Argos-MCP/commit/65e234f82465f47ff582cfe94c738dd859b979b9))
+
 ## [Unreleased]
 
 ## [3.0.0](https://github.com/AraneaDev/Argos-MCP/compare/v2.7.2...v3.0.0) (2026-08-09)

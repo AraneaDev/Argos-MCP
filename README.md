@@ -1,4 +1,4 @@
-# Argos-MCP v3.0.0 <!-- x-release-please-version -->
+# Argos-MCP v3.0.1 <!-- x-release-please-version -->
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Test Coverage](https://img.shields.io/badge/Coverage-88%25-brightgreen)](https://github.com/AraneaDev/Argos-MCP)

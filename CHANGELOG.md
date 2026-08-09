@@ -5,6 +5,68 @@ All notable changes to the Argos-MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.0.0](https://github.com/AraneaDev/Argos-MCP/compare/v2.7.2...v3.0.0) (2026-08-09)
+
+
+### ⚠ BREAKING CHANGES
+
+* package renamed sql-access -> argos-mcp; binaries renamed mcp-sql-server -> argos-mcp and mcp-sql-setup -> argos-setup; the mcp-sql-install binary is removed; Claude Desktop is no longer supported; the log file is now argos-mcp.log. Re-register the server with:
+
+### Features
+
+* **adapters:** stream+bound MySQL/SQLite results, SQLite statement timeout, fix ESM adapter crash ([c59fad6](https://github.com/AraneaDev/Argos-MCP/commit/c59fad6e65dfb32bbb4e7c9533fc443276c9ef2f))
+* add audit-logger and extend DatabaseConfig with audit_log and cache_ttl_seconds fields ([35de5d4](https://github.com/AraneaDev/Argos-MCP/commit/35de5d4e2df00eacb97ef7ceccf5ba141520e68d))
+* add circuit breaker state machine and CircuitOpenError ([eb07fcd](https://github.com/AraneaDev/Argos-MCP/commit/eb07fcd549f8af711e3248df43a26de92b1ee38a))
+* add MetricsManager with per-DB latency, error, circuit, and cache tracking ([69496ee](https://github.com/AraneaDev/Argos-MCP/commit/69496eed9351043283210596f1c31dd37e0975c8))
+* add sql_get_metrics MCP tool exposing in-memory performance metrics ([d18251a](https://github.com/AraneaDev/Argos-MCP/commit/d18251a3ce77abfcfd5f1b01053bfddabc8a0418))
+* add TTL-LRU QueryCache with per-DB partitioning and mutation invalidation ([2d10076](https://github.com/AraneaDev/Argos-MCP/commit/2d100765055da6db6cce3d4e7515ea18828f1c63))
+* add validateDatabaseConfig with host, port, and database name validation ([61534e0](https://github.com/AraneaDev/Argos-MCP/commit/61534e0551e57a2a3c23c73f22216588ee51e0d0))
+* compact schema output for large databases and bump to v2.3.1 ([0539b4a](https://github.com/AraneaDev/Argos-MCP/commit/0539b4a27610c8dbdb515f12829b7eede4198e5d))
+* connection reliability, god class breakup, and code quality tooling (v2.4.0) ([0cdf7be](https://github.com/AraneaDev/Argos-MCP/commit/0cdf7be5e660934560283e7dd809b0d2ce64e5bd))
+* fix tests, add CI, Prettier, and code quality tooling ([8a66b07](https://github.com/AraneaDev/Argos-MCP/commit/8a66b0737eb81bc9e05149254c414ef8bc37b46c))
+* implement comprehensive field redaction system with configurable masking patterns ([ea917b4](https://github.com/AraneaDev/Argos-MCP/commit/ea917b462c09be06990a60dc68b48c2c6e3bdc7b))
+* implement logic and security refinements for database adapters and sanitization ([80dc8b9](https://github.com/AraneaDev/Argos-MCP/commit/80dc8b926678e165aefdc5050b8050a2df84c3e3))
+* implement logic fixes, security upgrades, docs alignment, and release workflow ([fee75a0](https://github.com/AraneaDev/Argos-MCP/commit/fee75a00556e5751fbbbfd1a3f31dcfcf390c49f))
+* instantiate MetricsManager and QueryCache in SQLMCPServer and wire into ConnectionManager ([a999bce](https://github.com/AraneaDev/Argos-MCP/commit/a999bce5f9f87725121de50dbe202042bef04396))
+* integrate circuit breaker, query cache, and metrics into ConnectionManager.executeQuery ([47f16db](https://github.com/AraneaDev/Argos-MCP/commit/47f16db2952d33d16622cd950357d092798502a3))
+* make SSH tunnel bind address configurable via ssh_local_host ([97165e2](https://github.com/AraneaDev/Argos-MCP/commit/97165e2241520333329e54d9eaff06ec65a5be58))
+* migrate to MCP SDK transport and fix SSH tunnel reliability ([5ea236a](https://github.com/AraneaDev/Argos-MCP/commit/5ea236abf55287a00112f3fdc4213755f6986b11))
+* rebrand to Argos-MCP and adopt native Claude Code registration ([e51fde6](https://github.com/AraneaDev/Argos-MCP/commit/e51fde6f858f566c80043211b7091406259f314b))
+* rename CLI commands to mcp-sql-* prefix to avoid conflicts ([ad603f2](https://github.com/AraneaDev/Argos-MCP/commit/ad603f22ae2f4f2f1630864542e2cbd61074adf6))
+* **security:** audit log config changes via MCP ([b0e9acb](https://github.com/AraneaDev/Argos-MCP/commit/b0e9acb0a3ae8580a544a232acad8d78889d68eb))
+* v2.1.0 - 100% Clean Release Ready ([c90c1c7](https://github.com/AraneaDev/Argos-MCP/commit/c90c1c751e33c29269b6ee67dcafaa8507d568b3))
+* validate SSH private key file permissions before loading ([3c13ef0](https://github.com/AraneaDev/Argos-MCP/commit/3c13ef072a7dee589954dae94f662f81daec0a99))
+
+
+### Bug Fixes
+
+* add rationale for fake-timer fallback in timing test comment ([bb5ec4f](https://github.com/AraneaDev/Argos-MCP/commit/bb5ec4fe6132e1be826d1392f99ead288275050e))
+* adjust coverage thresholds for @swc/jest full instrumentation ([82d7fc2](https://github.com/AraneaDev/Argos-MCP/commit/82d7fc278ac7386427381cd2dca40a3446467100))
+* convert flaky timing assertion to fake timers in connection-manager test ([19a0cf5](https://github.com/AraneaDev/Argos-MCP/commit/19a0cf5bf063c3421d72f10c0c46c8e800ac99a7))
+* ensure bin files are executable after build ([7b5575e](https://github.com/AraneaDev/Argos-MCP/commit/7b5575ee8f38756569acb7a5ac420a3c43a4b909))
+* log swallowed errors in SSH port suggestion fallback ([2581b00](https://github.com/AraneaDev/Argos-MCP/commit/2581b00a068f704de73054856c1fa15e05f8398f))
+* prevent stdout contamination and config path failures causing random MCP connection drops ([b51ca1e](https://github.com/AraneaDev/Argos-MCP/commit/b51ca1e268705d13f76265b668e202408e615c2b))
+* replace unsafe internal property access in isConnected checks ([e8407b8](https://github.com/AraneaDev/Argos-MCP/commit/e8407b83219738eae5bebaed074f3d0fa20e9975))
+* report actual connection status in sql_test_connection ([542e5db](https://github.com/AraneaDev/Argos-MCP/commit/542e5db8cad56c7b2031b10d90b465258cf994da))
+* resolve lint errors, open handles, and dependency updates ([f83492e](https://github.com/AraneaDev/Argos-MCP/commit/f83492ed0b53a1fd4723f90963abad6f0c903ef2))
+* resolve lint warnings and flaky backoff test ([ed84a2d](https://github.com/AraneaDev/Argos-MCP/commit/ed84a2da84c21e9201d09ee8fabba63156cc2aa3))
+* resolve log and schema paths to project root instead of cwd ([8a541dc](https://github.com/AraneaDev/Argos-MCP/commit/8a541dc994b213cc75584854409880503efe70bf))
+* **security:** block MySQL version-conditional comment bypass ([845ea4a](https://github.com/AraneaDev/Argos-MCP/commit/845ea4a16be44db99cf00e9a7ebeaf695b544886))
+* **security:** block select_only changes via MCP tools ([992676b](https://github.com/AraneaDev/Argos-MCP/commit/992676b13a8b78d4a897cb0d90e98aa85dae5e2e))
+* **security:** remediate audit findings (SELECT-only bypasses, SSH MITM, credential exposure) ([8fcf0cd](https://github.com/AraneaDev/Argos-MCP/commit/8fcf0cdaa4c1645ec56859a29adb3f4647c62833))
+* **security:** remediate audit findings C1, H1-H6, M4 ([8ce9ee4](https://github.com/AraneaDev/Argos-MCP/commit/8ce9ee448513cbe1c9a554d99d53878961e419fa))
+* **security:** remediate v2.6.3 audit findings (SELECT-only bypass, redaction, DoS, supply chain) ([91f1f1e](https://github.com/AraneaDev/Argos-MCP/commit/91f1f1ee46827521a0cb4e10fa7164198b7553d0))
+* **security:** validate config in handleAddDatabase ([3622c3f](https://github.com/AraneaDev/Argos-MCP/commit/3622c3f8e6d2bc515a5c0e381033b53114ff5a98))
+* **security:** validate database names to prevent INI injection ([08642a2](https://github.com/AraneaDev/Argos-MCP/commit/08642a262f25b74cb896f49afd53995579d4818c))
+* **security:** validate queries even when select_only is false ([caf6f9d](https://github.com/AraneaDev/Argos-MCP/commit/caf6f9d951fdde7663237d302223c31064069417))
+* **security:** validate SQLite file paths against traversal ([babbca8](https://github.com/AraneaDev/Argos-MCP/commit/babbca84974ff7851527d229f00323624bb9516a))
+
+
+### Performance Improvements
+
+* add MySQL connection pooling via mysql2 createPool ([f9d9f33](https://github.com/AraneaDev/Argos-MCP/commit/f9d9f336d048ae60944fcab8137675fd19d67fa2))
+* add PostgreSQL connection pooling via pg.Pool ([fc96c47](https://github.com/AraneaDev/Argos-MCP/commit/fc96c4702787a8a4466cdfd311a31e32aa815003))
+
 ## [Unreleased]
 
 ## [3.0.0] - 2026-08-09

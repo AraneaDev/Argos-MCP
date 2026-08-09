@@ -1164,24 +1164,18 @@ export class ConnectionManager extends EventEmitter {
    * Format execution plan based on database type
    */
   private formatExecutionPlan(explainResult: QueryResult, dbType: string): string {
-    switch (dbType) {
-      case 'postgresql':
-        return explainResult.rows.map((row) => Object.values(row).join(' ')).join('\n');
+    // Every branch joins whatever columns the row actually has. The MySQL case
+    // used to index vals[0..3] explicitly, which was wrong in both directions:
+    // EXPLAIN FORMAT=JSON returns a single column, so slots 1-3 rendered as the
+    // literal "undefined", while a classic EXPLAIN returns 12 columns, so the
+    // key, rows, filtered and Extra fields were silently discarded.
+    //
+    // PostgreSQL's EXPLAIN returns one "QUERY PLAN" column per row — those rows
+    // are consecutive lines of a single plan, so they read as a block rather
+    // than as delimited fields.
+    const separator = dbType === 'postgresql' ? ' ' : ' | ';
 
-      case 'mysql':
-        return explainResult.rows
-          .map((row) => {
-            const vals = Object.values(row);
-            return `${vals[0]} | ${vals[1]} | ${vals[2]} | ${vals[3]}`;
-          })
-          .join('\n');
-
-      case 'sqlite':
-        return explainResult.rows.map((row) => Object.values(row).join(' | ')).join('\n');
-
-      default:
-        return explainResult.rows.map((row) => Object.values(row).join(' | ')).join('\n');
-    }
+    return explainResult.rows.map((row) => Object.values(row).join(separator)).join('\n');
   }
 
   /**

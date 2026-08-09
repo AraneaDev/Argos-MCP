@@ -863,6 +863,68 @@ describe('ConnectionManager', () => {
   });
 
   // ============================================================================
+  // Execution Plan Formatting
+  // ============================================================================
+
+  describe('formatExecutionPlan', () => {
+    const format = (rows: Record<string, unknown>[], dbType: string): string =>
+      (connectionManager as any).formatExecutionPlan({ rows }, dbType);
+
+    test('should render a single-column MySQL JSON plan without undefined padding', () => {
+      // MySQL's EXPLAIN FORMAT=JSON returns one column holding the whole plan.
+      const rows = [{ EXPLAIN: '{"query_block": {"select_id": 1}}' }];
+
+      const output = format(rows, 'mysql');
+
+      expect(output).toBe('{"query_block": {"select_id": 1}}');
+      expect(output).not.toContain('undefined');
+    });
+
+    test('should preserve every column of a classic MySQL EXPLAIN', () => {
+      // Classic EXPLAIN returns 12 columns; none of them may be dropped.
+      const rows = [
+        {
+          id: 1,
+          select_type: 'SIMPLE',
+          table: 'user',
+          partitions: null,
+          type: 'index',
+          possible_keys: null,
+          key: 'PRIMARY',
+          key_len: '4',
+          ref: null,
+          rows: 425,
+          filtered: 100,
+          Extra: 'Using where',
+        },
+      ];
+
+      const output = format(rows, 'mysql');
+
+      expect(output).toContain('PRIMARY');
+      expect(output).toContain('Using where');
+      expect(output).toContain('425');
+      expect(output).not.toContain('undefined');
+    });
+
+    test('should join multi-row plans with newlines', () => {
+      const output = format([{ step: 'SCAN widget' }, { step: 'USE TEMP B-TREE' }], 'sqlite');
+
+      expect(output).toBe('SCAN widget\nUSE TEMP B-TREE');
+    });
+
+    test('should keep PostgreSQL plan lines space-joined', () => {
+      const output = format([{ 'QUERY PLAN': 'Seq Scan on user' }], 'postgresql');
+
+      expect(output).toBe('Seq Scan on user');
+    });
+
+    test('should return an empty string for a plan with no rows', () => {
+      expect(format([], 'mysql')).toBe('');
+    });
+  });
+
+  // ============================================================================
   // Batch Execution
   // ============================================================================
 

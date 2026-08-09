@@ -1,6 +1,6 @@
 # JSON Schemas Reference
 
-This document provides comprehensive JSON schema definitions for all request and response formats used in the SQL MCP Server.
+This document provides comprehensive JSON schema definitions for all request and response formats used in the Argos-MCP.
 
 ## Table of Contents
 
@@ -1207,4 +1207,4 @@ describe('MCP Request Validation', () => {
 });
 ```
 
-This comprehensive JSON schema reference ensures consistent data structures and enables robust validation throughout the SQL MCP Server ecosystem.
+This comprehensive JSON schema reference ensures consistent data structures and enables robust validation throughout the Argos-MCP ecosystem.

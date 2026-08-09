@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-SQL MCP Server Python Client - Complete Integration Example
-Demonstrates comprehensive interaction with SQL MCP Server via WebSocket
+Argos-MCP Python Client - Complete Integration Example
+Demonstrates comprehensive interaction with Argos-MCP via WebSocket
 """
 
 import asyncio
@@ -25,7 +25,7 @@ class QueryResult:
 
 class SQLMCPClient:
     """
-    Asynchronous Python client for SQL MCP Server
+    Asynchronous Python client for Argos-MCP
     Provides high-level interface for database operations
     """
     
@@ -37,7 +37,7 @@ class SQLMCPClient:
         self.logger = logging.getLogger(__name__)
         
     async def connect(self) -> bool:
-        """Connect to SQL MCP Server with retry logic"""
+        """Connect to Argos-MCP with retry logic"""
         max_retries = 3
         for attempt in range(max_retries):
             try:
@@ -45,7 +45,7 @@ class SQLMCPClient:
                     websockets.connect(self.url), 
                     timeout=self.timeout
                 )
-                self.logger.info(f"Connected to SQL MCP Server at {self.url}")
+                self.logger.info(f"Connected to Argos-MCP at {self.url}")
                 return True
             except Exception as e:
                 self.logger.warning(f"Connection attempt {attempt + 1} failed: {e}")
@@ -59,12 +59,12 @@ class SQLMCPClient:
         """Gracefully disconnect from server"""
         if self.websocket:
             await self.websocket.close()
-            self.logger.info("Disconnected from SQL MCP Server")
+            self.logger.info("Disconnected from Argos-MCP")
     
     async def _send_request(self, method: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
         """Send JSON-RPC request with timeout and error handling"""
         if not self.websocket:
-            raise ConnectionError("Not connected to SQL MCP Server")
+            raise ConnectionError("Not connected to Argos-MCP")
             
         self.request_id += 1
         
@@ -171,7 +171,7 @@ class SQLMCPClient:
         return result
 
 async def main():
-    """Example usage of SQL MCP Client"""
+    """Example usage of Argos-MCP Client"""
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
@@ -185,11 +185,11 @@ async def main():
     try:
         # Connect to server
         if not await client.connect():
-            logger.error("Failed to connect to SQL MCP Server")
+            logger.error("Failed to connect to Argos-MCP")
             return
         
         # Demonstrate various operations
-        logger.info("=== SQL MCP Server Integration Demo ===")
+        logger.info("=== Argos-MCP Integration Demo ===")
         
         # 1. List available tools
         tools = await client.list_tools()

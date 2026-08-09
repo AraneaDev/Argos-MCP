@@ -1,12 +1,12 @@
-# SQL MCP Server Documentation Hub
+# Argos-MCP Documentation Hub
 
-Welcome to the comprehensive documentation for the SQL MCP Server - a high-performance, secure TypeScript implementation for connecting Claude Desktop to your databases.
+Welcome to the comprehensive documentation for the Argos-MCP - a high-performance, secure TypeScript implementation for connecting Claude Code to your databases.
 
 ## Documentation Map
 
 ### Getting Started
 - **[Quick Start Guide](guides/quick-start.md)** - Get up and running in 5 minutes
-- **[Automatic Installer](guides/installation-guide.md#option-0-automatic-installer-easiest)** - One-command setup with mcp-sql-install
+- **[Register with Claude Code](guides/installation-guide.md#option-0-register-with-claude-code-easiest)** - One-command setup with `claude mcp add`
 - **[Installation Guide](guides/installation-guide.md)** - Detailed installation instructions 
 - **[Configuration Guide](guides/configuration-guide.md)** - Complete configuration reference
 - **[Troubleshooting](guides/troubleshooting-guide.md)** - Common issues and solutions
@@ -39,7 +39,7 @@ Welcome to the comprehensive documentation for the SQL MCP Server - a high-perfo
 #### Getting Started Series
 1. **[Installation](tutorials/01-installation.md)** - Installing and first run
 2. **[First Database](tutorials/02-first-database.md)** - Connecting your first database
-3. **[Claude Integration](tutorials/03-claude-integration.md)** - Integrating with Claude Desktop
+3. **[Claude Integration](tutorials/03-claude-integration.md)** - Integrating with Claude Code
 4. **[Basic Queries](tutorials/04-basic-queries.md)** - Running your first queries
 
 #### Advanced Configuration Series

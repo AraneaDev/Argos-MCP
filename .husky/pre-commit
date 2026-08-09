@@ -1,1 +1,70 @@
+#!/bin/sh
+# Fast, staged-files-only gate. Anything slow (types, full test suite) belongs
+# in .husky/pre-push instead — a pre-commit hook that takes seconds is a hook
+# people start bypassing with --no-verify.
+#
+# Deliberate exception (a release chore, an emergency fix):
+#     git commit --no-verify
+set -eu
+
+# --- 1. Refuse commits made directly on an integration branch ---------------
+#
+# Work belongs on a topic branch so it can be reviewed as a pull request, and
+# so release-please sees a Conventional Commit title on the squash merge.
+#
+# `git symbolic-ref` is empty during a rebase, cherry-pick, or any other
+# detached-HEAD operation, which must not be blocked — those commits were
+# already made on a branch.
+branch=$(git symbolic-ref --quiet --short HEAD || true)
+if [ -n "$branch" ]; then
+    for protected in main master; do
+        if [ "$branch" = "$protected" ]; then
+            printf '%s\n' \
+                "Refusing to commit directly to '$branch'." \
+                "" \
+                "Move to a topic branch first — it carries the staged changes with it:" \
+                "    git checkout -b <type>/<short-description>" \
+                "" \
+                "Intentional? Re-run with --no-verify." >&2
+            exit 1
+        fi
+    done
+fi
+
+# --- 2. Refuse to commit credentials ----------------------------------------
+#
+# Argos exists to hold database and SSH credentials, so a stray `config.ini`
+# or private key is the single most likely thing to leak out of this repo.
+# config.ini is gitignored, but `git add -f` and renamed copies get past that.
+staged=$(git diff --cached --name-only --diff-filter=ACM)
+if [ -n "$staged" ]; then
+    secrets=$(printf '%s\n' "$staged" | grep -Ei '(^|/)(config\.ini|.*\.config\.ini)$|(^|/)id_(rsa|dsa|ecdsa|ed25519)$|\.pem$|\.p12$|\.pfx$' || true)
+    if [ -n "$secrets" ]; then
+        printf '%s\n' \
+            "Refusing to commit files that usually hold credentials:" \
+            "" >&2
+        printf '    %s\n' $secrets >&2
+        printf '%s\n' \
+            "" \
+            "Use config.ini.template for anything that should be tracked." \
+            "Intentional? Re-run with --no-verify." >&2
+        exit 1
+    fi
+
+    # Key material pasted into an otherwise innocent file (the SSH tunnel
+    # config invites this) is caught by content rather than by filename.
+    for file in $staged; do
+        [ -f "$file" ] || continue
+        if git show ":$file" | grep -qE 'BEGIN (RSA |DSA |EC |OPENSSH |PGP )?PRIVATE KEY'; then
+            printf '%s\n' \
+                "Private key material found in staged file: $file" \
+                "" \
+                "Point the config at a key path instead of embedding the key." \
+                "Intentional? Re-run with --no-verify." >&2
+            exit 1
+        fi
+    done
+fi
+
+# --- 3. Format and lint the staged files ------------------------------------
 npx lint-staged

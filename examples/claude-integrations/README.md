@@ -1,17 +1,12 @@
 # Claude Integrations Examples
 
-This directory contains comprehensive examples for integrating SQL MCP Server with various Claude interfaces and workflows. Learn how to configure, optimize, and troubleshoot Claude integrations.
+This directory contains comprehensive examples for integrating Argos-MCP with various Claude interfaces and workflows. Learn how to configure, optimize, and troubleshoot Claude integrations.
 
 ## Directory Structure
 
 ```
 claude-integrations/
 |-- README.md # This file
-|-- claude-desktop/ # Claude Desktop integration
-| |-- basic-config.json # Basic Claude Desktop configuration
-| |-- advanced-config.json # Advanced configuration with env vars
-| |-- multi-server-config.json # Multiple MCP servers setup
-| \-- troubleshooting.md # Desktop integration troubleshooting
 |-- claude-api/ # Claude API integration examples
 | |-- python-example.py # Python API integration
 | |-- javascript-example.js # Node.js API integration
@@ -35,8 +30,8 @@ claude-integrations/
 
 ## Integration Types
 
-### 1. Claude Desktop Integration
-Direct integration with Claude Desktop application for interactive database queries and analysis.
+### 1. Claude Code Integration
+Register the server with `claude mcp add` for interactive database queries and analysis. See the [Claude Integration Tutorial](../../docs/tutorials/03-claude-integration.md) for the full walkthrough.
 
 **Features:**
 - Real-time database connectivity
@@ -64,23 +59,23 @@ Pre-built workflows for common database tasks and analysis patterns.
 
 ## Quick Start Guide
 
-### Claude Desktop Setup
-1. **Install and configure SQL MCP Server**:
+### Claude Code Setup
+1. **Install and configure Argos-MCP**:
  ```bash
  npm install
  npm run build
  ```
 
-2. **Configure Claude Desktop**:
+2. **Configure Claude Code**:
  ```bash
  # Copy the basic configuration
- cp examples/claude-integrations/claude-desktop/basic-config.json ~/.config/Claude/claude_desktop_config.json
+ claude mcp add argos --scope user -- node "$(pwd)/dist/index.js" --config "$(pwd)/config.ini"
  
  # Edit paths to match your installation
  ```
 
 3. **Test the integration**:
- - Restart Claude Desktop
+ - Restart Claude Code
  - Ask: "What databases do you have access to?"
 
 ### API Integration Setup
@@ -145,13 +140,13 @@ Perform complex data analysis:
 
 ## Configuration Examples
 
-### Basic Claude Desktop Config
+### Basic Claude Code Config
 ```json
 {
  "mcpServers": {
- "sql-mcp-server": {
+ "argos-mcp": {
  "command": "node",
- "args": ["/path/to/sql-mcp-server/dist/index.js"]
+ "args": ["/path/to/argos-mcp/dist/index.js"]
  }
  }
 }
@@ -161,9 +156,9 @@ Perform complex data analysis:
 ```json
 {
  "mcpServers": {
- "sql-mcp-server": {
+ "argos-mcp": {
  "command": "node",
- "args": ["/path/to/sql-mcp-server/dist/index.js"],
+ "args": ["/path/to/argos-mcp/dist/index.js"],
  "env": {
  "CONFIG_PATH": "/path/to/config.ini",
  "LOG_LEVEL": "info",
@@ -183,7 +178,7 @@ Perform complex data analysis:
 4. **Performance issues**: Review timeout and limit settings
 
 ### Debug Steps
-1. Check Claude Desktop logs
+1. Check Claude Code logs
 2. Verify MCP server startup
 3. Test database connections independently
 4. Review security and performance settings
@@ -192,7 +187,7 @@ Perform complex data analysis:
 
 | Use Case | Files | Description |
 |----------|-------|-------------|
-| **Desktop Setup** | `claude-desktop/` | Claude Desktop integration configs |
+| **Claude Code Setup** | `../../docs/tutorials/03-claude-integration.md` | `claude mcp add` walkthrough |
 | **API Automation** | `claude-api/` | Programmatic integration examples |
 | **Data Analysis** | `workflows/data-analysis-prompts.md` | Analysis workflow templates |
 | **Reporting** | `workflows/reporting-templates.md` | Report generation examples |

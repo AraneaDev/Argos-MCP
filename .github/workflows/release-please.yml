@@ -1,0 +1,100 @@
+name: Release Please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+  pull-requests: write
+  id-token: write
+
+jobs:
+  release-please:
+    name: Release PR + tag/release on merge
+    runs-on: ubuntu-latest
+    outputs:
+      release_created: ${{ steps.release.outputs.release_created }}
+      tag_name: ${{ steps.release.outputs.tag_name }}
+    steps:
+      # Opens/updates the Release PR from Conventional Commits. On merge of that
+      # PR, creates the vX.Y.Z tag + GitHub Release and sets release_created=true.
+      - name: Run release-please
+        id: release
+        uses: googleapis/release-please-action@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      # Everything below runs ONLY on the merge that cut a release. Because the
+      # tag/release are made with GITHUB_TOKEN, no separate tag-triggered
+      # workflow would fire — so build/verify/publish live here instead.
+      - name: Checkout
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        if: ${{ steps.release.outputs.release_created }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        if: ${{ steps.release.outputs.release_created }}
+        run: npm ci
+
+      - name: Build
+        if: ${{ steps.release.outputs.release_created }}
+        run: npm run build
+
+      - name: Lint
+        if: ${{ steps.release.outputs.release_created }}
+        run: npm run lint:check
+
+      - name: Format check
+        if: ${{ steps.release.outputs.release_created }}
+        run: npm run format:check
+
+      - name: Typecheck
+        if: ${{ steps.release.outputs.release_created }}
+        run: npm run type-check
+
+      - name: Test
+        if: ${{ steps.release.outputs.release_created }}
+        run: npm test
+
+      # The MCP server speaks JSON-RPC on stdio and never exits on its own, so
+      # it cannot be smoke-tested by running it. Assert the shipped artifacts
+      # instead: both bin targets exist and the server entry keeps its shebang,
+      # which is what makes `claude mcp add argos -- node dist/index.js` work.
+      - name: Verify release artifacts
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          test -f dist/index.js
+          test -f dist/setup.js
+          head -n 1 dist/index.js | grep -qF '#!/usr/bin/env node'
+
+      - name: Package release assets
+        if: ${{ steps.release.outputs.release_created }}
+        run: |
+          npm pack
+          zip -r "argos-mcp-${{ steps.release.outputs.tag_name }}.zip" \
+            dist package.json README.md CHANGELOG.md
+
+      - name: Attach assets to the GitHub Release
+        if: ${{ steps.release.outputs.release_created }}
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag_name }}
+          files: |
+            argos-mcp-*.tgz
+            argos-mcp-*.zip
+
+      # Pre-release: not on npm yet. Intentionally dormant. To go public:
+      # remove `if: false` and set up auth (Trusted Publishing / OIDC, or NPM_TOKEN).
+      - name: Publish to npm (provenance)
+        if: false
+        run: npm publish --provenance --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

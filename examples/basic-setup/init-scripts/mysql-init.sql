@@ -1,5 +1,5 @@
 -- MySQL Demo Database Initialization Script
--- This script creates sample tables and data for testing SQL MCP Server
+-- This script creates sample tables and data for testing Argos-MCP
 
 -- Create users table
 CREATE TABLE users (

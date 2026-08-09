@@ -1,5 +1,5 @@
 /**
- * Performance analysis types for SQL MCP Server
+ * Performance analysis types for Argos-MCP
  */
 
 // ============================================================================

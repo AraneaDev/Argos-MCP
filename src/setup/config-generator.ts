@@ -120,7 +120,7 @@ export class ConfigGenerator {
   ): GeneratedConfigFile {
     const now = new Date();
     const version = metadata?.version || '2.0.0';
-    const description = metadata?.description || 'Claude SQL MCP Server Configuration';
+    const description = metadata?.description || 'Argos-MCP Configuration';
 
     let content = '';
 
@@ -130,7 +130,7 @@ export class ConfigGenerator {
     content += `# Version: ${version}\n`;
     content += '#\n';
     content += '# This configuration file defines database connections and settings\n';
-    content += '# for the Claude SQL MCP Server.\n';
+    content += '# for the Argos-MCP.\n';
     content += '#\n';
     content += '# Sections:\n';
     content += '# [database.*] - Database connection configurations\n';
@@ -210,7 +210,7 @@ export class ConfigGenerator {
 
     return this.generateConfigFile(sampleConfig, {
       version: '2.0.0',
-      description: 'Sample Claude SQL MCP Server Configuration',
+      description: 'Sample Argos-MCP Configuration',
       generated: new Date(),
     });
   }
@@ -227,15 +227,15 @@ export class ConfigGenerator {
     switch (templateType) {
       case 'production':
         config = this.createProductionTemplate();
-        description = 'Production-ready Claude SQL MCP Server Configuration Template';
+        description = 'Production-ready Argos-MCP Configuration Template';
         break;
       case 'development':
         config = this.createDevelopmentTemplate();
-        description = 'Development Claude SQL MCP Server Configuration Template';
+        description = 'Development Argos-MCP Configuration Template';
         break;
       case 'minimal':
         config = this.createMinimalTemplate();
-        description = 'Minimal Claude SQL MCP Server Configuration Template';
+        description = 'Minimal Argos-MCP Configuration Template';
         break;
     }
 
@@ -382,7 +382,7 @@ export class ConfigGenerator {
 
     return this.generateConfigFile(config, {
       version: '2.0.0',
-      description: 'Validated Claude SQL MCP Server Configuration',
+      description: 'Validated Argos-MCP Configuration',
       generated: new Date(),
     });
   }

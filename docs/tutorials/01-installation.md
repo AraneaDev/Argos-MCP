@@ -1,6 +1,6 @@
 # Installation Tutorial
 
-This tutorial walks you through installing and setting up the SQL MCP Server from start to finish.
+This tutorial walks you through installing and setting up the Argos-MCP from start to finish.
 
 ## Prerequisites
 
@@ -14,7 +14,7 @@ This tutorial walks you through installing and setting up the SQL MCP Server fro
 
 ### Supported Databases
 
-The SQL MCP Server supports these database systems:
+The Argos-MCP supports these database systems:
 
 - **PostgreSQL** 11+ (including Amazon RDS, Google Cloud SQL, Azure Database)
 - **MySQL** 5.7+ and MariaDB 10.3+ (including cloud variants)
@@ -23,41 +23,40 @@ The SQL MCP Server supports these database systems:
 
 ## Installation Methods
 
-### Method 0: Automatic Installer (Easiest)
+### Method 0: Register with Claude Code (Easiest)
 
-The fastest way to get started:
+The fastest way to get started. Registration is handled by Claude Code's own CLI:
 
 ```bash
-# Install the package
-npm install -g sql-access
+git clone https://github.com/AraneaDev/Argos-MCP.git
+cd Argos-MCP
+npm install && npm run build
 
-# Run the automatic installer
-mcp-sql-install
-
-# The installer automatically:
-# 1. Detects Claude Code and Claude Desktop
-# 2. Adds sql-access to their MCP configurations
-# 3. Creates a default config.ini
+claude mcp add argos --scope user -- \
+  node "$(pwd)/dist/index.js" --config "$HOME/.config/argos/config.ini"
 ```
 
-After installation, add your databases using the `sql_add_database` MCP tool directly from Claude, or edit `~/.config/sql-access/config.ini`.
+Then add your databases with the `sql_add_database` MCP tool directly from Claude, or run `npm run setup` to write `~/.config/argos/config.ini` by hand.
 
 ### Method 1: NPM Global Installation (Recommended)
 
 Install globally for system-wide access:
 
 ```bash
-# Install the SQL MCP Server globally
-npm install -g sql-mcp-server
+# Install the Argos-MCP globally
+npm install -g argos-mcp
 
 # Verify installation
-mcp-sql-server --version
+argos-mcp --version
 ```
 
 **Expected Output:**
+
+<!-- x-release-please-start-version -->
 ```
-SQL MCP Server v2.7.1
+Argos-MCP v3.0.0
 ```
+<!-- x-release-please-end-version -->
 
 ### Method 2: Local Project Installation
 
@@ -65,17 +64,17 @@ Install locally in a specific project:
 
 ```bash
 # Create project directory
-mkdir my-sql-mcp
-cd my-sql-mcp
+mkdir my-argos
+cd my-argos
 
 # Initialize npm project
 npm init -y
 
-# Install SQL MCP Server locally
-npm install sql-mcp-server
+# Install Argos-MCP locally
+npm install argos-mcp
 
 # Verify installation
-npx mcp-sql-server --version
+npx argos-mcp --version
 ```
 
 ### Method 3: Development Installation
@@ -84,8 +83,8 @@ For development or customization:
 
 ```bash
 # Clone the repository
-git clone https://github.com/AraneaDev/mcp-sql-access-server.git
-cd mcp-sql-access-server
+git clone https://github.com/AraneaDev/Argos-MCP.git
+cd Argos-MCP
 
 # Install dependencies
 npm install
@@ -107,7 +106,7 @@ The easiest way to configure the server is using the interactive setup wizard:
 # Run the setup wizard
 npm run setup
 # or if globally installed:
-mcp-sql-setup
+argos-setup
 ```
 
 The wizard will guide you through:
@@ -123,7 +122,7 @@ The wizard will guide you through:
 Here's what the interactive setup looks like for PostgreSQL:
 
 ```
- Claude SQL MCP Server Setup
+ Argos-MCP Setup
 
 === Claude SQL Extension Configuration ===
 
@@ -206,14 +205,14 @@ EOF
 
 ```bash
 # Start the server
-mcp-sql-server
+argos-mcp
 # or if installed locally:
-npx mcp-sql-server
+npx argos-mcp
 ```
 
 **Expected Output:**
 ```
- SQL MCP Server starting...
+ Argos-MCP starting...
  Loaded 1 database configuration(s):
  - primary (postgresql, SELECT-only)
  Security manager initialized
@@ -224,9 +223,9 @@ npx mcp-sql-server
 
 ```bash
 # Test connections (if server is running)
-sql-test-connections
+npm run setup
 # or via setup:
-mcp-sql-setup --test-only
+npm run setup
 ```
 
 **Expected Output:**
@@ -242,7 +241,7 @@ Testing primary...
 
 ```bash
 # Test MCP protocol communication
-echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | mcp-sql-server
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | argos-mcp
 ```
 
 **Expected Response:**
@@ -300,7 +299,7 @@ Error: EACCES: permission denied, mkdir '/usr/local/lib/node_modules'
 sudo chown -R $(whoami) $(npm config get prefix)/{lib/node_modules,bin,share}
 
 # Or use npx instead of global install
-npx sql-mcp-server
+npx argos-mcp
 ```
 
 ### Issue 3: Database Connection Failed
@@ -487,28 +486,28 @@ password=${DB_PASSWORD}
 
 ```bash
 # Start with debug output
-DEBUG=sql-mcp:* mcp-sql-server
+DEBUG=argos:* argos-mcp
 
 # Start with custom config
-mcp-sql-server --config=/path/to/custom/config.ini
+argos-mcp --config=/path/to/custom/config.ini
 
 # Start with environment override
-NODE_ENV=development mcp-sql-server
+NODE_ENV=development argos-mcp
 ```
 
 ### Production Mode
 
 ```bash
 # Start as background service
-nohup mcp-sql-server > server.log 2>&1 &
+nohup argos-mcp > server.log 2>&1 &
 
 # Using systemd (Linux)
-sudo systemctl start sql-mcp-server
-sudo systemctl enable sql-mcp-server
+sudo systemctl start argos-mcp
+sudo systemctl enable argos-mcp
 
 # Using PM2 process manager
 npm install -g pm2
-pm2 start mcp-sql-server --name "sql-mcp"
+pm2 start argos-mcp --name "argos"
 pm2 startup
 pm2 save
 ```
@@ -523,29 +522,29 @@ WORKDIR /app
 # Copy configuration
 COPY config.ini ./
 
-# Install SQL MCP Server
-RUN npm install -g sql-mcp-server
+# Install Argos-MCP
+RUN npm install -g argos-mcp
 
 # Expose port (if using HTTP mode)
 EXPOSE 3000
 
 # Start server
-CMD ["mcp-sql-server"]
+CMD ["argos-mcp"]
 ```
 
 ```bash
 # Build and run
-docker build -t sql-mcp-server .
-docker run -d --name sql-mcp \
+docker build -t argos-mcp .
+docker run -d --name argos \
  -v $(pwd)/config.ini:/app/config.ini \
- sql-mcp-server
+ argos-mcp
 ```
 
 ## Next Steps
 
 After successful installation:
 
-1. **Configure Claude Desktop Integration** -> [Claude Integration Tutorial](03-claude-integration.md)
+1. **Register with Claude Code** -> [Claude Integration Tutorial](03-claude-integration.md)
 2. **Learn Basic Query Operations** -> [Basic Queries Tutorial](04-basic-queries.md)
 3. **Review Security Configuration** -> [Security Guide](../guides/security-guide.md)
 4. **Explore Advanced Features** -> [Configuration Guide](../guides/configuration-guide.md)
@@ -554,39 +553,36 @@ After successful installation:
 
 ### Installation Commands
 ```bash
-npm install -g sql-mcp-server # Global installation
-npm install sql-mcp-server # Local installation
+npm install -g argos-mcp # Global installation
+npm install argos-mcp # Local installation
 git clone <repo-url> # Development installation
 ```
 
 ### Configuration Commands
 ```bash
-mcp-sql-setup # Interactive configuration
-mcp-sql-setup --template=production # Generate template
-mcp-sql-setup --config=/path/to/config.ini # Custom config path
+argos-setup # Interactive configuration
+argos-setup --template=production # Generate template
+argos-setup --config=/path/to/config.ini # Custom config path
 ```
 
 ### Server Commands
 ```bash
-mcp-sql-server # Start server
-mcp-sql-server --version # Show version
-mcp-sql-server --help # Show help
-sql-test-connections # Test database connections
+argos-mcp # Start the server on stdio (Claude Code does this for you)
+argos-mcp --version # Show version
+argos-mcp --help # Show help
 ```
 
-### Installer Commands
+### Claude Code Registration
 ```bash
-mcp-sql-install # Automatic MCP installer
-mcp-sql-install --client=claude-code # Install for Claude Code only
-mcp-sql-install --uninstall # Remove from MCP configs
+claude mcp add argos --scope user -- node /abs/path/dist/index.js --config /abs/path/config.ini
+claude mcp list # Confirm argos is connected
+claude mcp get argos # Show the recorded command and scope
+claude mcp remove argos --scope user
 ```
 
-### Utility Commands
-```bash
-sql-validate-config # Validate configuration
-sql-generate-schema # Generate database schema
-sql-benchmark # Run performance benchmarks
-```
+### Runtime Tools
+
+Connection testing, schema inspection, and performance analysis are exposed as MCP tools rather than shell commands — call `sql_test_connection`, `sql_get_schema`, and `sql_analyze_performance` from Claude.
 
 ## Getting Help
 
@@ -610,4 +606,4 @@ sql-benchmark # Run performance benchmarks
 
 ---
 
-** Congratulations!** You've successfully installed the SQL MCP Server. Continue with the [Claude Integration Tutorial](03-claude-integration.md) to connect it with Claude Desktop.
+** Congratulations!** You've successfully installed the Argos-MCP. Continue with the [Claude Integration Tutorial](03-claude-integration.md) to register it with Claude Code.

@@ -1,6 +1,6 @@
 # Configuration Guide
 
-This comprehensive guide covers all configuration options for the SQL MCP Server, from basic setup to advanced enterprise deployments.
+This comprehensive guide covers all configuration options for the Argos-MCP, from basic setup to advanced enterprise deployments.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ This comprehensive guide covers all configuration options for the SQL MCP Server
 ## Configuration Overview
 
 ### Configuration File Location
-The SQL MCP Server uses an INI-format configuration file:
+The Argos-MCP uses an INI-format configuration file:
 - **Default location**: `./config.ini`
 - **Custom location**: Specify via command line or environment variable
 
@@ -464,7 +464,7 @@ select_only=true
 ssh_host=bastion.company.com
 ssh_port=22
 ssh_username=service_account
-ssh_private_key=/etc/sql-mcp/keys/production.key
+ssh_private_key=/etc/argos/keys/production.key
 
 [database.multi_hop]
 type=mysql
@@ -491,7 +491,7 @@ Use the built-in wizard for guided configuration:
 
 ```bash
 # Start configuration wizard
-mcp-sql-setup
+argos-setup
 
 # Follow prompts:
 ? Select database type: PostgreSQL
@@ -598,8 +598,8 @@ CMD ["node", "dist/index.js"]
 # docker-compose.yml
 version: '3.8'
 services:
- sql-mcp-server:
- image: sql-mcp-server
+ argos-mcp:
+ image: argos-mcp
  environment:
  - SQL_MCP_DATABASE_APP_HOST=postgres
  - SQL_MCP_DATABASE_APP_PASSWORD=docker_password
@@ -637,7 +637,7 @@ For the current release, use environment variables for sensitive values and conf
 ```
 **Solutions:**
 1. Create configuration file: `touch config.ini`
-2. Run setup wizard: `mcp-sql-setup`
+2. Run setup wizard: `argos-setup`
 3. Specify custom path: `--config=/path/to/config.ini`
 
 #### Permission Denied Reading Configuration
@@ -673,10 +673,10 @@ For the current release, use environment variables for sensitive values and conf
 #### Built-in Validation
 ```bash
 # Validate configuration
-sql-mcp-server --validate-config
+argos-mcp --validate-config
 
 # Test specific database
-sql-mcp-server --test-database=production
+argos-mcp --test-database=production
 ```
 
 #### External Validation
@@ -690,4 +690,4 @@ npm install -g ajv-cli
 ajv validate -s config-schema.json -d config.json
 ```
 
-This comprehensive configuration guide provides all the information needed to properly configure the SQL MCP Server for any environment, from local development to enterprise production deployments.
+This comprehensive configuration guide provides all the information needed to properly configure the Argos-MCP for any environment, from local development to enterprise production deployments.

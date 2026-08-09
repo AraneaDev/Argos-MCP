@@ -1,16 +1,18 @@
-# MCP SQL Access Server v2.7.2
+# Argos-MCP v3.0.0 <!-- x-release-please-version -->
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Test Coverage](https://img.shields.io/badge/Coverage-88%25-brightgreen)](https://github.com/AraneaDev/mcp-sql-access-server)
+[![Test Coverage](https://img.shields.io/badge/Coverage-88%25-brightgreen)](https://github.com/AraneaDev/Argos-MCP)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/Tests-1181%20passing-success)](https://github.com/AraneaDev/mcp-sql-access-server)
+[![Tests](https://img.shields.io/badge/Tests-1181%20passing-success)](https://github.com/AraneaDev/Argos-MCP)
 [![ESLint](https://img.shields.io/badge/ESLint-0%20warnings-brightgreen?logo=eslint)](https://eslint.org/)
 [![JSDoc](https://img.shields.io/badge/JSDoc-enforced-blue)](https://jsdoc.app/)
 [![Strict TypeScript](https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript)](https://www.typescriptlang.org/)
 
-**Enterprise-grade MCP SQL Access Server v2.7.2** - Connect Claude Desktop to your databases with bulletproof security, comprehensive monitoring, and seamless multi-database support.
+> *Argos Panoptes — the hundred-eyed giant who never slept, set to watch over what mattered most.*
 
-## Why Choose MCP SQL Access Server v2.7.2?
+**Argos-MCP** — a hundred eyes on your databases. Connect Claude Code to PostgreSQL, MySQL, SQLite, and SQL Server with bulletproof security, comprehensive monitoring, and seamless multi-database support.
+
+## Why Argos-MCP?
 
 ### **Security First**
 - **SELECT-Only Mode** - Production-safe read-only database access
@@ -31,35 +33,53 @@
 - **SQL Server** - Enterprise-grade Microsoft SQL Server support
 
 ### **Developer Experience**
-- **5-Minute Setup** - Interactive configuration wizard or automatic installer
+- **One-command install** - Registers with Claude Code via the native `claude mcp add`
 - **TypeScript Native** - Full type safety and IntelliSense support
 - **Comprehensive Docs** - Detailed guides, tutorials, and API reference
 - **Extensive Testing** - Unit, integration, and end-to-end test coverage
 
 ## Quick Start
 
-### 1. Install
+**Requirements:** Node.js >= 16 and the [Claude Code CLI](https://docs.claude.com/en/docs/claude-code).
+
+### 1. Build
 ```bash
-git clone https://github.com/AraneaDev/mcp-sql-access-server.git
-cd mcp-sql-access-server
+git clone https://github.com/AraneaDev/Argos-MCP.git
+cd Argos-MCP
 npm install
 npm run build
-npm link
 ```
 
-> **Note:** `npm link` makes the CLI commands (`mcp-sql-install`, `mcp-sql-server`, `mcp-sql-setup`) available globally. Alternatively, you can run them directly with `node dist/install.js`.
-
-### 2. Connect to Claude
+### 2. Configure databases
 ```bash
-mcp-sql-install
+npm run setup
 ```
-Registers the MCP server with Claude Code and/or Claude Desktop. Use `--client=claude-code` or `--client=claude-desktop` to target a specific client.
+Interactive wizard for adding database connections, security settings, and SSH tunnels. It writes a `config.ini` — by convention at `~/.config/argos/config.ini`, though any path works. You can also add databases at runtime with the `sql_add_database` tool.
 
-### 3. Configure Databases
+### 3. Register with Claude Code
 ```bash
-mcp-sql-setup
+claude mcp add argos --scope user -- \
+  node "$(pwd)/dist/index.js" --config "$HOME/.config/argos/config.ini"
 ```
-Interactive wizard for adding database connections, security settings, and SSH tunnels. You can also add databases at runtime using the `sql_add_database` MCP tool.
+
+Scopes:
+
+| Scope | Flag | Where it lives | Use when |
+|-------|------|----------------|----------|
+| User | `--scope user` | `~/.claude.json` | You want Argos in every project (most common) |
+| Project | `--scope project` | `.mcp.json` in the repo | You want to share it with your team via git |
+| Local | *(default)* | Per-project, private | You're just trying it out |
+
+### 4. Verify
+```bash
+claude mcp list
+```
+You should see `argos` listed as connected. Its tools appear in Claude Code as `mcp__argos__sql_query`, `mcp__argos__sql_get_schema`, and so on.
+
+### Removing it
+```bash
+claude mcp remove argos --scope user
+```
 
 ## Use Cases
 
@@ -79,7 +99,7 @@ Interactive wizard for adding database connections, security settings, and SSH t
 
 ```mermaid
 graph TB
- Claude[Claude Desktop] --> MCP[MCP Protocol]
+ Claude[Claude Code] --> MCP[MCP Protocol]
  MCP --> Security[Security Layer]
  Security --> Connection[Connection Manager]
  Connection --> Adapters[Database Adapters]
@@ -106,7 +126,7 @@ graph TB
 - **[5-Minute Quick Start](docs/guides/quick-start.md)** - Get running fast
 - **[Installation Guide](docs/guides/installation-guide.md)** - Detailed setup instructions
 - **[First Database Tutorial](docs/tutorials/02-first-database.md)** - Connect your first database
-- **[Claude Integration](docs/tutorials/03-claude-integration.md)** - Set up Claude Desktop
+- **[Claude Integration](docs/tutorials/03-claude-integration.md)** - Register with Claude Code
 
 ### **Architecture & Design**
 - **[System Architecture](docs/architecture/system-architecture.md)** - How it all works together
@@ -233,7 +253,7 @@ redaction_log_access=true
 
 ## Dynamic Database Management
 
-MCP SQL Access Server supports runtime database management through dedicated MCP tools. This allows you to add, update, and remove database connections without restarting the server.
+Argos-MCP supports runtime database management through dedicated MCP tools. This allows you to add, update, and remove database connections without restarting the server.
 
 ### Available MCP Tools
 
@@ -271,20 +291,19 @@ MCP SQL Access Server supports runtime database management through dedicated MCP
 
 ## CLI Commands
 
-The following CLI commands are available after installation:
-
 | Command | Description |
 |---------|-------------|
-| `mcp-sql-server` | Start the MCP SQL Access Server |
-| `mcp-sql-setup` | Run the interactive configuration wizard |
-| `mcp-sql-install` | Automatic installer for quick setup and Claude Desktop integration |
+| `argos-mcp` | Start the Argos MCP server on stdio (this is what Claude Code invokes) |
+| `argos-setup` | Run the interactive configuration wizard |
+
+Both are exposed as `bin` entries, so `npm link` (or a global install) makes them available on your `PATH`. Registration with Claude Code is handled by `claude mcp add` — see [Quick Start](#quick-start).
 
 ## Development
 
 ### Development Setup
 ```bash
-git clone https://github.com/AraneaDev/mcp-sql-access-server.git
-cd mcp-sql-access-server
+git clone https://github.com/AraneaDev/Argos-MCP.git
+cd Argos-MCP
 npm install
 npm run dev
 npm test

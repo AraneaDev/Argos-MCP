@@ -6,7 +6,7 @@
 
 - Docker and Docker Compose installed
 - Node.js 16+ installed 
-- sql-access package installed (`npm install -g sql-access`)
+- argos package installed (`npm install -g argos`)
 - At least 512MB RAM available for containers
 
 ## Try It Now!
@@ -25,10 +25,10 @@ docker-compose up -d
 # 2. Wait for database initialization
 ./wait-for-postgres.sh
 
-# 3. Setup SQL MCP Server configuration 
+# 3. Setup Argos-MCP configuration 
 ./setup-config.sh
 
-# 4. Start SQL MCP Server
+# 4. Start Argos-MCP
 ./start-server.sh
 
 # 5. Run comprehensive tests
@@ -65,9 +65,9 @@ docker-compose up -d
 ## Architecture Demonstrated
 
 ```
-Claude Desktop
+Claude Code
  v
-SQL MCP Server (SELECT-only)
+Argos-MCP (SELECT-only)
  v
 PostgreSQL (Docker)
 |-- application schema (business data)
@@ -89,7 +89,7 @@ PostgreSQL (Docker)
  - `05-create-indexes.sql` - Performance indexes
  - `06-create-users.sql` - Security setup
 - `config/` - Configuration files
- - `production.ini` - SQL MCP Server config
+ - `production.ini` - Argos-MCP config
  - `readonly-config.ini` - Readonly-only config
  - `monitoring-config.ini` - Monitoring enhanced config
 - `scripts/` - Utility scripts
@@ -102,7 +102,7 @@ PostgreSQL (Docker)
 - `monitoring/` - Monitoring configuration
  - `prometheus.yml` - Metrics collection
  - `grafana-dashboard.json` - Visualization
-- `claude-integration/` - Claude Desktop setup
+- `claude-integration/` - Claude Code setup
  - `production-config.json` - Production integration
  - `development-config.json` - Development integration
  - `sample-prompts.md` - Example queries for Claude
@@ -343,7 +343,7 @@ After completing this demo, you'll understand:
 ## Related Resources
 
 - [PostgreSQL Documentation](https://www.postgresql.org/docs/)
-- [SQL MCP Server Security Guide](../../../docs/guides/security-guide.md)
+- [Argos-MCP Security Guide](../../../docs/guides/security-guide.md)
 - [Performance Tuning Guide](../../../docs/operations/performance-tuning.md)
 - [Monitoring Setup](../../../docs/operations/monitoring.md)
 
@@ -352,11 +352,11 @@ After completing this demo, you'll understand:
 - [ ] PostgreSQL containers start successfully
 - [ ] Database initialized with sample data
 - [ ] Readonly user created with proper permissions
-- [ ] SQL MCP Server connects and validates config
+- [ ] Argos-MCP connects and validates config
 - [ ] All test queries execute successfully 
 - [ ] Performance benchmarks meet expectations
 - [ ] Monitoring data collection works
-- [ ] Claude Desktop integration configured
+- [ ] Claude Code integration configured
 - [ ] Security constraints properly enforced
 - [ ] Cleanup script removes all containers and data
 

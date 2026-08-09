@@ -3,7 +3,7 @@
 
 set -e  # Exit on any error
 
-echo "[START] Starting SQL MCP Server SQLite Demo"
+echo "[START] Starting Argos-MCP SQLite Demo"
 echo "====================================="
 
 # Check prerequisites
@@ -31,7 +31,7 @@ echo "2. Setting up demo database..."
 ./setup-demo.sh
 
 # Start the server
-echo "3. Starting SQL MCP Server..."
+echo "3. Starting Argos-MCP..."
 ./start-server.sh
 
 # Give server time to start
@@ -42,13 +42,13 @@ echo "4. Testing server functionality..."
 ./test-queries.sh
 
 # Test Claude integration setup
-echo "5. Testing Claude Desktop configuration..."
-if [ -f "claude-config.json" ]; then
-    echo "[OK] Claude Desktop config available"
-    echo "   Copy to: ~/.config/Claude/claude_desktop_config.json"
-    echo "   Update path: $(pwd)"
+echo "5. Testing Claude Code registration..."
+if [ -f "register-with-claude.sh" ]; then
+    echo "[OK] Registration script available"
+    echo "   Run: ./register-with-claude.sh"
+    echo "   Then confirm with: claude mcp list"
 else
-    echo "[ERROR] Claude Desktop config missing"
+    echo "[ERROR] register-with-claude.sh missing (run setup-demo.sh first)"
 fi
 
 # Cleanup
@@ -61,16 +61,16 @@ echo "================================"
 echo ""
 echo "[INFO] What was demonstrated:"
 echo "  [OK] SQLite database with sample data"
-echo "  [OK] SQL MCP Server configuration"
+echo "  [OK] Argos-MCP configuration"
 echo "  [OK] MCP protocol communication"
 echo "  [OK] Query execution and results"
 echo "  [OK] Error handling"
-echo "  [OK] Claude Desktop integration setup"
+echo "  [OK] Claude Code integration setup"
 echo ""
 echo "[NEXT] Next steps:"
 echo "  1. Try the PostgreSQL production example"
-echo "  2. Configure Claude Desktop integration"
+echo "  2. Register the demo with Claude Code: ./register-with-claude.sh"
 echo "  3. Explore the configuration options"
 echo "  4. Read the documentation"
 echo ""
-echo "[DOCS] Documentation: https://github.com/AraneaDev/mcp-sql-access-server/tree/main/docs"
+echo "[DOCS] Documentation: https://github.com/AraneaDev/Argos-MCP/tree/main/docs"

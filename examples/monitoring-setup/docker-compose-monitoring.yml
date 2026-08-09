@@ -4,7 +4,7 @@ services:
   # Prometheus - Metrics Collection and Storage
   prometheus:
     image: prom/prometheus:v2.40.0
-    container_name: sql-mcp-prometheus
+    container_name: argos-prometheus
     ports:
       - "9090:9090"
     volumes:
@@ -25,7 +25,7 @@ services:
   # Grafana - Visualization and Dashboards
   grafana:
     image: grafana/grafana:9.5.0
-    container_name: sql-mcp-grafana
+    container_name: argos-grafana
     ports:
       - "3000:3000"
     volumes:
@@ -48,7 +48,7 @@ services:
   # AlertManager - Alert Management and Routing
   alertmanager:
     image: prom/alertmanager:v0.25.0
-    container_name: sql-mcp-alertmanager
+    container_name: argos-alertmanager
     ports:
       - "9093:9093"
     volumes:
@@ -66,7 +66,7 @@ services:
   # Node Exporter - System Metrics
   node-exporter:
     image: prom/node-exporter:v1.6.0
-    container_name: sql-mcp-node-exporter
+    container_name: argos-node-exporter
     ports:
       - "9100:9100"
     volumes:
@@ -84,7 +84,7 @@ services:
   # Elasticsearch - Log Storage and Search
   elasticsearch:
     image: docker.elastic.co/elasticsearch/elasticsearch:8.8.0
-    container_name: sql-mcp-elasticsearch
+    container_name: argos-elasticsearch
     environment:
       - discovery.type=single-node
       - ES_JAVA_OPTS=-Xms1g -Xmx1g
@@ -101,7 +101,7 @@ services:
   # Kibana - Log Visualization
   kibana:
     image: docker.elastic.co/kibana/kibana:8.8.0
-    container_name: sql-mcp-kibana
+    container_name: argos-kibana
     ports:
       - "5601:5601"
     environment:
@@ -116,7 +116,7 @@ services:
   # Logstash - Log Processing Pipeline
   logstash:
     image: docker.elastic.co/logstash/logstash:8.8.0
-    container_name: sql-mcp-logstash
+    container_name: argos-logstash
     ports:
       - "5044:5044"
       - "9600:9600"
@@ -134,7 +134,7 @@ services:
   # Redis - Caching and Session Storage
   redis:
     image: redis:7-alpine
-    container_name: sql-mcp-redis
+    container_name: argos-redis
     ports:
       - "6379:6379"
     volumes:
@@ -146,7 +146,7 @@ services:
   # PostgreSQL - Metrics Storage
   postgres-monitoring:
     image: postgres:15-alpine
-    container_name: sql-mcp-postgres-monitoring
+    container_name: argos-postgres-monitoring
     ports:
       - "5433:5432"
     environment:
@@ -191,7 +191,7 @@ networks:
 #    - Kibana: http://localhost:5601
 #    - Elasticsearch: http://localhost:9200
 #
-# 5. CONFIGURE SQL MCP SERVER:
+# 5. CONFIGURE Argos-MCP SERVER:
 #    Add to your config.ini or environment:
 #    - Enable metrics endpoint on port 3001
 #    - Configure structured logging output

@@ -1,5 +1,5 @@
 /**
- * Enhanced schema types for SQL MCP Server
+ * Enhanced schema types for Argos-MCP
  */
 
 import type { ColumnInfo, TableInfo } from './database.js';

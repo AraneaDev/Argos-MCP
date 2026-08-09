@@ -1,9 +1,9 @@
 #!/bin/bash
-# Stop SQL MCP Server
+# Stop Argos-MCP
 
 set -e
 
-echo "[STOP] Stopping SQL MCP Server..."
+echo "[STOP] Stopping Argos-MCP..."
 
 # Check if PID file exists
 if [ ! -f "server.pid" ]; then

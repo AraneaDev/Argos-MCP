@@ -1,6 +1,6 @@
-# SQL MCP Server Examples
+# Argos-MCP Examples
 
-This directory contains comprehensive examples for deploying, configuring, and integrating SQL MCP Server in various environments. From basic setups to enterprise deployments, these examples help you get started quickly and scale effectively.
+This directory contains comprehensive examples for deploying, configuring, and integrating Argos-MCP in various environments. From basic setups to enterprise deployments, these examples help you get started quickly and scale effectively.
 
 ## Directory Structure
 
@@ -13,12 +13,10 @@ examples/
 | |-- single-mysql.ini # Basic MySQL config
 | |-- multiple-databases.ini # Multi-database setup
 | |-- docker-compose-demo.yml # Docker demo environment
-| |-- claude-desktop-config.json # Claude Desktop integration
-| |-- test-queries.sql # Sample test queries
+| | |-- test-queries.sql # Sample test queries
 | \-- init-scripts/ # Database initialization scripts
 |-- claude-integrations/ # Claude integration examples
-| |-- claude-desktop/ # Claude Desktop configurations
-| |-- claude-api/ # API integration examples
+| | |-- claude-api/ # API integration examples
 | |-- workflows/ # Common workflow templates
 | |-- prompt-engineering/ # Optimized prompts
 | \-- automation/ # Automation scripts
@@ -58,12 +56,12 @@ cp examples/basic-setup/single-postgresql.ini config.ini
 npm start
 ```
 
-### 3. Claude Desktop Integration (5 minutes)
+### 3. Claude Code Integration (2 minutes)
 ```bash
-# Copy Claude Desktop configuration
-cp examples/basic-setup/claude-desktop-config.json \
- ~/.config/Claude/claude_desktop_config.json
-# Edit file paths and restart Claude Desktop
+# Register the built server with Claude Code
+claude mcp add argos --scope user -- \
+  node "$(pwd)/dist/index.js" --config "$(pwd)/config.ini"
+claude mcp list
 ```
 
 ### 4. Production Monitoring (15 minutes)
@@ -131,9 +129,9 @@ cp examples/basic-setup/multiple-databases.ini config.ini
 
 ### Data Analysis Team
 ```bash
-# Claude integration for data analysis
-cp examples/claude-integrations/claude-desktop/advanced-config.json \
- ~/.config/Claude/claude_desktop_config.json
+# Register a read-only analytics database for the team
+claude mcp add argos-analytics --scope project -- \
+  node "$(pwd)/dist/index.js" --config "$(pwd)/analytics.ini"
 # Review workflow templates in examples/claude-integrations/workflows/
 ```
 
@@ -220,7 +218,7 @@ const result = await client.query({
 # Python automation example
 import schedule
 import time
-from sql_mcp_client import SQLMCPClient
+from argos_client import SQLMCPClient
 
 def generate_daily_report():
  client = SQLMCPClient('http://localhost:3001')
@@ -237,7 +235,7 @@ const healthCheck = async () => {
  try {
  const response = await fetch('http://localhost:3001/health');
  const status = response.ok ? 'healthy' : 'unhealthy';
- console.log(`SQL MCP Server: ${status}`);
+ console.log(`Argos-MCP: ${status}`);
  } catch (error) {
  console.error('Health check failed:', error.message);
  }
@@ -261,7 +259,7 @@ setInterval(healthCheck, 30000); // Check every 30 seconds
  - Review timeout settings
 
 3. **Integration Problems**
- - Verify file paths in Claude Desktop config
+ - Verify the paths recorded by `claude mcp get argos` are absolute
  - Check MCP server startup logs
  - Test with simple queries first
 
@@ -316,7 +314,7 @@ After exploring these examples:
 |------|------------------|-----------|
 | **First Time Setup** | `basic-setup/` | `simple-sqlite.ini` |
 | **Production Config** | `basic-setup/` | `multiple-databases.ini` |
-| **Claude Desktop** | `claude-integrations/claude-desktop/` | `basic-config.json` |
+| **Claude Code** | `claude-integrations/` | `README.md` |
 | **API Integration** | `claude-integrations/claude-api/` | `python-example.py` |
 | **Custom Database** | `custom-adapters/` | `adapter-template.ts` |
 | **Monitoring** | `monitoring-setup/` | `docker-compose-monitoring.yml` |

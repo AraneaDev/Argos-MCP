@@ -1,11 +1,68 @@
 # Changelog
 
-All notable changes to the SQL MCP Server will be documented in this file.
+All notable changes to the Argos-MCP will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+## [3.0.0] - 2026-08-09
+
+Rebrand to **Argos-MCP**, and a move from a bespoke installer to Claude Code's
+native MCP registration. Named for Argos Panoptes, the hundred-eyed giant — one
+server watching many databases at once. Joins Chaos-MCP and Knossos-MCP under
+the same naming scheme.
+
+The full suite (1340 tests) passes, `lint:check`, `format:check`, `type-check`
+and `validate-docs` are clean.
+
+### Changed — BREAKING
+- **Package renamed** from `sql-access` to `argos-mcp`. The MCP server
+  identifier (`SERVER_NAME`) is now `argos-mcp`.
+- **Binaries renamed:** `mcp-sql-server` → `argos-mcp`, `mcp-sql-setup` →
+  `argos-setup`. Re-register the server after upgrading.
+- **Registration is now `claude mcp add`.** Claude Code owns its MCP registry;
+  the server is added with
+  `claude mcp add argos --scope user -- node <path>/dist/index.js --config <path>/config.ini`.
+- **Log file renamed** from `sql-mcp-server.log` to `argos-mcp.log`.
+- Repository moved to `AraneaDev/Argos-MCP`.
+
+MCP tool names are deliberately unchanged — `sql_query`, `sql_get_schema`,
+`sql_add_database` and the rest keep their names, so only the namespace shifts
+(`mcp__sql-access__sql_query` → `mcp__argos__sql_query`).
+
+### Removed — BREAKING
+- **`src/install.ts` and the `mcp-sql-install` binary.** The hand-rolled
+  installer edited `~/.claude.json` and `claude_desktop_config.json` as raw
+  JSON, duplicating what the Claude Code CLI does natively and drifting from it.
+- **Claude Desktop support.** All `claude_desktop_config.json` handling, example
+  configs, and integration docs are gone; Claude Code is the only documented
+  client.
+- **`scripts/bump-version.sh`**, superseded by release-please.
+- Documentation references to commands that never existed as bin entries
+  (`sql-test-connections`, `sql-validate-config`, `sql-generate-schema`,
+  `sql-benchmark`, `argos-start`, `argos-test`). Connection testing, schema
+  inspection, and performance analysis are MCP tools, not shell commands.
+
+### Added
+- **release-please** (`release-please-config.json`,
+  `.release-please-manifest.json`, `.github/workflows/release-please.yml`).
+  Releases are cut from Conventional Commits; version references in
+  `src/types/index.ts`, `README.md`, `docs/api/typescript-api.md` and
+  `docs/tutorials/01-installation.md` are rewritten automatically.
+- **`.github/workflows/pr-title.yml`** — rejects pull request titles that are
+  not Conventional Commits. A squash merge takes the PR title as the commit
+  subject, so an unclassifiable title silently skips a release.
+- **Rebuilt CI** (`.github/workflows/ci.yml`): lint/format/typecheck report
+  independently rather than short-circuiting, tests run on Node 20/22/24, and
+  the build job asserts both bin targets exist and runs `validate-docs`.
+- **Proper git hooks.** `pre-commit` refuses commits on `main`/`master`, blocks
+  staged credential files (`config.ini`, `*.pem`, SSH keys) and content
+  containing `BEGIN ... PRIVATE KEY`, then runs `lint-staged`. `commit-msg`
+  enforces Conventional Commits. `pre-push` runs the full `validate` gate.
+- **`CONTRIBUTING.md`** documenting the commit format, hooks, and release flow.
+- `repository`, `homepage`, and `bugs` fields in `package.json`.
 
 ## [2.7.2] - 2026-07-07
 
@@ -173,7 +230,7 @@ Remediation of security audit findings (3 critical, 8 high, 6 medium, 3 low from
 - Default `ssl_verify` to `true` when SSL is enabled, extended to MSSQL
 - Enforce `query_timeout` via `Promise.race`
 - Unified path validation across config handlers; validate config in `handleUpdateDatabase`
-- Renamed repository references and URLs to `mcp-sql-access-server`
+- Renamed repository references and URLs to `argos-mcp`
 
 ### Fixed
 - `sql_test_connection` now reports the actual connection status
@@ -319,9 +376,9 @@ Remediation of security audit findings (3 critical, 8 high, 6 medium, 3 low from
 - **`sql_get_config` Tool** - View database configuration with automatic password/credential redaction
 - **`sql_set_mcp_configurable` Tool** - One-way lock mechanism to prevent MCP configuration changes (unlocking requires manual config edit)
 - **`mcp_configurable` Configuration Flag** - Per-database flag controlling whether MCP tools can modify the database settings
-- **`mcp-sql-install` CLI Installer** - Automatic installer that configures Claude Code and Claude Desktop MCP integration
+- **`argos-install` CLI Installer** - Automatic installer that configures Claude Code and Claude Desktop MCP integration
 - **Platform Detection** - Installer auto-detects macOS, Windows, and Linux config file locations
-- **Default Config Location** - New default config path at `~/.config/sql-access/config.ini` for installed usage
+- **Default Config Location** - New default config path at `~/.config/argos/config.ini` for installed usage
 
 ### Changed
 - **`DatabaseConfig` Interface** - Added `mcp_configurable?: boolean` field
@@ -330,7 +387,7 @@ Remediation of security audit findings (3 critical, 8 high, 6 medium, 3 low from
 - **Config Persistence** - `saveConfigFile()` now writes `mcp_configurable` flag
 - **`SQLMCPServer`** - Stores config file path as instance variable for runtime config persistence
 - **`ConnectionManager`** - `createDatabaseListItems()` includes `mcp_configurable` in output
-- **`package.json`** - Added `mcp-sql-install` bin entry and `install-mcp` npm script
+- **`package.json`** - Added `argos-install` bin entry and `install-mcp` npm script
 - **esbuild Config** - Updated to bundle `install.ts` entry point
 - **Documentation** - Comprehensive updates across README, API reference, configuration guide, installation guide, tutorials, and architecture docs
 

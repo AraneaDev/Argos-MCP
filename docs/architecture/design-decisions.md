@@ -1,6 +1,6 @@
 # Design Decisions
 
-This document records important architectural and design decisions made during the development of the SQL MCP Server, along with the reasoning, alternatives considered, and trade-offs involved.
+This document records important architectural and design decisions made during the development of the Argos-MCP, along with the reasoning, alternatives considered, and trade-offs involved.
 
 ## Table of Contents
 
@@ -545,14 +545,14 @@ interface QueryResult {
 **Deciders**: Protocol Team, Claude Integration Team
 
 #### Context
-MCP protocol supports multiple transports. Need to choose one that works well with Claude Desktop integration.
+MCP protocol supports multiple transports. Need to choose one that works well with Claude Code integration.
 
 #### Decision
 Use stdio (standard input/output) transport as primary and only supported method.
 
 #### Consequences
 **Positive:**
-- Native support in Claude Desktop
+- Native support in Claude Code
 - Simple deployment (no network configuration)
 - Works across all platforms
 - Natural process isolation
@@ -626,7 +626,7 @@ Implement interactive CLI wizard that guides users through:
 - Configuration validation and testing
 
 ```bash
-sql-mcp-setup
+argos-setup
 ? Select database type: PostgreSQL
 ? Database host: db.example.com
 ? Enable SELECT-only mode? Yes (recommended)
@@ -913,4 +913,4 @@ Areas that may require future architectural decisions:
 4. **Team Review**: Get input from affected stakeholders
 5. **Decision**: Update ADR with new status (superseded, amended, etc.)
 
-This living document of design decisions provides crucial context for understanding the SQL MCP Server architecture and guides future development decisions.
+This living document of design decisions provides crucial context for understanding the Argos-MCP architecture and guides future development decisions.

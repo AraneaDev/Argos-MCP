@@ -1,10 +1,10 @@
 # SQL Server Database Configuration Guide
 
-This guide covers Microsoft SQL Server setup, configuration, and optimization for the SQL MCP Server.
+This guide covers Microsoft SQL Server setup, configuration, and optimization for the Argos-MCP.
 
 ## Overview
 
-The SQL MCP Server provides comprehensive SQL Server support through the `mssql` driver, offering enterprise-grade connectivity, connection pooling, and advanced features for Microsoft SQL Server environments.
+The Argos-MCP provides comprehensive SQL Server support through the `mssql` driver, offering enterprise-grade connectivity, connection pooling, and advanced features for Microsoft SQL Server environments.
 
 **Supported Versions:**
 - SQL Server 2016, 2017, 2019, 2022
@@ -35,7 +35,7 @@ timeout=30000
 ### 2. Test Connection
 
 ```bash
-sql-mcp-test sqlserver_example
+# Test it from Claude with the sql_test_connection tool, database: sqlserver_example
 ```
 
 ## Configuration Options

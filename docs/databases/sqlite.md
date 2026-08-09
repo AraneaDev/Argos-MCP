@@ -1,10 +1,10 @@
 # SQLite Database Configuration Guide
 
-This guide covers SQLite setup, configuration, and optimization for the SQL MCP Server.
+This guide covers SQLite setup, configuration, and optimization for the Argos-MCP.
 
 ## Overview
 
-The SQL MCP Server provides comprehensive SQLite support through the `sqlite3` driver, offering lightweight, serverless database connectivity perfect for development, testing, and single-user applications.
+The Argos-MCP provides comprehensive SQLite support through the `sqlite3` driver, offering lightweight, serverless database connectivity perfect for development, testing, and single-user applications.
 
 **Supported Versions:**
 - SQLite 3.x (all versions)
@@ -30,7 +30,7 @@ timeout=10000
 ### 2. Test Connection
 
 ```bash
-sql-mcp-test sqlite_local
+# Test it from Claude with the sql_test_connection tool, database: sqlite_local
 ```
 
 ## Configuration Options
@@ -596,7 +596,7 @@ ORDER BY month DESC;
 
 ## Conclusion
 
-SQLite provides an excellent lightweight database solution for the SQL MCP Server, offering:
+SQLite provides an excellent lightweight database solution for the Argos-MCP, offering:
 
 - **Zero configuration** for simple use cases
 - **High performance** for read-heavy workloads

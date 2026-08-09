@@ -1,9 +1,9 @@
 #!/bin/bash
-# Test SQL MCP Server functionality
+# Test Argos-MCP functionality
 
 set -e
 
-echo "[TEST] Testing SQL MCP Server functionality..."
+echo "[TEST] Testing Argos-MCP functionality..."
 
 # Check if server is running
 if [ ! -f "server.pid" ]; then

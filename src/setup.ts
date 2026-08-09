@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 /**
- * Setup Entry Point for Claude SQL MCP Server
+ * Setup Entry Point for Argos-MCP
  *
  * This script provides an interactive configuration wizard for setting up
- * database connections and server settings for the Claude SQL MCP Server.
+ * database connections and server settings for the Argos-MCP.
  *
  * Usage:
  * npm run setup
@@ -78,7 +78,7 @@ function parseArgs(args: string[]): CliOptions {
 function showHelp(): void {
   // eslint-disable-next-line no-console
   console.log(`
- Claude SQL MCP Server Setup
+ Argos-MCP Setup
 
 USAGE:
  npm run setup Interactive configuration wizard
@@ -105,12 +105,12 @@ EXAMPLES:
  node dist/setup.js --template=production
  
  # Setup with custom config path
- node dist/setup.js --config=/etc/claude-sql/config.ini
+ node dist/setup.js --config=/etc/argos/config.ini
  
  # Setup without connection tests
  node dist/setup.js --skip-tests
 
-For more information, visit: https://github.com/AraneaDev/mcp-sql-access-server
+For more information, visit: https://github.com/AraneaDev/Argos-MCP
 `);
 }
 
@@ -119,10 +119,10 @@ function showVersion(): void {
     const packagePath = path.join(currentDir, '..', 'package.json');
     const packageJson = JSON.parse(fs.readFileSync(packagePath, 'utf-8'));
     // eslint-disable-next-line no-console
-    console.log(`Claude SQL MCP Server v${packageJson.version}`);
+    console.log(`Argos-MCP v${packageJson.version}`);
   } catch (error) {
     // eslint-disable-next-line no-console
-    console.log(`Claude SQL MCP Server v${SERVER_VERSION}`);
+    console.log(`Argos-MCP v${SERVER_VERSION}`);
   }
 }
 

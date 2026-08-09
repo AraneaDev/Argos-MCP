@@ -2,11 +2,11 @@
 
 # TypeScript API Reference
 
-This document provides comprehensive TypeScript API documentation for the SQL MCP Server. It covers all interfaces, types, classes, and functions available for developers working with or extending the server.
+This document provides comprehensive TypeScript API documentation for the Argos-MCP. It covers all interfaces, types, classes, and functions available for developers working with or extending the server.
 
 ## Implementation Status Guide
 
-This documentation reflects the **actual implementation** as of v2.7.1. Status indicators show the current state:
+This documentation reflects the **actual implementation** as of v3.0.0 <!-- x-release-please-version -->. Status indicators show the current state:
 
 - **Fully Implemented** - Complete and ready for use (90%+ test coverage)
 - **Partially Implemented** - Basic functionality available, advanced features planned
@@ -786,7 +786,7 @@ Server and protocol version constants.
 ```typescript
 export const MCP_PROTOCOL_VERSION = '2025-06-18';
 export const SERVER_VERSION = '2.3.1';
-export const SERVER_NAME = 'mcp-sql-access-server';
+export const SERVER_NAME = 'argos-mcp';
 ```
 
 ### Enum Arrays
@@ -807,7 +807,7 @@ export const SSH_TUNNEL_STATUSES = ['connecting', 'connected', 'error', 'disconn
 
 ### Creating and Using SQLMCPServer
 ```typescript
-import { SQLMCPServer, DatabaseConfig } from 'sql-access';
+import { SQLMCPServer, DatabaseConfig } from 'argos';
 
 const server = new SQLMCPServer();
 
@@ -835,7 +835,7 @@ startServer();
 
 ### Custom Security Validation
 ```typescript
-import { SecurityManager, SecurityValidation } from 'sql-access';
+import { SecurityManager, SecurityValidation } from 'argos';
 
 class CustomSecurityManager extends SecurityManager {
  validateCustomRule(query: string): SecurityValidation {
@@ -857,7 +857,7 @@ class CustomSecurityManager extends SecurityManager {
 
 ### Type-Safe Configuration
 ```typescript
-import { DatabaseConfig, isDatabaseType, validateRequiredFields } from 'sql-access';
+import { DatabaseConfig, isDatabaseType, validateRequiredFields } from 'argos';
 
 function createDatabaseConfig(rawConfig: any): DatabaseConfig {
  // Validate database type
@@ -887,7 +887,7 @@ function createDatabaseConfig(rawConfig: any): DatabaseConfig {
 
 ### Custom Database Adapter
 ```typescript
-import { DatabaseConnection, QueryResult } from 'sql-access';
+import { DatabaseConnection, QueryResult } from 'argos';
 
 class CustomDatabaseAdapter implements DatabaseConnection {
  async connect(config: DatabaseConfig): Promise<void> {
@@ -929,7 +929,7 @@ import {
  SecurityViolationError, 
  ConnectionError,
  isSecurityViolationError 
-} from 'sql-access';
+} from 'argos';
 
 async function handleDatabaseOperation() {
  try {
@@ -943,7 +943,7 @@ async function handleDatabaseOperation() {
  console.log('Connection error:', error.message);
  console.log('Database:', error.details?.database);
  } else if (error instanceof SQLMCPError) {
- console.log('SQL MCP Error:', error.code, error.message);
+ console.log('Argos-MCP Error:', error.code, error.message);
  } else {
  console.log('Unknown error:', error);
  }
@@ -951,4 +951,4 @@ async function handleDatabaseOperation() {
 }
 ```
 
-This comprehensive TypeScript API reference provides developers with all the types, interfaces, and classes needed to work with or extend the SQL MCP Server effectively.
+This comprehensive TypeScript API reference provides developers with all the types, interfaces, and classes needed to work with or extend the Argos-MCP effectively.

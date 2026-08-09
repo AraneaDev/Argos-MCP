@@ -2,7 +2,7 @@
 
 ## Overview
 
-This advanced tutorial focuses on implementing enterprise-grade security measures for SQL MCP Server. You'll learn advanced authentication, authorization, encryption, monitoring, and compliance strategies for production environments.
+This advanced tutorial focuses on implementing enterprise-grade security measures for Argos-MCP. You'll learn advanced authentication, authorization, encryption, monitoring, and compliance strategies for production environments.
 
 ## Prerequisites
 
@@ -20,7 +20,7 @@ This advanced tutorial focuses on implementing enterprise-grade security measure
 +-------------------------------------------------------------------+
 |                                                                   |
 |  +--------------+ +------------------+ +------------------+       |
-|  | Client       |----| WAF/Proxy      |----| SQL MCP Server |    |
+|  | Client       |----| WAF/Proxy      |----| Argos-MCP |    |
 |  | (Claude)     | | (Security        | | (Hardened)       |      |
 |  +--------------+ | Gateway)         | +------------------+      |
 |                    +------------------+        |                  |
@@ -78,7 +78,7 @@ backup_codes_count=10
 [rbac]
 enabled=true
 default_role=readonly
-role_mapping_file=/etc/sql-mcp/roles.json
+role_mapping_file=/etc/argos/roles.json
 permission_cache_ttl=300
 
 # Role definitions
@@ -120,7 +120,7 @@ enabled=true
 threat_detection_level=strict
 block_dangerous_functions=true
 whitelist_mode=false
-custom_patterns_file=/etc/sql-mcp/security-patterns.json
+custom_patterns_file=/etc/argos/security-patterns.json
 
 # Dangerous function blocking
 blocked_functions=load_file,into_outfile,dumpfile,exec,xp_cmdshell
@@ -266,7 +266,7 @@ type=postgresql
 host=secure-db.company.com
 database=sensitive
 encryption_at_rest=true
-encryption_key_file=/etc/sql-mcp/keys/database.key
+encryption_key_file=/etc/argos/keys/database.key
 key_rotation_days=90
 
 [database.pii_data]
@@ -449,7 +449,7 @@ log_retention_days=2555 # 7 years for compliance
 
 # Audit destinations
 destinations=file,syslog,database,siem
-file_path=/var/log/sql-mcp/audit.log
+file_path=/var/log/argos/audit.log
 syslog_facility=local0
 database_table=audit_logs
 siem_endpoint=https://siem.company.com/api/events
@@ -744,7 +744,7 @@ enabled=true
 classification_levels=public,internal,confidential,restricted
 default_level=internal
 auto_classify=true
-classification_rules_file=/etc/sql-mcp/classification-rules.json
+classification_rules_file=/etc/argos/classification-rules.json
 
 # Classification enforcement
 enforce_access_controls=true
@@ -975,4 +975,4 @@ After implementing advanced security configuration:
 
 ---
 
-*This tutorial is part of the SQL MCP Server Advanced Configuration Series. For questions or feedback, please refer to our [community discussions](https://github.com/AraneaDev/mcp-sql-access-server/discussions).*
+*This tutorial is part of the Argos-MCP Advanced Configuration Series. For questions or feedback, please refer to our [community discussions](https://github.com/AraneaDev/Argos-MCP/discussions).*

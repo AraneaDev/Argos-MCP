@@ -1,10 +1,10 @@
 # MySQL Database Configuration Guide
 
-This guide covers MySQL and MariaDB setup, configuration, and optimization for the SQL MCP Server.
+This guide covers MySQL and MariaDB setup, configuration, and optimization for the Argos-MCP.
 
 ## Overview
 
-The SQL MCP Server provides comprehensive support for MySQL and MariaDB databases through the `mysql2` driver, offering high-performance connections, connection pooling, and enterprise-grade features.
+The Argos-MCP provides comprehensive support for MySQL and MariaDB databases through the `mysql2` driver, offering high-performance connections, connection pooling, and enterprise-grade features.
 
 **Supported Versions:**
 - MySQL 5.7, 8.0, 8.1+
@@ -35,7 +35,7 @@ timeout=30000
 ### 2. Test Connection
 
 ```bash
-sql-mcp-test mysql_example
+# Test it from Claude with the sql_test_connection tool, database: mysql_example
 ```
 
 ## Configuration Options

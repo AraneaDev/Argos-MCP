@@ -1,6 +1,6 @@
 # Tutorial 2: Connecting Your First Database
 
-This tutorial walks you through connecting your first database to the SQL MCP Server, from initial setup to running your first query with Claude Desktop.
+This tutorial walks you through connecting your first database to the Argos-MCP, from initial setup to running your first query with Claude Code.
 
 ## What You'll Learn
 
@@ -11,7 +11,7 @@ This tutorial walks you through connecting your first database to the SQL MCP Se
 
 ## Prerequisites
 
-- SQL MCP Server installed ([Tutorial 1: Installation](01-installation.md))
+- Argos-MCP installed ([Tutorial 1: Installation](01-installation.md))
 - A database to connect to (PostgreSQL, MySQL, SQLite, or SQL Server)
 - Database credentials and network access
 
@@ -229,10 +229,10 @@ npm start
 
 You should see:
 ```
-SQL MCP Server running on stdio
+Argos-MCP running on stdio
 Connection established: production
 Schema cached: production
-Server ready for Claude Desktop integration
+Server ready for Claude Code integration
 ```
 
 ## Security Configuration Deep Dive
@@ -429,7 +429,7 @@ npm run setup
 
 ### Test with Simple Queries
 
-Once connected, try these test queries through Claude Desktop:
+Once connected, try these test queries through Claude Code:
 
 1. **Basic Connection Test:**
  > "Test the connection to my production database"
@@ -497,7 +497,7 @@ Once connected, try these test queries through Claude Desktop:
 
 Once you have a working database connection:
 
-1. **[Tutorial 3: Claude Integration](03-claude-integration.md)** - Configure Claude Desktop
+1. **[Tutorial 3: Claude Integration](03-claude-integration.md)** - Configure Claude Code
 2. **[Tutorial 4: Basic Queries](04-basic-queries.md)** - Run your first queries
 3. **[Advanced Multi-Database Setup](advanced-01-multi-database.md)** - Add more databases
 4. **[SSH Tunnel Configuration](advanced-02-ssh-tunnels.md)** - Secure remote access

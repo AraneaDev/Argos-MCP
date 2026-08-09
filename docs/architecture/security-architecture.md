@@ -1,6 +1,6 @@
 # Security Architecture
 
-The SQL MCP Server implements a comprehensive, multi-layered security architecture designed to protect database assets while providing secure access to Claude Desktop. This document details the security model, threat analysis, and protective mechanisms.
+The Argos-MCP implements a comprehensive, multi-layered security architecture designed to protect database assets while providing secure access to Claude Code. This document details the security model, threat analysis, and protective mechanisms.
 
 ## Security Philosophy
 
@@ -16,7 +16,7 @@ The security architecture follows the principle of **Defense in Depth**, impleme
 
 ```mermaid
 graph TB
- Claude[Claude Desktop] --> Transport[Transport Security]
+ Claude[Claude Code] --> Transport[Transport Security]
  Transport --> Protocol[MCP Protocol Validation]
  Protocol --> Authentication[Authentication Layer]
  Authentication --> Authorization[Authorization & Access Control]

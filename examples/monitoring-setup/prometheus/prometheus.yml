@@ -1,10 +1,10 @@
-# Prometheus Configuration for SQL MCP Server Monitoring
+# Prometheus Configuration for Argos-MCP Monitoring
 
 global:
   scrape_interval: 15s
   evaluation_interval: 15s
   external_labels:
-    monitor: 'sql-mcp-server-monitor'
+    monitor: 'argos-mcp-monitor'
 
 # Alertmanager configuration
 alerting:
@@ -27,10 +27,10 @@ scrape_configs:
     scrape_interval: 30s
     metrics_path: /metrics
 
-  # SQL MCP Server main metrics
-  - job_name: 'sql-mcp-server'
+  # Argos-MCP main metrics
+  - job_name: 'argos-mcp'
     static_configs:
-      - targets: ['host.docker.internal:3001']  # Adjust for your SQL MCP Server
+      - targets: ['host.docker.internal:3001']  # Adjust for your Argos-MCP
     scrape_interval: 10s
     metrics_path: /metrics
     scrape_timeout: 10s
@@ -107,26 +107,26 @@ scrape_configs:
 # Configuration for recording rules (optional)
 # Used to pre-compute frequently used or expensive queries
 recording_rules:
-  - name: sql_mcp_server_recording_rules
+  - name: argos_server_recording_rules
     interval: 30s
     rules:
-      - record: sql_mcp:query_rate_5m
-        expr: rate(sql_mcp_queries_total[5m])
+      - record: argos:query_rate_5m
+        expr: rate(argos_queries_total[5m])
       
-      - record: sql_mcp:error_rate_5m
-        expr: rate(sql_mcp_queries_total{status="error"}[5m])
+      - record: argos:error_rate_5m
+        expr: rate(argos_queries_total{status="error"}[5m])
       
-      - record: sql_mcp:success_rate_5m
-        expr: rate(sql_mcp_queries_total{status="success"}[5m])
+      - record: argos:success_rate_5m
+        expr: rate(argos_queries_total{status="success"}[5m])
       
-      - record: sql_mcp:query_duration_p95
-        expr: histogram_quantile(0.95, rate(sql_mcp_query_duration_seconds_bucket[5m]))
+      - record: argos:query_duration_p95
+        expr: histogram_quantile(0.95, rate(argos_query_duration_seconds_bucket[5m]))
       
-      - record: sql_mcp:query_duration_p99
-        expr: histogram_quantile(0.99, rate(sql_mcp_query_duration_seconds_bucket[5m]))
+      - record: argos:query_duration_p99
+        expr: histogram_quantile(0.99, rate(argos_query_duration_seconds_bucket[5m]))
       
-      - record: sql_mcp:connection_utilization
-        expr: sql_mcp_connections_active / sql_mcp_connections_max * 100
+      - record: argos:connection_utilization
+        expr: argos_connections_active / argos_connections_max * 100
 
 # Storage configuration
 storage:

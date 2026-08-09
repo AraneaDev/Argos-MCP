@@ -1,5 +1,5 @@
 /**
- * Main type exports for SQL MCP Server
+ * Main type exports for Argos-MCP
  */
 
 // Database types
@@ -266,8 +266,8 @@ export {
 // ============================================================================
 
 export const MCP_PROTOCOL_VERSION = '2025-06-18';
-export const SERVER_VERSION = '2.7.1';
-export const SERVER_NAME = 'mcp-sql-access-server';
+export const SERVER_VERSION = '3.0.0'; // x-release-please-version
+export const SERVER_NAME = 'argos-mcp';
 
 // ============================================================================
 // Common Enums (as const assertions for better type safety)

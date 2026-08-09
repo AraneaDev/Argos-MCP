@@ -1,18 +1,17 @@
 {
-  "name": "sql-access",
-  "version": "2.7.2",
-  "description": "MCP server for accessing SQL databases, with support for PostgreSQL, MySQL, SQLite, MSSQL, and SSH tunnels",
+  "name": "argos-mcp",
+  "version": "3.0.0",
+  "description": "Argos-MCP - the hundred-eyed MCP server for SQL databases, with support for PostgreSQL, MySQL, SQLite, MSSQL, and SSH tunnels",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
-    "mcp-sql-server": "./dist/index.js",
-    "mcp-sql-setup": "./dist/setup.js",
-    "mcp-sql-install": "./dist/install.js"
+    "argos-mcp": "./dist/index.js",
+    "argos-setup": "./dist/setup.js"
   },
   "scripts": {
-    "build": "npm run clean && tsc && chmod +x dist/index.js dist/setup.js dist/install.js",
+    "build": "npm run clean && tsc && chmod +x dist/index.js dist/setup.js",
     "build:fast": "npm run clean && npm run build:esbuild",
-    "build:esbuild": "esbuild src/index.ts src/setup.ts src/install.ts --bundle --platform=node --outdir=dist --external:mssql --external:mysql2 --external:pg --external:sqlite3 --external:ssh2 --external:ini --format=esm --sourcemap --minify && chmod +x dist/index.js dist/setup.js dist/install.js",
+    "build:esbuild": "esbuild src/index.ts src/setup.ts --bundle --platform=node --outdir=dist --external:mssql --external:mysql2 --external:pg --external:sqlite3 --external:ssh2 --external:ini --format=esm --sourcemap --minify && chmod +x dist/index.js dist/setup.js",
     "build:production": "npm run clean && npm run lint && npm run test && npm run build",
     "build:watch": "tsc --watch",
     "dev": "npm run build:watch",
@@ -34,8 +33,15 @@
     "validate-docs": "node scripts/validate-documentation.js",
     "prepack": "npm run build:production",
     "generate-template": "node dist/setup.js --template",
-    "install-mcp": "node dist/install.js",
     "prepare": "husky"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AraneaDev/Argos-MCP.git"
+  },
+  "homepage": "https://github.com/AraneaDev/Argos-MCP#readme",
+  "bugs": {
+    "url": "https://github.com/AraneaDev/Argos-MCP/issues"
   },
   "lint-staged": {
     "{src,tests}/**/*.ts": "prettier --write",
@@ -45,7 +51,10 @@
     "qs": "^6.15.2"
   },
   "keywords": [
+    "argos",
+    "argos-mcp",
     "claude",
+    "claude-code",
     "mcp",
     "sql",
     "database",

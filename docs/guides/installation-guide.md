@@ -5,15 +5,15 @@ This comprehensive guide walks you through installing the Argos-MCP on various p
 ## System Requirements
 
 ### Minimum Requirements
-- **Node.js**: 16.0.0 or higher
-- **npm**: 8.0.0 or higher
+- **Node.js**: 22.0.0 or higher
+- **npm**: 10.0.0 or higher
 - **Memory**: 256 MB RAM
 - **Storage**: 100 MB available disk space
 - **Network**: Internet access for package installation
 
 ### Recommended Requirements
-- **Node.js**: 18.0.0 or higher (LTS)
-- **npm**: 9.0.0 or higher
+- **Node.js**: 24.0.0 or higher (current LTS)
+- **npm**: 11.0.0 or higher
 - **Memory**: 512 MB RAM
 - **Storage**: 500 MB available disk space
 - **Database Access**: Network connectivity to your databases
@@ -92,7 +92,7 @@ npm run setup
 #### Prerequisites
 1. **Install Node.js**
  - Download from [nodejs.org](https://nodejs.org/)
- - Choose LTS version (18.x recommended)
+ - Choose an LTS version (22.x or 24.x)
  - Run installer with default options
 
 2. **Verify Installation**
@@ -131,7 +131,7 @@ ssh_private_key=C:\Users\username\.ssh\id_rsa
 1. **Install Node.js**
  ```bash
  # Using Homebrew (recommended)
- brew install node@18
+ brew install node@22
 
  # Or download from nodejs.org
  ```
@@ -165,8 +165,8 @@ argos-setup
 # Update package index
 sudo apt update
 
-# Install Node.js 18.x
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+# Install Node.js 22.x
+curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
 sudo apt-get install -y nodejs
 
 # Install build tools (if building from source)
@@ -186,8 +186,8 @@ argos-setup
 
 #### CentOS/RHEL/Rocky Linux
 ```bash
-# Install Node.js 18.x
-curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
+# Install Node.js 22.x
+curl -fsSL https://rpm.nodesource.com/setup_22.x | sudo bash -
 sudo dnf install -y nodejs
 
 # Install development tools (if building from source)
@@ -529,7 +529,7 @@ node --version
 
 # If version is too old:
 # - Windows: Download from nodejs.org
-# - macOS: brew install node@18
+# - macOS: brew install node@22
 # - Linux: Use NodeSource repository
 ```
 

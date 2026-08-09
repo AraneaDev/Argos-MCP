@@ -1,10 +1,10 @@
 # Release Process Guide
 
-This guide outlines the complete release process for the SQL MCP Server, including versioning, testing, documentation, and deployment procedures.
+This guide outlines the complete release process for the Argos-MCP, including versioning, testing, documentation, and deployment procedures.
 
 ## Overview
 
-The SQL MCP Server follows semantic versioning and maintains a structured release process that ensures quality, stability, and proper change management. Every release goes through comprehensive testing, documentation updates, and deployment validation.
+The Argos-MCP follows semantic versioning and maintains a structured release process that ensures quality, stability, and proper change management. Every release goes through comprehensive testing, documentation updates, and deployment validation.
 
 **Release Cycle:**
 - **Major versions** (X.0.0) - Breaking changes, major new features
@@ -99,393 +99,63 @@ For development and testing releases:
 
 ## Release Workflow
 
-### 1. Pre-Release Planning
+Releases are cut by [release-please](https://github.com/googleapis/release-please)
+from Conventional Commits. Versions are **never** bumped by hand, and there is no
+`bump-version` script — it was removed in v3.0.0.
 
-#### Version Planning Meeting
-- Review completed features and bug fixes
-- Determine version type (major/minor/patch)
-- Identify any breaking changes
-- Plan release timeline
-- Assign release responsibilities
+### 1. Merge work to `main`
 
-#### Release Branch Strategy
+Each pull request carries a Conventional Commit title. Because a squash merge
+takes the PR title as the commit subject on `main`, that title is what
+release-please parses; `.github/workflows/pr-title.yml` rejects titles it could
+not classify.
 
-```bash
-# Create release branch from main
-git checkout main
-git pull origin main
-git checkout -b release/2.1.0
+- `feat:` → minor bump
+- `fix:` → patch bump
+- `feat!:` / `fix!:` / a `BREAKING CHANGE:` footer → major bump
+- everything else (`docs`, `chore`, `ci`, `refactor`, `style`, `test`, `build`,
+  `perf`) lands without cutting a release
 
-# Development continues on main
-# Bug fixes for release go on release branch
-```
+### 2. Review the Release PR
 
-### 2. Code Preparation
+`.github/workflows/release-please.yml` opens (and keeps updating) a Release PR
+containing:
 
-#### Update Version Numbers
+- the version bump in `package.json` and `.release-please-manifest.json`
+- the generated `CHANGELOG.md` entry
+- rewritten version references in `src/types/index.ts`, `README.md`,
+  `docs/api/typescript-api.md`, and `docs/tutorials/01-installation.md`
 
-```json
-// package.json
-{
- "name": "sql-access",
- "version": "2.1.0",
- "description": "MCP server for accessing SQL databases"
-}
-```
+Those four files are listed in `release-please-config.json` and each carries an
+`x-release-please-version` annotation. If you add another place the version
+appears, annotate it and register it there — otherwise `npm run validate-docs`
+will fail on the next release.
 
-#### Update Documentation
+Review the changelog entry as you would any other diff. This is the moment to
+correct a misleading commit subject, since it is what users will read.
 
-```bash
-# Update version references in documentation
-grep -r "version.*2\.0\.0" docs/ | # Find old version references
-sed -i 's/2\.0\.0/2.1.0/g' docs/ # Update to new version
-```
+### 3. Merge the Release PR
 
-#### Dependencies Review
+Merging tags `vX.Y.Z`, creates the GitHub Release, and runs the verification
+steps in the same workflow: build, lint, format check, typecheck, the full test
+suite, then an assertion that both bin targets exist and `dist/index.js` kept its
+shebang. The packaged `.tgz` and `.zip` are attached to the Release.
 
-```bash
-# Check for outdated dependencies
-npm audit
-npm outdated
+Publishing to npm is wired up but dormant (`if: false`) — Argos is not on the
+registry yet. To go public, remove that guard and configure Trusted Publishing
+or an `NPM_TOKEN`.
 
-# Update non-breaking dependencies
-npm update
+### Quality gates
 
-# Review and test breaking dependency updates manually
-```
-
-### 3. Quality Assurance
-
-#### Automated Testing Pipeline
+Everything below runs before a release can be cut, on every pull request via
+`.github/workflows/ci.yml`, and locally on `git push` via the `pre-push` hook:
 
 ```bash
-# Run complete test suite
-npm run validate
-
-# This runs:
-# - npm run lint:check # Code style validation
-# - npm run type-check # TypeScript compilation
-# - npm run test:coverage # Full test suite with coverage
+npm run validate       # lint:check + format:check + type-check + test
+npm run validate-docs  # version references across README and docs
+npm run build          # must emit dist/index.js and dist/setup.js
 ```
 
-#### Manual Testing Checklist
-
-- [ ] **Database Connectivity**: Test all database types (PostgreSQL, MySQL, SQLite, SQL Server)
-- [ ] **SSH Tunneling**: Verify SSH tunnel functionality
-- [ ] **Security Validation**: Test query validation with various scenarios
-- [ ] **MCP Protocol**: Verify MCP tool integration with Claude Desktop
-- [ ] **Performance**: Run performance benchmarks
-- [ ] **Configuration**: Test configuration validation and error handling
-- [ ] **Documentation**: Verify all examples in documentation work
-
-#### Integration Testing
-
-```bash
-# Run integration tests with real databases
-docker-compose up -d # Start test databases
-
-# Test each database type
-npm run test:integration -- --testNamePattern="PostgreSQL"
-npm run test:integration -- --testNamePattern="MySQL"
-npm run test:integration -- --testNamePattern="SQLite"
-npm run test:integration -- --testNamePattern="SQL Server"
-
-docker-compose down # Clean up
-```
-
-#### Security Audit
-
-```bash
-# Run security audit
-npm audit --audit-level high
-
-# Check for vulnerable dependencies
-npm audit fix
-
-# Manual security review
-# - Review new/changed SQL parsing logic
-# - Validate input sanitization
-# - Check error message sanitization
-# - Review authentication/authorization changes
-```
-
-### 4. Documentation Updates
-
-#### Release Notes Preparation
-
-Create `CHANGELOG.md` entry:
-
-```markdown
-## [2.1.0] - 2024-08-12
-
-### Added
-- Batch query validation support
-- PostgreSQL array and JSON query support
-- Enhanced SSH tunnel monitoring
-- New configuration validation utilities
-
-### Changed 
-- Improved query complexity analysis algorithm
-- Enhanced error messages for better debugging
-- Updated TypeScript to v5.0.0
-
-### Fixed
-- Fixed connection leak in MySQL adapter
-- Resolved SSH tunnel reconnection issues
-- Fixed query parsing edge cases with comments
-
-### Security
-- Enhanced SQL injection prevention
-- Improved error message sanitization
-- Updated vulnerable dependencies
-
-### Breaking Changes
-- None in this release
-
-### Deprecated 
-- Legacy configuration format (will be removed in v3.0.0)
-
-### Migration Guide
-No migration required for this version.
-```
-
-#### Documentation Version Update
-
-```bash
-# Update version in documentation
-find docs -name "*.md" -exec sed -i 's/Version: [0-9]\+\.[0-9]\+\.[0-9]\+/Version: 2.1.0/g' {} \;
-
-# Update API documentation
-npm run docs:generate # If automated docs generation exists
-
-# Review and update:
-# - Installation instructions
-# - Configuration examples 
-# - API reference
-# - Tutorial content
-# - Troubleshooting guides
-```
-
-### 5. Build and Packaging
-
-#### Production Build
-
-```bash
-# Clean build
-npm run clean
-
-# Production build with all validations
-npm run build:production
-
-# Verify build output
-ls -la dist/
-file dist/index.js # Should be JavaScript, not TypeScript
-
-# Test built version
-node dist/index.js --version
-```
-
-#### Package Preparation
-
-```bash
-# Verify package contents
-npm pack --dry-run
-
-# Check included/excluded files
-cat .npmignore
-grep -E "^(files|main|bin)" package.json
-
-# Test installation locally
-npm pack
-npm install -g sql-access-2.1.0.tgz
-mcp-sql-server --version
-npm uninstall -g sql-access
-```
-
-#### Build Artifacts
-
-```bash
-# Generate checksums
-sha256sum dist/index.js > dist/checksums.txt
-sha256sum sql-access-2.1.0.tgz >> dist/checksums.txt
-
-# Create source archive
-git archive --format=tar.gz --prefix=sql-access-2.1.0/ v2.1.0 > sql-access-2.1.0-src.tar.gz
-```
-
-### 6. Release Deployment
-
-#### GitHub Release Process
-
-```bash
-# Tag the release
-git tag -a v2.1.0 -m "Release version 2.1.0
-
-- Added batch query validation support
-- Enhanced SSH tunnel monitoring 
-- Fixed connection leak issues
-- Improved security validation
-
-See CHANGELOG.md for complete details."
-
-# Push tag to origin
-git push origin v2.1.0
-
-# Push release branch
-git push origin release/2.1.0
-```
-
-#### GitHub Release Creation
-
-1. **Navigate to GitHub Releases**
- - Go to repository -> Releases -> Draft a new release
-
-2. **Release Configuration**
- ```
- Tag version: v2.1.0
- Release title: SQL MCP Server v2.1.0
- 
- Target: main (after merging release branch)
- ```
-
-3. **Release Description Template**
- ```markdown
- ## SQL MCP Server v2.1.0
- 
- This release adds batch query support, enhanced monitoring, and several bug fixes.
- 
- ### New Features
- - Batch query validation with comprehensive analysis
- - Enhanced SSH tunnel health monitoring
- - Improved query complexity analysis
- 
- ### Bug Fixes
- - Fixed MySQL connection leak in high-load scenarios
- - Resolved SSH tunnel reconnection edge cases
- - Fixed query parsing with embedded comments
- 
- ### Security Improvements
- - Enhanced SQL injection prevention
- - Improved error message sanitization
- - Updated dependencies with security fixes
- 
- ### Documentation
- - Updated all database configuration guides
- - Added batch query examples
- - Enhanced troubleshooting documentation
- 
- ## Installation
- 
- ```bash
- npm install -g sql-access@2.1.0
- ```
- 
- ## Upgrade from v2.0.x
- 
- This release is fully backward compatible. No configuration changes required.
- 
- ```bash
- npm update -g sql-access
- ```
- 
- ## Full Changelog
- 
- See [CHANGELOG.md](CHANGELOG.md) for complete details.
- 
- ## Contributors
- 
- Thanks to all contributors who made this release possible!
- ```
-
-4. **Attach Release Assets**
- - `sql-access-2.1.0.tgz` (npm package)
- - `sql-access-2.1.0-src.tar.gz` (source code)
- - `checksums.txt` (file integrity verification)
-
-#### NPM Publishing
-
-```bash
-# Verify package before publishing
-npm pack
-tar -tzf sql-access-2.1.0.tgz | head -20
-
-# Login to npm (if not already)
-npm login
-
-# Publish to npm
-npm publish
-
-# Verify publication
-npm view sql-access@2.1.0
-
-# Test installation from npm
-npm install -g sql-access@2.1.0
-mcp-sql-server --version
-```
-
-### 7. Post-Release Activities
-
-#### Merge Release Branch
-
-```bash
-# Merge release branch back to main
-git checkout main
-git pull origin main
-git merge --no-ff release/2.1.0
-git push origin main
-
-# Clean up release branch
-git branch -d release/2.1.0
-git push origin --delete release/2.1.0
-```
-
-#### Update Main Branch
-
-```bash
-# Ensure main is ready for next development
-git checkout main
-
-# Update version to next development version
-sed -i 's/"version": "2.3.1"/"version": "2.3.1-dev"/' package.json
-
-# Commit development version
-git add package.json
-git commit -m "Bump version to 2.3.1-dev for next development cycle"
-git push origin main
-```
-
-#### Communication and Announcements
-
-1. **Internal Team Notification**
- - Slack/Teams announcement with release highlights
- - Update project documentation
- - Notify support team of new features
-
-2. **Community Announcements**
- - GitHub Discussions post
- - Update README badges
- - Social media announcements (if applicable)
-
-3. **User Communication**
- - Update documentation website
- - Send notification to users (if mailing list exists)
- - Update examples and tutorials
-
-#### Monitoring Post-Release
-
-```bash
-# Monitor npm download stats
-npm view sql-access downloads --json
-
-# Monitor GitHub metrics
-# - Stars, forks, issues
-# - Download counts for releases
-
-# Check for immediate issues
-# - Monitor error reporting
-# - Review new GitHub issues
-# - Check community discussions
-```
 
 ## Hotfix Release Process
 
@@ -498,245 +168,59 @@ npm view sql-access downloads --json
 
 ### Hotfix Workflow
 
+A hotfix is an ordinary `fix:` pull request — the automation handles the rest.
+There is no separate branch-off-the-tag procedure, because releases are always
+cut from `main`.
+
 ```bash
-# Create hotfix branch from latest release tag
-git checkout v2.1.0
-git checkout -b hotfix/2.1.1
+git checkout main && git pull
+git checkout -b fix/connection-pool-leak
 
-# Make minimal fix
-# ... edit files ...
+# Make the minimal fix, with a regression test
+npm run validate
 
-# Test the fix thoroughly
-npm run test
-npm run test:integration
-
-# Update version (patch only)
-sed -i 's/"version": "2.1.0"/"version": "2.1.1"/' package.json
-
-# Update changelog
-cat >> CHANGELOG.md << 'EOF'
-## [2.1.1] - 2024-08-15
-
-### Fixed
-- Critical security fix for SQL injection vulnerability
-- Fixed connection pool leak under high load
-
-### Security
-- Patched SQL injection in query parameter handling
-EOF
-
-# Commit and tag
-git add .
-git commit -m "Hotfix 2.1.1: Critical security and stability fixes"
-git tag -a v2.1.1 -m "Hotfix release 2.1.1"
-
-# Push hotfix
-git push origin hotfix/2.1.1
-git push origin v2.1.1
-
-# Deploy immediately
-npm publish
-
-# Merge back to main
-git checkout main
-git merge --no-ff hotfix/2.1.1
-git push origin main
-
-# Clean up
-git branch -d hotfix/2.1.1
-git push origin --delete hotfix/2.1.1
+git commit -m "fix(connection): release pooled handles on tunnel teardown"
+git push -u origin fix/connection-pool-leak
 ```
+
+Open the pull request with that same Conventional Commit subject as its title.
+Once merged, release-please raises a Release PR with a patch bump; merging it
+publishes the release.
+
+If a fix is urgent, merge its PR and then merge the Release PR immediately —
+the Release PR is updated within a minute of the fix landing on `main`. Nothing
+about the path is different for a security fix beyond that urgency; note the
+advisory in the commit body so it lands in the changelog.
 
 ## Release Automation
 
-### GitHub Actions Workflow
+Three workflows carry the release, all under `.github/workflows/`:
 
-```yaml
-# .github/workflows/release.yml
-name: Release
+| Workflow | Trigger | What it does |
+|----------|---------|--------------|
+| `ci.yml` | push/PR to `main` | lint, format check, typecheck; tests on Node 20/22/24; build, artifact assertions, `validate-docs` |
+| `pr-title.yml` | pull request opened/edited | Rejects a PR title that is not a Conventional Commit |
+| `release-please.yml` | push to `main` | Opens/updates the Release PR; on merge, tags, releases, verifies, and attaches artifacts |
 
-on:
- push:
- tags:
- - 'v*'
+`pr-title.yml` runs on `pull_request_target` rather than `pull_request`, so the
+workflow definition is taken from the base branch and a pull request cannot
+weaken the check in the same change it is meant to police. That trigger runs in
+a trusted context, so the job is payload-only — it never checks out or executes
+anything from the pull request's tree, and `permissions: {}` withholds the token
+regardless.
 
-jobs:
- release:
- runs-on: ubuntu-latest
- 
- steps:
- - name: Checkout
- uses: actions/checkout@v3
- with:
- fetch-depth: 0
- 
- - name: Setup Node.js
- uses: actions/setup-node@v3
- with:
- node-version: '18'
- registry-url: 'https://registry.npmjs.org'
- cache: 'npm'
- 
- - name: Install dependencies
- run: npm ci
- 
- - name: Run tests
- run: npm run validate
- 
- - name: Build
- run: npm run build:production
- 
- - name: Create package
- run: npm pack
- 
- - name: Generate checksums
- run: |
- sha256sum *.tgz > checksums.txt
- sha256sum dist/index.js >> checksums.txt
- 
- - name: Publish to NPM
- run: npm publish
- env:
- NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
- 
- - name: Create GitHub Release
- uses: actions/create-release@v1
- env:
- GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
- with:
- tag_name: ${{ github.ref }}
- release_name: SQL MCP Server ${{ github.ref }}
- draft: false
- prerelease: false
- 
- - name: Upload Assets
- uses: actions/upload-release-asset@v1
- env:
- GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
- with:
- upload_url: ${{ steps.create_release.outputs.upload_url }}
- asset_path: ./sql-access-*.tgz
- asset_name: sql-access-${{ github.ref }}.tgz
- asset_content_type: application/gzip
-```
+Release configuration lives in two files:
 
-### Release Scripts
+- **`release-please-config.json`** — release type (`node`), changelog path, and
+  the `extra-files` whose version references get rewritten.
+- **`.release-please-manifest.json`** — the current version, which release-please
+  maintains. Do not edit it by hand.
 
-```javascript
-// scripts/release.js - Automated release helper
-const fs = require('fs');
-const { execSync } = require('child_process');
-const semver = require('semver');
+There is no `scripts/release.js` and no tag-triggered release workflow. Because
+release-please creates the tag with `GITHUB_TOKEN`, a separate `on: push: tags`
+workflow would never fire — which is why build, verification, and publishing all
+live inside `release-please.yml` behind `if: steps.release.outputs.release_created`.
 
-class ReleaseManager {
- constructor() {
- this.packageJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
- this.currentVersion = this.packageJson.version;
- }
-
- validatePrerequisites() {
- console.log(' Validating release prerequisites...');
- 
- // Check git status
- const gitStatus = execSync('git status --porcelain', { encoding: 'utf8' });
- if (gitStatus.trim()) {
- throw new Error('Working directory must be clean before release');
- }
-
- // Check branch
- const branch = execSync('git branch --show-current', { encoding: 'utf8' }).trim();
- if (branch !== 'main' && !branch.startsWith('release/')) {
- throw new Error('Releases must be made from main or release branch');
- }
-
- // Run tests
- execSync('npm run validate', { stdio: 'inherit' });
- 
- console.log(' Prerequisites validated');
- }
-
- bumpVersion(type) {
- console.log(` Bumping ${type} version from ${this.currentVersion}`);
- 
- const newVersion = semver.inc(this.currentVersion, type);
- if (!newVersion) {
- throw new Error(`Invalid version bump: ${type}`);
- }
-
- // Update package.json
- this.packageJson.version = newVersion;
- fs.writeFileSync('package.json', JSON.stringify(this.packageJson, null, 2) + '\n');
- 
- console.log(` Version bumped to ${newVersion}`);
- return newVersion;
- }
-
- updateChangelog(version, changes) {
- console.log(' Updating CHANGELOG.md...');
- 
- const date = new Date().toISOString().split('T')[0];
- const changelogEntry = `## [${version}] - ${date}\n\n${changes}\n\n`;
- 
- let changelog = fs.readFileSync('CHANGELOG.md', 'utf8');
- const insertPoint = changelog.indexOf('## [');
- 
- if (insertPoint === -1) {
- changelog = `# Changelog\n\n${changelogEntry}${changelog}`;
- } else {
- changelog = 
- changelog.slice(0, insertPoint) + 
- changelogEntry + 
- changelog.slice(insertPoint);
- }
- 
- fs.writeFileSync('CHANGELOG.md', changelog);
- console.log(' CHANGELOG.md updated');
- }
-
- createTag(version) {
- console.log(` Creating tag v${version}...`);
- 
- execSync(`git add package.json CHANGELOG.md`);
- execSync(`git commit -m "Release version ${version}"`);
- execSync(`git tag -a v${version} -m "Release version ${version}"`);
- 
- console.log(' Tag created');
- }
-
- async release(type, changes) {
- try {
- this.validatePrerequisites();
- const newVersion = this.bumpVersion(type);
- this.updateChangelog(newVersion, changes);
- this.createTag(newVersion);
- 
- console.log(` Release ${newVersion} prepared successfully!`);
- console.log('Next steps:');
- console.log('1. Push tags: git push origin v' + newVersion);
- console.log('2. GitHub Actions will handle the rest');
- 
- } catch (error) {
- console.error(' Release failed:', error.message);
- process.exit(1);
- }
- }
-}
-
-// CLI usage
-if (require.main === module) {
- const [,, type, ...changesList] = process.argv;
- const changes = changesList.join(' ');
- 
- if (!['patch', 'minor', 'major'].includes(type)) {
- console.error('Usage: node scripts/release.js <patch|minor|major> <changes>');
- process.exit(1);
- }
- 
- new ReleaseManager().release(type, changes);
-}
-
-module.exports = ReleaseManager;
-```
 
 ## Quality Gates
 
@@ -752,8 +236,9 @@ Before any release can proceed, all quality gates must pass:
 - [ ] No security vulnerabilities (npm audit)
 
 #### Documentation Gates
-- [ ] CHANGELOG.md updated
-- [ ] Version references updated in docs
+- [ ] CHANGELOG.md entry reads correctly (release-please generates it from commit
+      subjects — fix a misleading one in the Release PR)
+- [ ] `npm run validate-docs` passes (version references across README and docs)
 - [ ] API documentation current
 - [ ] README.md reflects current features
 - [ ] Migration guide available (for breaking changes)
@@ -773,13 +258,19 @@ Before any release can proceed, all quality gates must pass:
 
 ### NPM Package Rollback
 
-```bash
-# Deprecate problematic version
-npm deprecate sql-access@2.1.0 "This version has critical issues. Please upgrade to 2.1.1"
+Argos is not published to npm yet, so this applies once the publish step in
+`release-please.yml` is enabled.
 
-# If severe issues, unpublish (within 24 hours)
-npm unpublish sql-access@2.1.0
+```bash
+# Deprecate a problematic version
+npm deprecate argos-mcp@3.0.0 "This version has critical issues. Please upgrade to 3.0.1"
+
+# If severe, unpublish (only possible within 72 hours of publishing)
+npm unpublish argos-mcp@3.0.0
 ```
+
+Prefer deprecating over unpublishing: unpublishing breaks every lockfile that
+already pins the version.
 
 ### GitHub Release Rollback
 
@@ -793,7 +284,7 @@ npm unpublish sql-access@2.1.0
 ```markdown
 # Critical Security Update Required
 
-**Action Required:** All users of SQL MCP Server v2.1.0 must upgrade immediately.
+**Action Required:** All users of Argos-MCP v2.1.0 must upgrade immediately.
 
 ## Issue
 Version 2.1.0 contains a critical security vulnerability that could allow SQL injection attacks.
@@ -802,7 +293,7 @@ Version 2.1.0 contains a critical security vulnerability that could allow SQL in
 Upgrade to v2.1.1 immediately:
 
 ```bash
-npm update -g sql-access
+npm update -g argos
 ```
 
 ## Timeline
@@ -833,7 +324,7 @@ const releaseMetrics = {
  version: '2.1.0',
  releaseDate: '2024-08-12',
  downloads: {
- npm: await getNpmDownloads('sql-access', '2.1.0'),
+ npm: await getNpmDownloads('argos', '2.1.0'),
  github: await getGitHubReleaseDownloads('v2.1.0')
  },
  issues: {
@@ -851,7 +342,7 @@ const releaseMetrics = {
 
 ## Conclusion
 
-This comprehensive release process ensures that every SQL MCP Server release meets high standards for quality, security, and reliability. The structured approach minimizes risks while maintaining development velocity and user satisfaction.
+This comprehensive release process ensures that every Argos-MCP release meets high standards for quality, security, and reliability. The structured approach minimizes risks while maintaining development velocity and user satisfaction.
 
 **Key Principles:**
 - **Quality First**: Comprehensive testing before any release
@@ -866,29 +357,25 @@ Following this process helps maintain the project's reputation for reliability w
 
 ### Release Commands
 
+There are none — the bump type is derived from your commit subjects, and the
+release is cut by merging the Release PR.
+
 ```bash
-# Patch release (bug fixes)
-npm run release:patch
+# Choose the bump by choosing the commit type
+git commit -m "fix(mysql): ..."   # patch
+git commit -m "feat(schema): ..." # minor
+git commit -m "feat(api)!: ..."   # major
 
-# Minor release (new features)
-npm run release:minor
-
-# Major release (breaking changes)
-npm run release:major
-
-# Hotfix release
-npm run release:hotfix
-
-# Pre-release
-npm run release:beta
+# Verify locally before pushing (the pre-push hook runs this too)
+npm run validate
+npm run validate-docs
 ```
 
-### Emergency Contacts
+### Related Documentation
 
-- **Release Manager**: [Primary contact]
-- **Security Team**: [Security contact]
-- **DevOps Team**: [Infrastructure contact]
-- **Community Manager**: [User communication]
+- [CONTRIBUTING.md](../../CONTRIBUTING.md) — commit format, git hooks, release flow
+- [`release-please-config.json`](../../release-please-config.json) — files whose version references are rewritten
+- [`.github/workflows/release-please.yml`](../../.github/workflows/release-please.yml) — the release job itself
 
 ---
 

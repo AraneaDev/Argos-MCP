@@ -1,7 +1,7 @@
 /**
- * SQL MCP Server Health Check Script
+ * Argos-MCP Health Check Script
  * 
- * This script performs comprehensive health checks on SQL MCP Server
+ * This script performs comprehensive health checks on Argos-MCP
  * including connectivity, performance, and functionality tests.
  * 
  * Usage:
@@ -95,7 +95,7 @@ async function checkMetricsEndpoint() {
     
     if (response.statusCode === 200) {
       const metricsCount = response.body.split('\n').filter(line => 
-        line.startsWith('sql_mcp_') && !line.startsWith('#')
+        line.startsWith('argos_') && !line.startsWith('#')
       ).length;
       
       addCheck('metrics_endpoint', 'pass', `Metrics endpoint active (${metricsCount} metrics)`, duration, {
@@ -378,7 +378,7 @@ function makeHttpRequest(path, method = 'GET', data = null) {
 
 // Output formatters
 function outputConsole() {
-  console.log('\n=== SQL MCP Server Health Check Results ===\n');
+  console.log('\n=== Argos-MCP Health Check Results ===\n');
   
   console.log(`Overall Status: ${results.overall.toUpperCase()}`);
   console.log(`Check Duration: ${results.duration.toFixed(2)}ms`);
@@ -405,38 +405,38 @@ function outputJson() {
 }
 
 function outputPrometheus() {
-  console.log('# SQL MCP Server Health Check Metrics');
+  console.log('# Argos-MCP Health Check Metrics');
   console.log(`# Generated at ${results.timestamp}`);
   console.log();
   
   // Overall health
   const overallHealthValue = results.overall === 'pass' ? 1 : 
                             results.overall === 'warn' ? 0.5 : 0;
-  console.log(`sql_mcp_health_check_overall{status="${results.overall}"} ${overallHealthValue}`);
+  console.log(`argos_health_check_overall{status="${results.overall}"} ${overallHealthValue}`);
   
   // Individual check results
   results.checks.forEach(check => {
     const checkValue = check.status === 'pass' ? 1 : 
                       check.status === 'warn' ? 0.5 : 0;
-    console.log(`sql_mcp_health_check{check="${check.name}",status="${check.status}"} ${checkValue}`);
-    console.log(`sql_mcp_health_check_duration_ms{check="${check.name}"} ${check.duration}`);
+    console.log(`argos_health_check{check="${check.name}",status="${check.status}"} ${checkValue}`);
+    console.log(`argos_health_check_duration_ms{check="${check.name}"} ${check.duration}`);
   });
   
   // Metrics
   Object.entries(results.metrics).forEach(([name, metric]) => {
     const labels = Object.entries(metric.labels).map(([k, v]) => `${k}="${v}"`).join(',');
     const labelsStr = labels ? `{${labels}}` : '';
-    console.log(`sql_mcp_health_${name}${labelsStr} ${metric.value}`);
+    console.log(`argos_health_${name}${labelsStr} ${metric.value}`);
   });
   
-  console.log(`sql_mcp_health_check_duration_total_ms ${results.duration}`);
+  console.log(`argos_health_check_duration_total_ms ${results.duration}`);
 }
 
 // Main health check function
 async function runHealthChecks() {
   const overallStartTime = performance.now();
   
-  log('Starting SQL MCP Server health checks...');
+  log('Starting Argos-MCP health checks...');
   
   // Run all health checks
   const checks = [
@@ -493,7 +493,7 @@ if (process.argv.includes('--config')) {
 
 if (process.argv.includes('--help')) {
   console.log(`
-SQL MCP Server Health Check Script
+Argos-MCP Health Check Script
 
 Usage: node health-check-script.js [options]
 

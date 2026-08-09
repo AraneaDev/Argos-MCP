@@ -1,10 +1,10 @@
 # Basic Queries Tutorial
 
-This tutorial teaches you how to effectively use Claude with the SQL MCP Server to query and analyze your databases.
+This tutorial teaches you how to effectively use Claude with the Argos-MCP to query and analyze your databases.
 
 ## Overview
 
-With Claude Desktop connected to your SQL MCP Server, Claude can help you:
+With Claude Code connected to your Argos-MCP, Claude can help you:
 
 - **Execute SQL queries** safely with built-in security validation
 - **Analyze data patterns** and generate business insights 
@@ -16,8 +16,8 @@ With Claude Desktop connected to your SQL MCP Server, Claude can help you:
 
 Before starting, ensure you have:
 
-- **SQL MCP Server installed** - [Installation Tutorial](01-installation.md)
-- **Claude Desktop integrated** - [Claude Integration Tutorial](03-claude-integration.md)
+- **Argos-MCP installed** - [Installation Tutorial](01-installation.md)
+- **Claude Code integrated** - [Claude Integration Tutorial](03-claude-integration.md)
 - **Database connected** - At least one database configured and tested
 - **Sample data** - Some data in your database to query
 
@@ -37,7 +37,7 @@ Both databases are configured with SELECT-only access for security. Would you li
 
 ### Understanding Security Mode
 
-The SQL MCP Server operates in SELECT-only mode by default, which means:
+The Argos-MCP operates in SELECT-only mode by default, which means:
 
 - **Allowed**: SELECT, WITH, SHOW, EXPLAIN, DESCRIBE
 - **Blocked**: INSERT, UPDATE, DELETE, DROP, CREATE, ALTER
@@ -719,4 +719,4 @@ SELECT column, ROW_NUMBER() OVER (ORDER BY column) FROM table;
 
 ---
 
-** Congratulations!** You now know how to effectively use Claude for database queries and analysis. The combination of Claude's AI capabilities with the SQL MCP Server's security features provides a powerful platform for data exploration and business intelligence.
+** Congratulations!** You now know how to effectively use Claude for database queries and analysis. The combination of Claude's AI capabilities with the Argos-MCP's security features provides a powerful platform for data exploration and business intelligence.

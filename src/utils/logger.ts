@@ -1,5 +1,5 @@
 /**
- * Enhanced logging utilities for SQL MCP Server
+ * Enhanced logging utilities for Argos-MCP
  */
 import { createWriteStream, existsSync, unlinkSync, renameSync, chmodSync } from 'fs';
 import { dirname, join, resolve } from 'path';

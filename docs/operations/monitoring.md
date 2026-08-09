@@ -1,8 +1,8 @@
-# SQL MCP Server Monitoring Guide
+# Argos-MCP Monitoring Guide
 
 ## Overview
 
-This guide covers comprehensive monitoring strategies for the SQL MCP Server, including metrics collection, alerting, log analysis, and performance tracking.
+This guide covers comprehensive monitoring strategies for the Argos-MCP, including metrics collection, alerting, log analysis, and performance tracking.
 
 ## Monitoring Architecture
 
@@ -220,7 +220,7 @@ rule_files:
  - "sql_mcp_rules.yml"
 
 scrape_configs:
- - job_name: 'sql-mcp-server'
+ - job_name: 'argos-mcp'
  static_configs:
  - targets: ['mcp-1:3000', 'mcp-2:3000', 'mcp-3:3000']
  metrics_path: '/metrics'
@@ -252,7 +252,7 @@ groups:
  for: 2m
  labels:
  severity: warning
- service: sql-mcp-server
+ service: argos-mcp
  annotations:
  summary: "High SQL query error rate detected"
  description: "Query error rate is {{ $value }} errors/sec on database {{ $labels.database }}"
@@ -262,7 +262,7 @@ groups:
  for: 5m
  labels:
  severity: warning
- service: sql-mcp-server
+ service: argos-mcp
  annotations:
  summary: "High query execution time"
  description: "95th percentile query time is {{ $value }}s on database {{ $labels.database }}"
@@ -272,7 +272,7 @@ groups:
  for: 1m
  labels:
  severity: critical
- service: sql-mcp-server
+ service: argos-mcp
  annotations:
  summary: "Connection pool nearly exhausted"
  description: "Only {{ $value }} idle connections remaining for database {{ $labels.database }}"
@@ -282,7 +282,7 @@ groups:
  for: 5m
  labels:
  severity: warning
- service: sql-mcp-server
+ service: argos-mcp
  annotations:
  summary: "High memory usage detected"
  description: "Memory usage is {{ $value | humanizePercentage }} of heap"
@@ -292,7 +292,7 @@ groups:
  for: 3m
  labels:
  severity: warning
- service: sql-mcp-server
+ service: argos-mcp
  annotations:
  summary: "High event loop lag"
  description: "Event loop lag is {{ $value }}ms"
@@ -302,7 +302,7 @@ groups:
  for: 0m
  labels:
  severity: critical
- service: sql-mcp-server
+ service: argos-mcp
  annotations:
  summary: "Security policy violation detected"
  description: "{{ $value }} queries blocked due to {{ $labels.reason }} on database {{ $labels.database }}"
@@ -316,7 +316,7 @@ groups:
 {
  "dashboard": {
  "id": null,
- "title": "SQL MCP Server Monitoring",
+ "title": "Argos-MCP Monitoring",
  "tags": ["sql", "mcp", "monitoring"],
  "timezone": "browser",
  "panels": [
@@ -381,7 +381,7 @@ groups:
 ```json
 {
  "dashboard": {
- "title": "SQL MCP Server Performance",
+ "title": "Argos-MCP Performance",
  "panels": [
  {
  "title": "Memory Usage",
@@ -436,7 +436,7 @@ export const logger = winston.createLogger({
  winston.format.json()
  ),
  defaultMeta: {
- service: 'sql-mcp-server',
+ service: 'argos-mcp',
  version: process.env.APP_VERSION,
  instance: process.env.HOSTNAME
  },
@@ -463,7 +463,7 @@ export const logger = winston.createLogger({
  clientOpts: {
  node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200'
  },
- index: 'sql-mcp-server-logs'
+ index: 'argos-mcp-logs'
  })
  ]
 });
@@ -586,7 +586,7 @@ receivers:
 - name: 'web.hook'
  email_configs:
  - to: 'devops@company.com'
- subject: '[{{ .Status | title }}] SQL MCP Server Alert'
+ subject: '[{{ .Status | title }}] Argos-MCP Alert'
  body: |
  {{ range .Alerts }}
  Alert: {{ .Annotations.summary }}
@@ -596,7 +596,7 @@ receivers:
  slack_configs:
  - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
  channel: '#alerts'
- title: 'SQL MCP Server Alert'
+ title: 'Argos-MCP Alert'
  text: |
  {{ range .Alerts }}
  {{ .Annotations.summary }}
@@ -635,7 +635,7 @@ curl -X POST -H 'Content-type: application/json' \
  --data "{
  \"attachments\": [{
  \"color\": \"$COLOR\",
- \"title\": \"SQL MCP Server Alert\",
+ \"title\": \"Argos-MCP Alert\",
  \"text\": \"$ALERT_MESSAGE\",
  \"timestamp\": $(date +%s)
  }]
@@ -725,7 +725,7 @@ app.get('/health', async (req, res) => {
 **Pingdom Configuration**:
 ```http
 GET /health HTTP/1.1
-Host: sql-mcp.company.com
+Host: argos.company.com
 User-Agent: Pingdom.com_bot_version_1.4
 
 Expected Response: 200 OK
@@ -737,7 +737,7 @@ Contains: "status":"healthy"
 // synthetic-monitor.js
 var assert = require('assert');
 
-$http.get('https://sql-mcp.company.com/health', function(err, response, body) {
+$http.get('https://argos.company.com/health', function(err, response, body) {
  assert.equal(response.statusCode, 200, 'Expected HTTP 200');
  
  var health = JSON.parse(body);
@@ -772,15 +772,15 @@ ORDER BY avg_time DESC;
 #!/bin/bash
 # performance-report.sh
 
-echo "=== SQL MCP Server Performance Report ==="
+echo "=== Argos-MCP Performance Report ==="
 echo "Date: $(date)"
 echo
 
 echo "=== CPU Usage ==="
-ps aux | grep "sql-mcp-server" | grep -v grep
+ps aux | grep "argos-mcp" | grep -v grep
 
 echo "=== Memory Usage ==="
-pmap $(pgrep -f sql-mcp-server) | tail -1
+pmap $(pgrep -f argos-mcp) | tail -1
 
 echo "=== Network Connections ==="
 netstat -an | grep :3000
@@ -819,12 +819,12 @@ histogram_quantile(0.95,
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
- name: sql-mcp-hpa
+ name: argos-hpa
 spec:
  scaleTargetRef:
  apiVersion: apps/v1
  kind: Deployment 
- name: sql-mcp-server
+ name: argos-mcp
  minReplicas: 2
  maxReplicas: 20
  metrics:
@@ -888,6 +888,6 @@ spec:
 
 ## Conclusion
 
-Comprehensive monitoring ensures the SQL MCP Server operates reliably and efficiently. This guide provides the foundation for implementing robust observability practices that enable proactive issue detection and resolution.
+Comprehensive monitoring ensures the Argos-MCP operates reliably and efficiently. This guide provides the foundation for implementing robust observability practices that enable proactive issue detection and resolution.
 
 Regular monitoring review and optimization ensures the system continues to meet performance and reliability requirements as it scales.

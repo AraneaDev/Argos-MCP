@@ -20,7 +20,7 @@ This advanced tutorial covers secure database connections through SSH tunnels, e
 +-------------------------------------------------------------------+
 |                                                                   |
 |  +--------------+ Encrypted SSH  +------------------+             |
-|  | SQL MCP      |====Tunnel======| SSH Bastion      |             |
+|  | Argos-MCP      |====Tunnel======| SSH Bastion      |             |
 |  | Server       |                | Host             |             |
 |  |(Local:1234)  |                |                  |             |
 |  +--------------+                +------------------+             |
@@ -192,16 +192,16 @@ Host secure-db
 # ssh-key-setup.sh
 
 # Generate SSH key pair
-ssh-keygen -t ed25519 -b 521 -f /secure/keys/sql-mcp-tunnel -C "sql-mcp-server@$(hostname)"
+ssh-keygen -t ed25519 -b 521 -f /secure/keys/argos-tunnel -C "argos-mcp@$(hostname)"
 
 # Set proper permissions
-chmod 600 /secure/keys/sql-mcp-tunnel
-chmod 644 /secure/keys/sql-mcp-tunnel.pub
+chmod 600 /secure/keys/argos-tunnel
+chmod 644 /secure/keys/argos-tunnel.pub
 
 # Copy public key to bastion host
-ssh-copy-id -i /secure/keys/sql-mcp-tunnel.pub tunnel_user@bastion.company.com
+ssh-copy-id -i /secure/keys/argos-tunnel.pub tunnel_user@bastion.company.com
 
-echo "SSH key setup complete. Private key: /secure/keys/sql-mcp-tunnel"
+echo "SSH key setup complete. Private key: /secure/keys/argos-tunnel"
 ```
 
 **Configuration with private key**:
@@ -215,7 +215,7 @@ port=15432
 # SSH tunnel with private key
 ssh_host=bastion.company.com
 ssh_username=tunnel_service
-ssh_private_key=/secure/keys/sql-mcp-tunnel
+ssh_private_key=/secure/keys/argos-tunnel
 ssh_private_key_passphrase=optional_key_passphrase # If key is encrypted
 ```
 
@@ -242,7 +242,7 @@ ssh_use_agent=true # Use SSH agent instead of private key file
 eval $(ssh-agent)
 
 # Add private key to agent
-ssh-add /secure/keys/sql-mcp-tunnel
+ssh-add /secure/keys/argos-tunnel
 
 # Verify key is loaded
 ssh-add -l
@@ -261,8 +261,8 @@ type=postgresql
 # SSH tunnel with certificate
 ssh_host=bastion.company.com
 ssh_username=cert_user
-ssh_certificate=/secure/certs/sql-mcp-cert.pub
-ssh_private_key=/secure/keys/sql-mcp-key
+ssh_certificate=/secure/certs/argos-cert.pub
+ssh_private_key=/secure/keys/argos-key
 ```
 
 ## Advanced Tunnel Configurations
@@ -315,26 +315,26 @@ ssh_local_host=127.0.0.1   # Local bind address (default: 127.0.0.1)
 # secure-key-setup.sh
 
 # Create secure directory
-sudo mkdir -p /etc/sql-mcp/keys
-sudo chmod 700 /etc/sql-mcp/keys
+sudo mkdir -p /etc/argos/keys
+sudo chmod 700 /etc/argos/keys
 
 # Generate key with strong parameters
-ssh-keygen -t ed25519 -a 100 -f /etc/sql-mcp/keys/tunnel_key -C "sql-mcp-$(date +%Y%m%d)"
+ssh-keygen -t ed25519 -a 100 -f /etc/argos/keys/tunnel_key -C "argos-$(date +%Y%m%d)"
 
 # Set restrictive permissions
-sudo chmod 600 /etc/sql-mcp/keys/tunnel_key
-sudo chmod 644 /etc/sql-mcp/keys/tunnel_key.pub
-sudo chown sql-mcp:sql-mcp /etc/sql-mcp/keys/tunnel_key*
+sudo chmod 600 /etc/argos/keys/tunnel_key
+sudo chmod 644 /etc/argos/keys/tunnel_key.pub
+sudo chown argos:argos /etc/argos/keys/tunnel_key*
 
 # Create key configuration
-cat > /etc/sql-mcp/ssh-config << EOF
+cat > /etc/argos/ssh-config << EOF
 Host tunnel-bastion
  HostName bastion.company.com
  User tunnel_service
- IdentityFile /etc/sql-mcp/keys/tunnel_key
+ IdentityFile /etc/argos/keys/tunnel_key
  IdentitiesOnly yes
  StrictHostKeyChecking yes
- UserKnownHostsFile /etc/sql-mcp/known_hosts
+ UserKnownHostsFile /etc/argos/known_hosts
  ServerAliveInterval 60
  ServerAliveCountMax 3
 EOF
@@ -357,7 +357,7 @@ MaxAuthTries 3
 MaxStartups 10:30:60
 ClientAliveInterval 300
 ClientAliveCountMax 2
-AllowUsers tunnel_service sql-mcp-tunnel
+AllowUsers tunnel_service argos-tunnel
 DenyUsers root admin guest
 ```
 
@@ -369,7 +369,7 @@ DenyUsers root admin guest
 # firewall-setup.sh
 
 # Allow SSH from specific IPs only
-sudo ufw allow from 192.168.1.100 to any port 2222 proto tcp comment "SQL MCP Server SSH"
+sudo ufw allow from 192.168.1.100 to any port 2222 proto tcp comment "Argos-MCP SSH"
 
 # Block all other SSH access
 sudo ufw deny 22
@@ -521,9 +521,9 @@ ssh_server_alive_count_max=6
 #!/bin/bash
 # tunnel-manager.sh
 
-CONFIG_FILE="/etc/sql-mcp/tunnel-config.conf"
-PID_FILE="/var/run/sql-mcp-tunnels.pid"
-LOG_FILE="/var/log/sql-mcp/tunnel.log"
+CONFIG_FILE="/etc/argos/tunnel-config.conf"
+PID_FILE="/var/run/argos-tunnels.pid"
+LOG_FILE="/var/log/argos/tunnel.log"
 
 # Load tunnel configurations
 source "$CONFIG_FILE"
@@ -605,9 +605,9 @@ esac
 
 **Systemd service for tunnel management**:
 ```ini
-# /etc/systemd/system/sql-mcp-tunnels.service
+# /etc/systemd/system/argos-tunnels.service
 [Unit]
-Description=SQL MCP Server SSH Tunnels
+Description=Argos-MCP SSH Tunnels
 After=network.target
 Wants=network.target
 
@@ -616,17 +616,17 @@ Type=forking
 ExecStart=/usr/local/bin/tunnel-manager.sh start
 ExecStop=/usr/local/bin/tunnel-manager.sh stop
 ExecReload=/usr/local/bin/tunnel-manager.sh restart
-PIDFile=/var/run/sql-mcp-tunnels.pid
+PIDFile=/var/run/argos-tunnels.pid
 Restart=always
 RestartSec=30
-User=sql-mcp
-Group=sql-mcp
+User=argos
+Group=argos
 
 # Security settings
 NoNewPrivileges=true
 ProtectSystem=strict
 ProtectHome=true
-ReadWritePaths=/var/log/sql-mcp /var/run
+ReadWritePaths=/var/log/argos /var/run
 
 [Install]
 WantedBy=multi-user.target
@@ -721,9 +721,9 @@ services:
  ports:
  - "15432:5432"
  networks:
- - sql-mcp-network
+ - argos-network
 
- sql-mcp-server:
+ argos-mcp:
  build: .
  depends_on:
  - ssh-tunnel
@@ -731,10 +731,10 @@ services:
  - DATABASE_HOST=ssh-tunnel
  - DATABASE_PORT=5432
  networks:
- - sql-mcp-network
+ - argos-network
 
 networks:
- sql-mcp-network:
+ argos-network:
  driver: bridge
 ```
 
@@ -853,4 +853,4 @@ After mastering SSH tunnel configuration:
 
 ---
 
-*This tutorial is part of the SQL MCP Server Advanced Configuration Series. For questions or feedback, please refer to our [community discussions](https://github.com/AraneaDev/mcp-sql-access-server/discussions).*
+*This tutorial is part of the Argos-MCP Advanced Configuration Series. For questions or feedback, please refer to our [community discussions](https://github.com/AraneaDev/Argos-MCP/discussions).*

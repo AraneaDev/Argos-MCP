@@ -1,6 +1,8 @@
-# Contributing to SQL MCP Server
+# Contributing to Argos-MCP
 
-Thank you for your interest in contributing to the SQL MCP Server! This guide provides everything you need to know to contribute effectively to the project.
+Thank you for your interest in contributing to Argos-MCP! This guide covers coding standards, project structure, and the review expectations for a change.
+
+> For the mechanics — commit message format, the git hooks, and how a release is cut — see [CONTRIBUTING.md](../../CONTRIBUTING.md) in the repository root.
 
 ## How to Contribute
 
@@ -128,12 +130,14 @@ There are many ways to contribute to this project:
 
 ### Code Guidelines
 
-1. **Clear Commit Messages**: Use conventional commits format
+1. **Clear Commit Messages**: Conventional Commits are enforced by a `commit-msg` hook, and pull request titles are checked in CI — a squash merge takes the PR title as the commit subject, and release-please parses it.
  - `feat: add new feature`
  - `fix: resolve issue with X`
  - `docs: update installation guide`
  - `test: add tests for Y`
  - `refactor: improve Z performance`
+
+ Full list of types and the release rules: [CONTRIBUTING.md](../../CONTRIBUTING.md#commits).
 
 2. **Small, Focused Changes**: Keep changes focused on a single feature/fix
 
@@ -537,13 +541,19 @@ We use [Semantic Versioning](https://semver.org/):
 - **MINOR** version for backwards-compatible functionality additions
 - **PATCH** version for backwards-compatible bug fixes
 
+Versions are **not** bumped by hand. release-please derives them from the
+Conventional Commits merged to `main`.
+
 ### Release Checklist
 
-1. **Update version** in `package.json`
-2. **Update CHANGELOG.md** with release notes
-3. **Run full test suite** and ensure all tests pass
-4. **Build and test** the release package
-5. **Create release tag** and publish
+1. **Merge a `feat:` or `fix:` pull request** into `main`
+2. **Review the Release PR** release-please opens — it carries the version bump
+   and the generated `CHANGELOG.md` entry
+3. **Merge the Release PR** — this tags `vX.Y.Z`, creates the GitHub Release,
+   and attaches the packaged artifacts
+
+See [CONTRIBUTING.md](../../CONTRIBUTING.md#releases) for the version references
+release-please rewrites and how to add a new one.
 
 ## Development Guidelines
 
@@ -585,7 +595,7 @@ When debugging issues:
 
 ## Thank You!
 
-Every contribution, whether it's a bug report, feature suggestion, code change, or documentation improvement, helps make this project better for everyone. We appreciate your time and effort in contributing to the SQL MCP Server!
+Every contribution, whether it's a bug report, feature suggestion, code change, or documentation improvement, helps make this project better for everyone. We appreciate your time and effort in contributing to the Argos-MCP!
 
 ---
 

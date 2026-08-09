@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-This comprehensive guide helps you diagnose and resolve common issues with the SQL MCP Server.
+This comprehensive guide helps you diagnose and resolve common issues with the Argos-MCP.
 
 ## Quick Diagnostic Checklist
 
@@ -8,7 +8,7 @@ This comprehensive guide helps you diagnose and resolve common issues with the S
 1. **Check server status**: Is the MCP server running?
 2. **Verify configuration**: Does `config.ini` exist and have correct settings?
 3. **Test database connectivity**: Can you connect directly to the database?
-4. **Check Claude Desktop**: Is Claude Desktop properly configured?
+4. **Check Claude Code**: Is Claude Code properly configured?
 5. **Review logs**: What do the server logs show?
 
 ### Getting Log Information
@@ -342,15 +342,15 @@ FLUSH PRIVILEGES;
  psql -h localhost -p 5433 -U dbuser -d database
  ```
 
-## Claude Desktop Integration Issues
+## Claude Code Integration Issues
 
-### Issue: Claude Desktop doesn't see the SQL tools
+### Issue: Claude Code doesn't see the SQL tools
 ```
-Claude Desktop shows no SQL-related tools available
+Claude Code shows no SQL-related tools available
 ```
 
 **Solutions:**
-1. **Check Claude Desktop configuration**:
+1. **Check Claude Code configuration**:
  ```json
  {
  "mcpServers": {
@@ -376,11 +376,11 @@ Claude Desktop shows no SQL-related tools available
  npm start
  ```
 
-4. **Restart Claude Desktop** after configuration changes.
+4. **Restart Claude Code** after configuration changes.
 
-### Issue: Claude Desktop shows connection errors
+### Issue: Claude Code shows connection errors
 ```
-Claude Desktop error: "Failed to connect to MCP server"
+Claude Code error: "Failed to connect to MCP server"
 ```
 
 **Solutions:**
@@ -389,7 +389,7 @@ Claude Desktop error: "Failed to connect to MCP server"
  # Server should start and show:
  npm start
  # Expected output:
- # SQL MCP Server running on stdio
+ # Argos-MCP running on stdio
  # Connection established: database_name
  ```
 
@@ -645,10 +645,10 @@ When reporting issues, include:
 - **System logs**: `/var/log/` (Linux) or Console app (macOS)
 
 ### Community Support
-- **GitHub Issues**: [Report bugs and issues](https://github.com/AraneaDev/mcp-sql-access-server/issues)
-- **GitHub Discussions**: [Ask questions and get help](https://github.com/AraneaDev/mcp-sql-access-server/discussions)
+- **GitHub Issues**: [Report bugs and issues](https://github.com/AraneaDev/Argos-MCP/issues)
+- **GitHub Discussions**: [Ask questions and get help](https://github.com/AraneaDev/Argos-MCP/discussions)
 - **Documentation**: [Browse all documentation](../README.md)
 
 ---
 
-** Pro Tip**: Start with simple configurations and gradually add complexity. Test each component (database connection, SSH tunnel, Claude Desktop integration) independently before combining them.
+** Pro Tip**: Start with simple configurations and gradually add complexity. Test each component (database connection, SSH tunnel, Claude Code integration) independently before combining them.

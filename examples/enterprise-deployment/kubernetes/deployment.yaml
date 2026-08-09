@@ -1,16 +1,16 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: sql-mcp-server
+  name: argos-mcp
   labels:
-    name: sql-mcp-server
+    name: argos-mcp
     environment: production
 ---
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: sql-mcp-config
-  namespace: sql-mcp-server
+  name: argos-config
+  namespace: argos-mcp
 data:
   config.ini: |
     [server]
@@ -70,13 +70,13 @@ data:
     [caching]
     enable_query_cache=true
     cache_ttl=300
-    redis_url=redis://redis.sql-mcp-server.svc.cluster.local:6379
+    redis_url=redis://redis.argos-mcp.svc.cluster.local:6379
 ---
 apiVersion: v1
 kind: Secret
 metadata:
-  name: sql-mcp-secrets
-  namespace: sql-mcp-server
+  name: argos-secrets
+  namespace: argos-mcp
 type: Opaque
 data:
   # Base64 encoded database passwords
@@ -88,8 +88,8 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: sql-mcp-tls
-  namespace: sql-mcp-server
+  name: argos-tls
+  namespace: argos-mcp
 type: kubernetes.io/tls
 data:
   tls.crt: LS0tLS1CRUdJTi... # TLS certificate (base64)
@@ -98,10 +98,10 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sql-mcp-server
-  namespace: sql-mcp-server
+  name: argos-mcp
+  namespace: argos-mcp
   labels:
-    app: sql-mcp-server
+    app: argos-mcp
     version: v1.0.0
 spec:
   replicas: 3
@@ -112,25 +112,25 @@ spec:
       maxUnavailable: 1
   selector:
     matchLabels:
-      app: sql-mcp-server
+      app: argos-mcp
   template:
     metadata:
       labels:
-        app: sql-mcp-server
+        app: argos-mcp
         version: v1.0.0
       annotations:
         prometheus.io/scrape: "true"
         prometheus.io/port: "9090"
         prometheus.io/path: "/metrics"
     spec:
-      serviceAccountName: sql-mcp-server
+      serviceAccountName: argos-mcp
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
         fsGroup: 1001
       containers:
-      - name: sql-mcp-server
-        image: sql-mcp-server:1.0.0
+      - name: argos-mcp
+        image: argos-mcp:1.0.0
         imagePullPolicy: Always
         ports:
         - name: http
@@ -147,22 +147,22 @@ spec:
         - name: PRIMARY_DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: sql-mcp-secrets
+              name: argos-secrets
               key: primary_db_password
         - name: REPLICA_DB_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: sql-mcp-secrets
+              name: argos-secrets
               key: replica_db_password
         - name: REDIS_PASSWORD
           valueFrom:
             secretKeyRef:
-              name: sql-mcp-secrets
+              name: argos-secrets
               key: redis_password
         - name: JWT_SECRET
           valueFrom:
             secretKeyRef:
-              name: sql-mcp-secrets
+              name: argos-secrets
               key: jwt_secret
         - name: POD_NAME
           valueFrom:
@@ -237,11 +237,11 @@ spec:
       volumes:
       - name: config
         configMap:
-          name: sql-mcp-config
+          name: argos-config
           defaultMode: 0444
       - name: tls-certs
         secret:
-          secretName: sql-mcp-tls
+          secretName: argos-tls
           defaultMode: 0400
       - name: logs
         emptyDir: {}
@@ -257,7 +257,7 @@ spec:
                 - key: app
                   operator: In
                   values:
-                  - sql-mcp-server
+                  - argos-mcp
               topologyKey: kubernetes.io/hostname
       tolerations:
       - key: "node.kubernetes.io/unreachable"
@@ -272,10 +272,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: sql-mcp-server
-  namespace: sql-mcp-server
+  name: argos-mcp
+  namespace: argos-mcp
   labels:
-    app: sql-mcp-server
+    app: argos-mcp
   annotations:
     service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
     service.beta.kubernetes.io/aws-load-balancer-ssl-cert: "arn:aws:acm:region:account:certificate/cert-id"
@@ -296,15 +296,15 @@ spec:
     targetPort: http
     protocol: TCP
   selector:
-    app: sql-mcp-server
+    app: argos-mcp
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: sql-mcp-server-headless
-  namespace: sql-mcp-server
+  name: argos-mcp-headless
+  namespace: argos-mcp
   labels:
-    app: sql-mcp-server
+    app: argos-mcp
 spec:
   type: ClusterIP
   clusterIP: None
@@ -318,22 +318,22 @@ spec:
     targetPort: metrics
     protocol: TCP
   selector:
-    app: sql-mcp-server
+    app: argos-mcp
 ---
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: sql-mcp-server
-  namespace: sql-mcp-server
+  name: argos-mcp
+  namespace: argos-mcp
   labels:
-    app: sql-mcp-server
+    app: argos-mcp
 automountServiceAccountToken: false
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: sql-mcp-server
-  namespace: sql-mcp-server
+  name: argos-mcp
+  namespace: argos-mcp
 rules:
 - apiGroups: [""]
   resources: ["pods"]
@@ -348,27 +348,27 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: sql-mcp-server
-  namespace: sql-mcp-server
+  name: argos-mcp
+  namespace: argos-mcp
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: sql-mcp-server
+  name: argos-mcp
 subjects:
 - kind: ServiceAccount
-  name: sql-mcp-server
-  namespace: sql-mcp-server
+  name: argos-mcp
+  namespace: argos-mcp
 ---
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: sql-mcp-server-hpa
-  namespace: sql-mcp-server
+  name: argos-mcp-hpa
+  namespace: argos-mcp
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: sql-mcp-server
+    name: argos-mcp
   minReplicas: 3
   maxReplicas: 10
   metrics:
@@ -412,23 +412,23 @@ spec:
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: sql-mcp-server-pdb
-  namespace: sql-mcp-server
+  name: argos-mcp-pdb
+  namespace: argos-mcp
 spec:
   minAvailable: 2
   selector:
     matchLabels:
-      app: sql-mcp-server
+      app: argos-mcp
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: sql-mcp-server-netpol
-  namespace: sql-mcp-server
+  name: argos-mcp-netpol
+  namespace: argos-mcp
 spec:
   podSelector:
     matchLabels:
-      app: sql-mcp-server
+      app: argos-mcp
   policyTypes:
   - Ingress
   - Egress

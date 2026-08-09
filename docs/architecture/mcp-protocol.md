@@ -1,6 +1,6 @@
 # MCP Protocol Implementation
 
-This document details how the SQL MCP Server implements the Model Context Protocol (MCP) for seamless integration with Claude Desktop and other MCP-compatible clients.
+This document details how the Argos-MCP implements the Model Context Protocol (MCP) for seamless integration with Claude Code and other MCP-compatible clients.
 
 ## Table of Contents
 
@@ -36,7 +36,7 @@ The Model Context Protocol (MCP) is a standardized protocol that enables AI assi
 ## Protocol Implementation
 
 ### Server Architecture
-The SQL MCP Server implements the complete MCP specification:
+The Argos-MCP implements the complete MCP specification:
 
 ```mermaid
 graph TB
@@ -62,7 +62,7 @@ graph TB
 ```
 
 ### Message Flow
-1. **Client Connection**: Claude Desktop connects via stdio
+1. **Client Connection**: Claude Code connects via stdio
 2. **Initialization Handshake**: Server capabilities negotiation
 3. **Tool Discovery**: Client requests available tools
 4. **Tool Execution**: Client calls tools with parameters
@@ -671,4 +671,4 @@ const messageSchemas = {
 3. **Backpressure**: Handle high message volumes gracefully
 4. **Memory Management**: Prevent memory leaks in long-running processes
 
-This comprehensive MCP protocol implementation ensures reliable, secure, and performant integration with Claude Desktop and other MCP-compatible clients.
+This comprehensive MCP protocol implementation ensures reliable, secure, and performant integration with Claude Code and other MCP-compatible clients.

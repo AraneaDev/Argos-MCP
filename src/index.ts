@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 
 /**
- * SQL MCP Server - Main Entry Point
- * TypeScript implementation of the SQL Model Context Protocol Server
+ * Argos-MCP - Main Entry Point
+ * TypeScript implementation of the Argos SQL Model Context Protocol Server
  *
  * This server provides secure database connectivity through MCP protocol,
  * enabling AI assistants to interact with SQL databases with built-in
@@ -31,7 +31,7 @@ async function main(): Promise<void> {
   // Initialize global logger for all components BEFORE creating any other components
   await initializeLogger({
     enableConsole: false, // Critical: Disable console output to prevent JSON-RPC interference
-    logFile: join(PROJECT_ROOT, 'sql-mcp-server.log'),
+    logFile: join(PROJECT_ROOT, 'argos-mcp.log'),
     logLevel: 'INFO',
   });
 

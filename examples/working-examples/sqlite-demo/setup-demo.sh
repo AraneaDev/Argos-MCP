@@ -152,26 +152,21 @@ EOF
 
 echo "[OK] Configuration created: config.ini"
 
-# Create Claude Desktop integration config
-echo "[CONFIG] Creating Claude Desktop configuration..."
-cat > claude-config.json << EOF
-{
-  "mcpServers": {
-    "sql-demo": {
-      "command": "sql-server",
-      "args": ["--config", "$(pwd)/config.ini"],
-      "cwd": "$(pwd)",
-      "env": {
-        "NODE_ENV": "development",
-        "DEBUG": "false"
-      }
-    }
-  }
-}
+# Create the Claude Code registration command for this demo
+echo "[CONFIG] Writing the Claude Code registration command..."
+REPO_ROOT=$(cd "$(dirname "$0")/../../.." && pwd)
+cat > register-with-claude.sh << EOF
+#!/bin/sh
+# Registers this SQLite demo with Claude Code as "argos-demo".
+# Remove it again with: claude mcp remove argos-demo
+set -eu
+claude mcp add argos-demo -- \\
+  node "$REPO_ROOT/dist/index.js" --config "$(pwd)/config.ini"
 EOF
+chmod +x register-with-claude.sh
 
-echo "[OK] Claude Desktop config created: claude-config.json"
-echo "   Copy to: ~/.config/Claude/claude_desktop_config.json"
+echo "[OK] Registration script created: register-with-claude.sh"
+echo "   Run it, then confirm with: claude mcp list"
 
 # Create sample queries file
 echo "[INFO] Creating sample queries..."
@@ -235,5 +230,5 @@ echo "[OK] Sample queries created: sample-queries.sql"
 echo "[FILES] Demo setup complete! Files created:"
 echo "   - demo.db (SQLite database)"
 echo "   - config.ini (MCP server config)"
-echo "   - claude-config.json (Claude Desktop config)"
+echo "   - register-with-claude.sh (Claude Code registration)"
 echo "   - sample-queries.sql (Test queries)"

@@ -212,4 +212,4 @@ After completing the advanced tutorial series:
 
 ---
 
-*This completes the SQL MCP Server Advanced Tutorial Series. For questions or feedback, please refer to our [community discussions](https://github.com/AraneaDev/mcp-sql-access-server/discussions).*
+*This completes the Argos-MCP Advanced Tutorial Series. For questions or feedback, please refer to our [community discussions](https://github.com/AraneaDev/Argos-MCP/discussions).*

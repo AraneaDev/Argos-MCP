@@ -1,6 +1,6 @@
 # Basic Setup Examples
 
-This directory contains simple, minimal examples for getting started with SQL MCP Server quickly. These examples are perfect for new users who want to get up and running in minutes.
+This directory contains simple, minimal examples for getting started with Argos-MCP quickly. These examples are perfect for new users who want to get up and running in minutes.
 
 ## Directory Structure
 
@@ -12,7 +12,6 @@ basic-setup/
 |-- single-mysql.ini # Basic MySQL configuration
 |-- multiple-databases.ini # Multiple database example
 |-- docker-compose-demo.yml # Quick Docker demo setup
-|-- claude-desktop-config.json # Claude Desktop integration
 \-- test-queries.sql # Sample test queries
 ```
 
@@ -111,7 +110,7 @@ After getting basic setup working:
 
 - **Documentation**: [docs/README.md](../../docs/README.md)
 - **Troubleshooting**: [docs/guides/troubleshooting-guide.md](../../docs/guides/troubleshooting-guide.md)
-- **Issues**: [GitHub Issues](https://github.com/AraneaDev/mcp-sql-access-server/issues)
+- **Issues**: [GitHub Issues](https://github.com/AraneaDev/Argos-MCP/issues)
 
 ## File Descriptions
 
@@ -122,5 +121,4 @@ After getting basic setup working:
 | `single-mysql.ini` | Basic MySQL/MariaDB setup | MySQL |
 | `multiple-databases.ini` | Multi-database configuration | Mixed |
 | `docker-compose-demo.yml` | Containerized demo environment | PostgreSQL/MySQL |
-| `claude-desktop-config.json` | Claude Desktop integration | N/A |
 | `test-queries.sql` | Sample queries for testing | All |

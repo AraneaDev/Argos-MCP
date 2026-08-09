@@ -1,10 +1,10 @@
 # SSH Tunneling Configuration Guide
 
-This guide covers SSH tunnel setup, configuration, and troubleshooting for secure database connections through the SQL MCP Server.
+This guide covers SSH tunnel setup, configuration, and troubleshooting for secure database connections through the Argos-MCP.
 
 ## Overview
 
-SSH tunneling provides an additional security layer for database connections by encrypting traffic through a secure SSH connection. The SQL MCP Server includes a comprehensive SSH tunnel manager that handles connection establishment, monitoring, and automatic reconnection.
+SSH tunneling provides an additional security layer for database connections by encrypting traffic through a secure SSH connection. The Argos-MCP includes a comprehensive SSH tunnel manager that handles connection establishment, monitoring, and automatic reconnection.
 
 **Use Cases:**
 - Connect to databases behind firewalls
@@ -44,7 +44,7 @@ ssh_private_key=/path/to/private/key
 ssh -i /path/to/private/key tunnel_user@bastion.company.com
 
 # Test database connection through tunnel
-sql-mcp-test production_tunnel
+# Test it from Claude with the sql_test_connection tool, database: production_tunnel
 ```
 
 ## SSH Configuration Options
@@ -726,14 +726,14 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
- name: sql-mcp-server
+ name: argos-mcp
 spec:
  replicas: 1
  template:
  spec:
  containers:
  - name: mcp-server
- image: sql-mcp-server:latest
+ image: argos-mcp:latest
  volumeMounts:
  - name: ssh-keys
  mountPath: /app/ssh-keys
@@ -812,7 +812,7 @@ Track tunnel performance:
 
 ## Conclusion
 
-SSH tunneling provides a robust, secure method for connecting to databases through the SQL MCP Server. The built-in tunnel manager handles the complexity of SSH connections, port forwarding, and health monitoring while providing enterprise-grade reliability and security.
+SSH tunneling provides a robust, secure method for connecting to databases through the Argos-MCP. The built-in tunnel manager handles the complexity of SSH connections, port forwarding, and health monitoring while providing enterprise-grade reliability and security.
 
 Key benefits:
 - **Transparent Integration** - Works seamlessly with all database types

@@ -1,8 +1,8 @@
-# SQL MCP Server Deployment Guide
+# Argos-MCP Deployment Guide
 
 ## Overview
 
-This guide covers production deployment strategies for the SQL MCP Server, including containerization, orchestration, monitoring, and scaling considerations.
+This guide covers production deployment strategies for the Argos-MCP, including containerization, orchestration, monitoring, and scaling considerations.
 
 ## Deployment Architectures
 
@@ -19,7 +19,7 @@ This guide covers production deployment strategies for the SQL MCP Server, inclu
  | MCP Protocol
  v
 +-----------------+ +--------------+
-| SQL MCP Server |----| Database |
+| Argos-MCP |----| Database |
 | (Standalone) | | |
 \-----------------+ \--------------+
 ```
@@ -94,7 +94,7 @@ CMD ["node", "dist/index.js"]
 version: '3.8'
 
 services:
- sql-mcp-server:
+ argos-mcp:
  build: .
  environment:
  - NODE_ENV=production
@@ -132,21 +132,21 @@ volumes:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
- name: sql-mcp-server
+ name: argos-mcp
  namespace: production
 spec:
  replicas: 3
  selector:
  matchLabels:
- app: sql-mcp-server
+ app: argos-mcp
  template:
  metadata:
  labels:
- app: sql-mcp-server
+ app: argos-mcp
  spec:
  containers:
- - name: sql-mcp-server
- image: sql-mcp-server:latest
+ - name: argos-mcp
+ image: argos-mcp:latest
  ports:
  - containerPort: 3000
  env:
@@ -183,7 +183,7 @@ spec:
  volumes:
  - name: config
  configMap:
- name: sql-mcp-config
+ name: argos-config
 ```
 
 **Service**:
@@ -191,11 +191,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
- name: sql-mcp-server
+ name: argos-mcp
  namespace: production
 spec:
  selector:
- app: sql-mcp-server
+ app: argos-mcp
  ports:
  - port: 80
  targetPort: 3000
@@ -207,7 +207,7 @@ spec:
 apiVersion: v1
 kind: ConfigMap
 metadata:
- name: sql-mcp-config
+ name: argos-config
  namespace: production
 data:
  config.ini: |
@@ -283,7 +283,7 @@ upstream sql_mcp_backend {
 
 server {
  listen 80;
- server_name sql-mcp.company.com;
+ server_name argos.company.com;
  
  location / {
  proxy_pass http://sql_mcp_backend;
@@ -302,7 +302,7 @@ server {
 **Certificate Management**:
 ```bash
 # Using Let's Encrypt with certbot
-sudo certbot --nginx -d sql-mcp.company.com
+sudo certbot --nginx -d argos.company.com
 
 # Or use existing certificates
 sudo cp company.crt /etc/ssl/certs/
@@ -345,10 +345,10 @@ max_cache_size=100MB
 **System Limits**:
 ```bash
 # /etc/security/limits.conf
-sql-mcp soft nofile 65536
-sql-mcp hard nofile 65536
-sql-mcp soft nproc 32768
-sql-mcp hard nproc 32768
+argos soft nofile 65536
+argos hard nofile 65536
+argos soft nproc 32768
+argos hard nproc 32768
 ```
 
 **Node.js Optimization**:
@@ -439,7 +439,7 @@ filebeat.inputs:
 
 output.elasticsearch:
  hosts: ["elasticsearch:9200"]
- index: "sql-mcp-server-%{+yyyy.MM.dd}"
+ index: "argos-mcp-%{+yyyy.MM.dd}"
 ```
 
 ## Backup and Disaster Recovery
@@ -450,7 +450,7 @@ output.elasticsearch:
 #!/bin/bash
 # backup-config.sh
 DATE=$(date +%Y%m%d_%H%M%S)
-BACKUP_DIR="/backups/sql-mcp"
+BACKUP_DIR="/backups/argos"
 
 mkdir -p "$BACKUP_DIR"
 cp config.ini "$BACKUP_DIR/config_$DATE.ini"
@@ -480,10 +480,10 @@ find /backups/db -name "*.sql.gz" -mtime +30 -delete
 ### Recovery Procedures
 
 **Configuration Recovery**:
-1. Stop MCP server: `systemctl stop sql-mcp-server`
+1. Stop MCP server: `systemctl stop argos-mcp`
 2. Restore configuration: `cp backup/config.ini ./config.ini`
 3. Validate configuration: `npm run validate-config`
-4. Start server: `systemctl start sql-mcp-server`
+4. Start server: `systemctl start argos-mcp`
 
 **Database Recovery**:
 1. Create recovery database: `createdb recovery_db`
@@ -510,12 +510,12 @@ backend sql_mcp_servers
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
- name: sql-mcp-hpa
+ name: argos-hpa
 spec:
  scaleTargetRef:
  apiVersion: apps/v1
  kind: Deployment
- name: sql-mcp-server
+ name: argos-mcp
  minReplicas: 2
  maxReplicas: 10
  metrics:
@@ -569,9 +569,9 @@ export JAVA_OPTS="-Xms512m -Xmx2g -XX:+UseG1GC"
 for server in server1 server2 server3; do
  echo "Deploying to $server"
  ssh $server "
- systemctl stop sql-mcp-server
- cp /tmp/new-version/* /opt/sql-mcp-server/
- systemctl start sql-mcp-server
+ systemctl stop argos-mcp
+ cp /tmp/new-version/* /opt/argos-mcp/
+ systemctl start argos-mcp
  "
  sleep 30 # Wait for health check
 done
@@ -607,13 +607,13 @@ netstat -tlnp | grep :3000
 lsof -i :3000
 
 # Kill conflicting processes
-pkill -f "sql-mcp-server"
+pkill -f "argos-mcp"
 ```
 
 **Permission Issues**:
 ```bash
 # Fix file permissions
-chown -R sql-mcp:sql-mcp /opt/sql-mcp-server
+chown -R argos:argos /opt/argos-mcp
 chmod 600 config.ini
 chmod 755 logs/
 ```
@@ -677,6 +677,6 @@ grep "out of memory" logs/application.log
 
 ## Conclusion
 
-This deployment guide provides comprehensive strategies for deploying the SQL MCP Server in various environments. Choose the appropriate architecture and configuration based on your specific requirements, security needs, and scale.
+This deployment guide provides comprehensive strategies for deploying the Argos-MCP in various environments. Choose the appropriate architecture and configuration based on your specific requirements, security needs, and scale.
 
 For additional support, consult the troubleshooting guide and community resources.

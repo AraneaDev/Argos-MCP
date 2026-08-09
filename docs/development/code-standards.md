@@ -1,10 +1,10 @@
 # Code Standards Guide
 
-This document outlines the coding standards, style guidelines, and best practices for the SQL MCP Server project.
+This document outlines the coding standards, style guidelines, and best practices for the Argos-MCP project.
 
 ## Overview
 
-The SQL MCP Server follows strict coding standards to ensure consistency, maintainability, and reliability across the codebase. These standards cover TypeScript code style, architecture patterns, documentation requirements, and development workflows.
+The Argos-MCP follows strict coding standards to ensure consistency, maintainability, and reliability across the codebase. These standards cover TypeScript code style, architecture patterns, documentation requirements, and development workflows.
 
 **Key Principles:**
 - **Type Safety First** - Leverage TypeScript's type system fully
@@ -1024,7 +1024,7 @@ if (attempts > MAX_RETRY_ATTEMPTS) {
 
 ## Conclusion
 
-These coding standards ensure the SQL MCP Server maintains high quality, security, and maintainability. All developers should familiarize themselves with these guidelines and apply them consistently across the codebase.
+These coding standards ensure the Argos-MCP maintains high quality, security, and maintainability. All developers should familiarize themselves with these guidelines and apply them consistently across the codebase.
 
 **Key Takeaways:**
 - **Type safety first** - Leverage TypeScript fully

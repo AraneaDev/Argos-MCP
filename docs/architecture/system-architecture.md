@@ -1,12 +1,12 @@
 # System Architecture
 
-The SQL MCP Server follows a layered, modular architecture designed for security, performance, and maintainability. This document provides a comprehensive overview of the system design, component interactions, and architectural decisions.
+The Argos-MCP follows a layered, modular architecture designed for security, performance, and maintainability. This document provides a comprehensive overview of the system design, component interactions, and architectural decisions.
 
 ## High-Level Architecture
 
 ```mermaid
 graph TB
- Claude[Claude Desktop] --> MCP[MCP Protocol Layer]
+ Claude[Claude Code] --> MCP[MCP Protocol Layer]
  MCP --> Server[SQLMCPServer]
  Server --> Security[SecurityManager]
  Server --> Connection[ConnectionManager]
@@ -32,7 +32,7 @@ graph TB
 **Responsibility**: MCP protocol communication and message handling
 
 - **MCP Message Processing**: Handles JSON-RPC 2.0 messages over stdio
-- **Tool Registration**: Exposes database tools to Claude Desktop
+- **Tool Registration**: Exposes database tools to Claude Code
 - **Request Routing**: Routes tool calls to appropriate handlers
 - **Error Handling**: Standardized error responses and recovery
 
@@ -87,7 +87,7 @@ graph TB
 ## Component Interactions
 
 ### Request Flow
-1. **Claude Desktop** sends MCP request via stdio
+1. **Claude Code** sends MCP request via stdio
 2. **SQLMCPServer** receives and validates the request
 3. **SecurityManager** validates query permissions and complexity
 4. **EnhancedSSHTunnelManager** establishes tunnels if needed
@@ -381,4 +381,4 @@ securityManager.on('query-approved', (dbName: string) => {...})
 
 ---
 
-This architecture provides a solid foundation for secure, performant, and maintainable database access from Claude Desktop while maintaining flexibility for future enhancements and extensions.
+This architecture provides a solid foundation for secure, performant, and maintainable database access from Claude Code while maintaining flexibility for future enhancements and extensions.

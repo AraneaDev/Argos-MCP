@@ -1,8 +1,8 @@
-# SQL MCP Server Development Environment Setup
+# Argos-MCP Development Environment Setup
 
 ## Overview
 
-This guide provides a comprehensive development environment setup for contributing to the SQL MCP Server project, including advanced developer tools, debugging configurations, and testing strategies.
+This guide provides a comprehensive development environment setup for contributing to the Argos-MCP project, including advanced developer tools, debugging configurations, and testing strategies.
 
 ## Quick Development Setup
 
@@ -18,8 +18,8 @@ This guide provides a comprehensive development environment setup for contributi
 
 ```bash
 # Clone the repository
-git clone https://github.com/AraneaDev/mcp-sql-access-server.git
-cd mcp-sql-access-server
+git clone https://github.com/AraneaDev/Argos-MCP.git
+cd Argos-MCP
 
 # Install dependencies
 npm install
@@ -104,8 +104,8 @@ npm run dev -- --config config/development.ini
  "profile": "node --prof dist/index.js",
  "profile:analyze": "node --prof-process isolate-*.log > profile.txt",
  
- "docker:build": "docker build -t sql-mcp-server .",
- "docker:run": "docker run -p 3000:3000 sql-mcp-server",
+ "docker:build": "docker build -t argos-mcp .",
+ "docker:run": "docker run -p 3000:3000 argos-mcp",
  "docker:test": "docker-compose -f docker/test.yml up --abort-on-container-exit",
  
  "release": "semantic-release",
@@ -286,7 +286,7 @@ version: '3.8'
 services:
  postgres-dev:
  image: postgres:15-alpine
- container_name: sql-mcp-postgres-dev
+ container_name: argos-postgres-dev
  environment:
  POSTGRES_DB: mcp_development
  POSTGRES_USER: mcp_dev
@@ -302,7 +302,7 @@ services:
 
  mysql-dev:
  image: mysql:8.0
- container_name: sql-mcp-mysql-dev
+ container_name: argos-mysql-dev
  environment:
  MYSQL_ROOT_PASSWORD: root_password
  MYSQL_DATABASE: mcp_development
@@ -318,7 +318,7 @@ services:
 
  redis-dev:
  image: redis:7-alpine
- container_name: sql-mcp-redis-dev
+ container_name: argos-redis-dev
  ports:
  - "6379:6379"
  volumes:
@@ -329,7 +329,7 @@ services:
 
  pgadmin:
  image: dpage/pgadmin4
- container_name: sql-mcp-pgadmin
+ container_name: argos-pgadmin
  environment:
  PGADMIN_DEFAULT_EMAIL: admin@local.dev
  PGADMIN_DEFAULT_PASSWORD: admin
@@ -345,7 +345,7 @@ services:
 
  adminer:
  image: adminer
- container_name: sql-mcp-adminer
+ container_name: argos-adminer
  ports:
  - "8081:8080"
  networks:
@@ -481,7 +481,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 
 async function setupDevelopmentEnvironment() {
- console.log(' Setting up SQL MCP Server development environment...\n');
+ console.log(' Setting up Argos-MCP development environment...\n');
 
  try {
  // Check prerequisites
@@ -595,7 +595,7 @@ async function setupGitHooks() {
  console.log(' Setting up Git hooks...');
  
  const preCommitHook = `#!/bin/sh
-# Pre-commit hook for SQL MCP Server
+# Pre-commit hook for Argos-MCP
 
 echo "Running pre-commit checks..."
 
@@ -946,4 +946,4 @@ kill -9 <PID>
 - Performance tests for critical paths
 - Security tests for input validation
 
-This development setup provides a comprehensive environment for contributing to the SQL MCP Server with modern tooling, automated quality checks, and debugging capabilities.
+This development setup provides a comprehensive environment for contributing to the Argos-MCP with modern tooling, automated quality checks, and debugging capabilities.

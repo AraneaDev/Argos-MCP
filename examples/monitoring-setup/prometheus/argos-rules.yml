@@ -1,68 +1,68 @@
-# SQL MCP Server Alerting Rules
+# Argos-MCP Alerting Rules
 # These rules define alerts for various conditions that require attention
 
 groups:
   # Critical System Alerts
-  - name: sql_mcp_server_critical
+  - name: argos_server_critical
     rules:
       # Server Down Alert
       - alert: SQLMCPServerDown
-        expr: up{job="sql-mcp-server"} == 0
+        expr: up{job="argos-mcp"} == 0
         for: 1m
         labels:
           severity: critical
-          service: sql-mcp-server
+          service: argos-mcp
         annotations:
-          summary: "SQL MCP Server is down"
-          description: "SQL MCP Server has been down for more than 1 minute. Last seen {{ $value }} seconds ago."
-          runbook_url: "https://your-runbook-url.com/sql-mcp-server-down"
+          summary: "Argos-MCP is down"
+          description: "Argos-MCP has been down for more than 1 minute. Last seen {{ $value }} seconds ago."
+          runbook_url: "https://your-runbook-url.com/argos-mcp-down"
 
       # High Error Rate Alert
       - alert: SQLMCPHighErrorRate
-        expr: (rate(sql_mcp_queries_total{status="error"}[5m]) / rate(sql_mcp_queries_total[5m])) * 100 > 5
+        expr: (rate(argos_queries_total{status="error"}[5m]) / rate(argos_queries_total[5m])) * 100 > 5
         for: 5m
         labels:
           severity: critical
-          service: sql-mcp-server
+          service: argos-mcp
         annotations:
-          summary: "High error rate in SQL MCP Server"
+          summary: "High error rate in Argos-MCP"
           description: "Error rate is {{ $value }}% over the last 5 minutes, which is above the 5% threshold."
           runbook_url: "https://your-runbook-url.com/high-error-rate"
 
       # Database Connection Failure
       - alert: DatabaseConnectionFailure
-        expr: sql_mcp_database_connection_errors_total > 0
+        expr: argos_database_connection_errors_total > 0
         for: 2m
         labels:
           severity: critical
-          service: sql-mcp-server
+          service: argos-mcp
         annotations:
           summary: "Database connection failures detected"
           description: "{{ $value }} database connection failures detected in the last 2 minutes for database {{ $labels.database }}."
           runbook_url: "https://your-runbook-url.com/database-connection-failure"
 
   # Warning Level Alerts
-  - name: sql_mcp_server_warning
+  - name: argos_server_warning
     rules:
       # High Query Response Time
       - alert: SQLMCPHighQueryLatency
-        expr: histogram_quantile(0.95, rate(sql_mcp_query_duration_seconds_bucket[5m])) > 1.0
+        expr: histogram_quantile(0.95, rate(argos_query_duration_seconds_bucket[5m])) > 1.0
         for: 10m
         labels:
           severity: warning
-          service: sql-mcp-server
+          service: argos-mcp
         annotations:
-          summary: "High query latency in SQL MCP Server"
+          summary: "High query latency in Argos-MCP"
           description: "95th percentile query latency is {{ $value }}s, which is above the 1.0s threshold."
           runbook_url: "https://your-runbook-url.com/high-query-latency"
 
       # Connection Pool Exhaustion Warning
       - alert: SQLMCPConnectionPoolHigh
-        expr: (sql_mcp_connections_active / sql_mcp_connections_max) * 100 > 80
+        expr: (argos_connections_active / argos_connections_max) * 100 > 80
         for: 5m
         labels:
           severity: warning
-          service: sql-mcp-server
+          service: argos-mcp
         annotations:
           summary: "Connection pool utilization is high"
           description: "Connection pool utilization is {{ $value }}% for database {{ $labels.database }}, above 80% threshold."
@@ -74,7 +74,7 @@ groups:
         for: 5m
         labels:
           severity: warning
-          service: sql-mcp-server
+          service: argos-mcp
         annotations:
           summary: "High memory usage detected"
           description: "Available memory is {{ $value }}%, which is below 20% threshold."
@@ -86,22 +86,22 @@ groups:
         for: 10m
         labels:
           severity: warning
-          service: sql-mcp-server
+          service: argos-mcp
         annotations:
           summary: "High CPU usage detected"
           description: "CPU usage is {{ $value }}%, which is above 80% threshold."
           runbook_url: "https://your-runbook-url.com/high-cpu-usage"
 
   # Security Alerts
-  - name: sql_mcp_server_security
+  - name: argos_server_security
     rules:
       # Failed Authentication Attempts
       - alert: SQLMCPFailedAuthAttempts
-        expr: increase(sql_mcp_authentication_failures_total[5m]) > 5
+        expr: increase(argos_authentication_failures_total[5m]) > 5
         for: 1m
         labels:
           severity: warning
-          service: sql-mcp-server
+          service: argos-mcp
           category: security
         annotations:
           summary: "Multiple failed authentication attempts"
@@ -110,11 +110,11 @@ groups:
 
       # Blocked Queries Due to Security Policy
       - alert: SQLMCPSecurityPolicyViolations
-        expr: increase(sql_mcp_security_violations_total[5m]) > 3
+        expr: increase(argos_security_violations_total[5m]) > 3
         for: 2m
         labels:
           severity: warning
-          service: sql-mcp-server
+          service: argos-mcp
           category: security
         annotations:
           summary: "Security policy violations detected"
@@ -122,15 +122,15 @@ groups:
           runbook_url: "https://your-runbook-url.com/security-violations"
 
   # Performance Alerts
-  - name: sql_mcp_server_performance
+  - name: argos_server_performance
     rules:
       # Query Volume Spike
       - alert: SQLMCPQueryVolumeSpike
-        expr: rate(sql_mcp_queries_total[5m]) > (rate(sql_mcp_queries_total[1h]) * 3)
+        expr: rate(argos_queries_total[5m]) > (rate(argos_queries_total[1h]) * 3)
         for: 5m
         labels:
           severity: info
-          service: sql-mcp-server
+          service: argos-mcp
         annotations:
           summary: "Query volume spike detected"
           description: "Current query rate {{ $value }} is 3x higher than the hourly average."
@@ -138,11 +138,11 @@ groups:
 
       # Large Result Set Warning
       - alert: SQLMCPLargeResultSets
-        expr: sql_mcp_query_result_size_bytes > 10485760  # 10MB
+        expr: argos_query_result_size_bytes > 10485760  # 10MB
         for: 1m
         labels:
           severity: info
-          service: sql-mcp-server
+          service: argos-mcp
         annotations:
           summary: "Large result sets detected"
           description: "Query returned result set larger than 10MB: {{ $value }} bytes."
@@ -150,26 +150,26 @@ groups:
 
       # Slow Queries
       - alert: SQLMCPSlowQueries
-        expr: sql_mcp_query_duration_seconds > 30
+        expr: argos_query_duration_seconds > 30
         for: 1m
         labels:
           severity: info
-          service: sql-mcp-server
+          service: argos-mcp
         annotations:
           summary: "Slow query detected"
           description: "Query took {{ $value }} seconds to complete, above 30s threshold."
           runbook_url: "https://your-runbook-url.com/slow-queries"
 
   # Database-Specific Alerts
-  - name: sql_mcp_database_health
+  - name: argos_database_health
     rules:
       # Database Unavailable
       - alert: DatabaseUnavailable
-        expr: sql_mcp_database_available{database!=""} == 0
+        expr: argos_database_available{database!=""} == 0
         for: 2m
         labels:
           severity: critical
-          service: sql-mcp-server
+          service: argos-mcp
         annotations:
           summary: "Database {{ $labels.database }} is unavailable"
           description: "Database {{ $labels.database }} has been unavailable for more than 2 minutes."
@@ -177,18 +177,18 @@ groups:
 
       # Schema Changes Detected
       - alert: DatabaseSchemaChange
-        expr: increase(sql_mcp_schema_changes_total[1h]) > 0
+        expr: increase(argos_schema_changes_total[1h]) > 0
         for: 1m
         labels:
           severity: info
-          service: sql-mcp-server
+          service: argos-mcp
         annotations:
           summary: "Database schema changes detected"
           description: "{{ $value }} schema changes detected in database {{ $labels.database }} in the last hour."
           runbook_url: "https://your-runbook-url.com/schema-changes"
 
   # Capacity Planning Alerts
-  - name: sql_mcp_capacity
+  - name: argos_capacity
     rules:
       # Disk Space Low
       - alert: SQLMCPLowDiskSpace
@@ -196,7 +196,7 @@ groups:
         for: 5m
         labels:
           severity: warning
-          service: sql-mcp-server
+          service: argos-mcp
         annotations:
           summary: "Low disk space"
           description: "Disk space is {{ $value }}% available on {{ $labels.device }}, below 10% threshold."
@@ -204,11 +204,11 @@ groups:
 
       # High Query Concurrency
       - alert: SQLMCPHighConcurrency
-        expr: sql_mcp_concurrent_queries > 50
+        expr: argos_concurrent_queries > 50
         for: 5m
         labels:
           severity: warning
-          service: sql-mcp-server
+          service: argos-mcp
         annotations:
           summary: "High query concurrency"
           description: "{{ $value }} concurrent queries detected, above recommended limit of 50."

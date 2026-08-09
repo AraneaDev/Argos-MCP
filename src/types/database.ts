@@ -1,5 +1,5 @@
 /**
- * Core type definitions for SQL MCP Server
+ * Core type definitions for Argos-MCP
  */
 
 import type { Client as PgClient, PoolClient as PgPoolClient } from 'pg';

@@ -1,8 +1,8 @@
-# SQL MCP Server Performance Tuning Guide
+# Argos-MCP Performance Tuning Guide
 
 ## Overview
 
-This comprehensive guide covers performance optimization strategies for the SQL MCP Server, including query optimization, connection management, memory tuning, and system-level optimizations.
+This comprehensive guide covers performance optimization strategies for the Argos-MCP, including query optimization, connection management, memory tuning, and system-level optimizations.
 
 ## Performance Architecture
 
@@ -596,7 +596,7 @@ export class ResultStreamOptimizer {
 # system-optimization.sh
 
 # TCP/IP optimizations
-echo "# SQL MCP Server optimizations" >> /etc/sysctl.conf
+echo "# Argos-MCP optimizations" >> /etc/sysctl.conf
 echo "net.core.somaxconn = 65535" >> /etc/sysctl.conf
 echo "net.core.netdev_max_backlog = 5000" >> /etc/sysctl.conf
 echo "net.ipv4.tcp_max_syn_backlog = 65535" >> /etc/sysctl.conf
@@ -611,8 +611,8 @@ echo "vm.dirty_background_ratio = 5" >> /etc/sysctl.conf
 
 # File descriptor limits
 echo "fs.file-max = 2097152" >> /etc/sysctl.conf
-echo "sql-mcp soft nofile 65536" >> /etc/security/limits.conf
-echo "sql-mcp hard nofile 65536" >> /etc/security/limits.conf
+echo "argos soft nofile 65536" >> /etc/security/limits.conf
+echo "argos hard nofile 65536" >> /etc/security/limits.conf
 
 # Apply changes
 sysctl -p
@@ -659,7 +659,7 @@ FROM node:18-alpine AS runtime
 
 # Security: Run as non-root user
 RUN addgroup -g 1001 -S nodejs && \
- adduser -S sql-mcp -u 1001 -G nodejs
+ adduser -S argos -u 1001 -G nodejs
 
 # System optimizations
 RUN apk add --no-cache \
@@ -671,7 +671,7 @@ WORKDIR /app
 
 # Copy optimized node_modules
 COPY --from=builder /app/node_modules ./node_modules
-COPY --chown=sql-mcp:nodejs . .
+COPY --chown=argos:nodejs . .
 
 # Performance settings
 ENV NODE_ENV=production
@@ -682,7 +682,7 @@ ENV UV_THREADPOOL_SIZE=16
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
  CMD node healthcheck.js
 
-USER sql-mcp
+USER argos
 EXPOSE 3000
 
 # Use tini for proper signal handling
@@ -935,6 +935,6 @@ export class PerformanceBenchmark {
 
 ## Conclusion
 
-Performance optimization is an ongoing process that requires regular monitoring, testing, and adjustment. This guide provides the foundation for implementing comprehensive performance improvements across all layers of the SQL MCP Server stack.
+Performance optimization is an ongoing process that requires regular monitoring, testing, and adjustment. This guide provides the foundation for implementing comprehensive performance improvements across all layers of the Argos-MCP stack.
 
 Regular benchmarking and performance analysis ensure the system continues to meet performance requirements as load and usage patterns evolve.

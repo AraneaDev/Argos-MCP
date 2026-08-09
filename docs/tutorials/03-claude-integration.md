@@ -1,10 +1,10 @@
-# Claude Desktop Integration Tutorial
+# Claude Code Integration Tutorial
 
-This tutorial shows you how to integrate the SQL MCP Server with Claude Desktop, enabling Claude to query your databases directly.
+This tutorial shows you how to register Argos-MCP with Claude Code, enabling Claude to query your databases directly.
 
 ## Overview
 
-Claude Desktop can connect to MCP (Model Context Protocol) servers to extend Claude's capabilities. The SQL MCP Server acts as a bridge between Claude and your databases, allowing Claude to:
+Claude Code connects to MCP (Model Context Protocol) servers to extend Claude's capabilities. Argos-MCP acts as a bridge between Claude and your databases, allowing Claude to:
 
 - Query your databases safely with built-in security validation
 - Analyze data and generate insights
@@ -15,14 +15,14 @@ Claude Desktop can connect to MCP (Model Context Protocol) servers to extend Cla
 
 Before starting this tutorial, ensure you have:
 
-- **SQL MCP Server installed** - [Installation Tutorial](01-installation.md)
+- **Argos-MCP installed** - [Installation Tutorial](01-installation.md)
 - **Database configured** - At least one database connection configured
-- **Claude Desktop installed** - Download from [claude.ai](https://claude.ai/desktop)
-- **Server tested** - Verified that `mcp-sql-server` starts without errors
+- **Claude Code installed** - `claude --version` should report a version
+- **Server tested** - Verified that `argos-mcp` starts without errors
 
-## Step 1: Verify SQL MCP Server
+## Step 1: Verify Argos-MCP
 
-First, ensure your SQL MCP Server is properly configured:
+First, ensure your Argos-MCP is properly configured:
 
 ### Check Configuration
 
@@ -31,12 +31,12 @@ First, ensure your SQL MCP Server is properly configured:
 ls -la config.ini
 
 # Test server startup
-mcp-sql-server --test
+argos-mcp --test
 ```
 
 **Expected Output:**
 ```
- SQL MCP Server starting...
+ Argos-MCP starting...
  Loaded 1 database configuration(s):
  - production (postgresql, SELECT-only)
  Security manager initialized with default limits
@@ -47,7 +47,7 @@ mcp-sql-server --test
 
 ```bash
 # Test all configured databases
-mcp-sql-setup --test-only
+npm run setup
 ```
 
 **Expected Output:**
@@ -64,149 +64,69 @@ Testing analytics...
  Access mode: SELECT-only
 ```
 
-If you see connection errors, resolve them before proceeding to Claude Desktop integration.
+If you see connection errors, resolve them before registering with Claude Code.
 
-## Step 2: Locate Claude Desktop Configuration
+## Step 2: Register the Server with Claude Code
 
-Claude Desktop stores its configuration in different locations depending on your operating system:
-
-### Configuration File Locations
-
-**macOS:**
-```
-~/Library/Application Support/Claude/claude_desktop_config.json
-```
-
-**Windows:**
-```
-%APPDATA%\Claude\claude_desktop_config.json
-```
-
-**Linux:**
-```
-~/.config/Claude/claude_desktop_config.json
-```
-
-### Create Configuration Directory
-
-If the configuration file doesn't exist, create it:
+Claude Code owns its own MCP registry — you never hand-edit a JSON config. From the repository root:
 
 ```bash
-# macOS
-mkdir -p ~/Library/Application\ Support/Claude
-touch ~/Library/Application\ Support/Claude/claude_desktop_config.json
-
-# Linux
-mkdir -p ~/.config/Claude
-touch ~/.config/Claude/claude_desktop_config.json
-
-# Windows (PowerShell)
-New-Item -Path "$env:APPDATA\Claude" -ItemType Directory -Force
-New-Item -Path "$env:APPDATA\Claude\claude_desktop_config.json" -ItemType File
+claude mcp add argos --scope user -- \
+  node "$(pwd)/dist/index.js" --config "$HOME/.config/argos/config.ini"
 ```
 
-## Step 3: Configure Claude Desktop
+Everything after `--` is the command Claude Code will spawn. Both paths must be absolute: Claude Code executes the command directly, so `~` and relative paths are not expanded.
 
-### Basic Configuration
+### Choosing a Scope
 
-Edit the Claude Desktop configuration file and add the SQL MCP Server:
+| Scope | Flag | Stored in | Use when |
+|-------|------|-----------|----------|
+| User | `--scope user` | `~/.claude.json` | You want Argos in every project — the usual choice |
+| Project | `--scope project` | `.mcp.json` in the repo | You want to commit the registration for your team |
+| Local | *(default)* | Per-project, private | You are trying it out in one project |
 
-```json
-{
- "mcpServers": {
- "sql-database": {
- "command": "mcp-sql-server",
- "args": []
- }
- }
-}
+A project-scoped registration is worth knowing about: `.mcp.json` is a tracked file, so teammates get Argos on checkout. It records the command, not your credentials — those stay in the `config.ini` each person keeps locally.
+
+### Passing Environment Variables
+
+Use `-e` for anything the server should read from the environment, so secrets stay out of the recorded arguments:
+
+```bash
+claude mcp add argos --scope user \
+  -e NODE_ENV=production \
+  -e SSH_KEY_PASSPHRASE="$SSH_KEY_PASSPHRASE" \
+  -- node "$(pwd)/dist/index.js" --config "$HOME/.config/argos/config.ini"
 ```
 
-### Configuration with Custom Config Path
+### Registering Several Configurations
 
-If your `config.ini` is in a non-standard location:
+Separate registrations can point at different `config.ini` files — useful for keeping production strictly read-only while development stays writable:
 
-```json
-{
- "mcpServers": {
- "sql-database": {
- "command": "mcp-sql-server",
- "args": ["--config", "/path/to/your/config.ini"]
- }
- }
-}
+```bash
+claude mcp add argos-prod --scope user -- \
+  node "$(pwd)/dist/index.js" --config /etc/argos/production.ini
+
+claude mcp add argos-dev --scope user -- \
+  node "$(pwd)/dist/index.js" --config /etc/argos/development.ini
 ```
 
-### Configuration for Local Installation
+Each appears under its own tool namespace — `mcp__argos-prod__sql_query`, `mcp__argos-dev__sql_query` — so there is no ambiguity about which database Claude is reaching for.
 
-If you installed the SQL MCP Server locally (not globally):
+## Step 3: Verify the Registration
 
-```json
-{
- "mcpServers": {
- "sql-database": {
- "command": "npx",
- "args": ["mcp-sql-server"]
- }
- }
-}
+```bash
+claude mcp list
 ```
 
-### Configuration with Environment Variables
+Argos should be listed as connected. To see exactly what was recorded:
 
-To pass environment variables (like passwords):
-
-```json
-{
- "mcpServers": {
- "sql-database": {
- "command": "mcp-sql-server",
- "args": [],
- "env": {
- "DB_PASSWORD": "your_secure_password",
- "NODE_ENV": "production"
- }
- }
- }
-}
+```bash
+claude mcp get argos
 ```
 
-### Advanced Configuration Example
+## Step 4: Start a Session
 
-```json
-{
- "mcpServers": {
- "sql-database": {
- "command": "mcp-sql-server",
- "args": [
- "--config", "/etc/claude-sql/config.ini",
- "--debug"
- ],
- "env": {
- "DB_PROD_PASSWORD": "prod_password",
- "DB_ANALYTICS_PASSWORD": "analytics_password",
- "SSH_KEY_PASSPHRASE": "ssh_passphrase"
- }
- }
- }
-}
-```
-
-## Step 4: Restart Claude Desktop
-
-After updating the configuration:
-
-1. **Close Claude Desktop completely**
-2. **Wait 5 seconds** for all processes to terminate
-3. **Restart Claude Desktop**
-
-### Verify Configuration Load
-
-When Claude Desktop starts, it should load the MCP server. You can verify this by:
-
-1. Opening Claude Desktop
-2. Starting a new conversation
-3. Looking for available tools or functions
+Claude Code launches the server on demand — there is no daemon to start and no application to restart. Open Claude Code and the Argos tools are available immediately in a new session; `/mcp` lists the connected servers and their tools.
 
 ## Step 5: Test Integration
 
@@ -298,35 +218,32 @@ Would you like me to analyze posting patterns over time or explore other user en
 ### Issue 1: MCP Server Not Found
 
 **Symptoms:**
-- Claude Desktop starts but doesn't recognize database tools
-- No database-related capabilities available
+- `claude mcp list` does not show `argos`, or shows it as failed
+- No database tools available in a new session
 
 **Solutions:**
 
-1. **Verify command path:**
+1. **Check what was actually recorded:**
  ```bash
- # Test if command is in PATH
- which mcp-sql-server
- # or
- mcp-sql-server --version
+ claude mcp get argos
+ ```
+ The command and every argument must be an absolute path. A registration made with `~` or a relative path will fail to spawn.
+
+2. **Confirm the entry point exists and runs:**
+ ```bash
+ test -f /abs/path/to/Argos-MCP/dist/index.js && echo present
+ node /abs/path/to/Argos-MCP/dist/index.js --version
+ ```
+ If it is missing, you have not built yet — run `npm run build`.
+
+3. **Re-register after moving or rebuilding the repository:**
+ ```bash
+ claude mcp remove argos --scope user
+ claude mcp add argos --scope user -- \
+   node "$(pwd)/dist/index.js" --config "$HOME/.config/argos/config.ini"
  ```
 
-2. **Use full path in configuration:**
- ```json
- {
- "mcpServers": {
- "sql-database": {
- "command": "/usr/local/bin/mcp-sql-server",
- "args": []
- }
- }
- }
- ```
-
-3. **Check npm global installation:**
- ```bash
- npm list -g --depth=0 | grep sql-mcp-server
- ```
+4. **Check the scope you registered under.** A `--scope local` registration only exists in the project directory where you ran it. `claude mcp list` from elsewhere will not show it.
 
 ### Issue 2: Configuration File Not Found
 
@@ -336,23 +253,18 @@ Would you like me to analyze posting patterns over time or explore other user en
 
 **Solutions:**
 
-1. **Specify config path explicitly:**
- ```json
- {
- "mcpServers": {
- "sql-database": {
- "command": "mcp-sql-server",
- "args": ["--config", "/full/path/to/config.ini"]
- }
- }
- }
+1. **Specify the config path explicitly when registering:**
+ ```bash
+ claude mcp remove argos --scope user
+ claude mcp add argos --scope user -- \
+   node /abs/path/dist/index.js --config /full/path/to/config.ini
  ```
 
-2. **Verify config file exists:**
+2. **Verify the config file exists and is readable:**
  ```bash
- ls -la config.ini
- cat config.ini # Check contents
+ ls -la /full/path/to/config.ini
  ```
+ Argos resolves `--config` relative to nothing — the path is used as given, and Claude Code spawns the server with an unpredictable working directory, so a bare `config.ini` will not be found.
 
 ### Issue 3: Database Connection Errors
 
@@ -362,40 +274,25 @@ Would you like me to analyze posting patterns over time or explore other user en
 
 **Solutions:**
 
-1. **Test connections independently:**
+1. **Test connections independently** — call the `sql_test_connection` tool from Claude, or run the wizard's test pass:
  ```bash
- mcp-sql-setup --test-only
+ npm run setup
  ```
 
-2. **Check environment variables:**
- ```json
- {
- "mcpServers": {
- "sql-database": {
- "command": "mcp-sql-server",
- "args": [],
- "env": {
- "DB_PASSWORD": "correct_password"
- }
- }
- }
- }
+2. **Pass credentials through the environment** rather than the config file:
+ ```bash
+ claude mcp add argos --scope user \
+   -e DB_PASSWORD="$DB_PASSWORD" \
+   -- node /abs/path/dist/index.js --config /abs/path/config.ini
  ```
 
-3. **Enable debug mode:**
- ```json
- {
- "mcpServers": {
- "sql-database": {
- "command": "mcp-sql-server",
- "args": ["--debug"],
- "env": {
- "DEBUG": "sql-mcp:*"
- }
- }
- }
- }
+3. **Enable debug logging:**
+ ```bash
+ claude mcp add argos --scope user \
+   -e LOG_LEVEL=DEBUG \
+   -- node /abs/path/dist/index.js --config /abs/path/config.ini
  ```
+ Output goes to `argos-mcp.log`, never to stdout — stdout carries the JSON-RPC stream and anything written there breaks the protocol.
 
 ### Issue 4: Permission Denied
 
@@ -407,7 +304,7 @@ Would you like me to analyze posting patterns over time or explore other user en
 
 1. **Check file permissions:**
  ```bash
- chmod +x $(which mcp-sql-server)
+ chmod +x $(which argos-mcp)
  chmod 600 config.ini # Protect sensitive config
  ```
 
@@ -417,155 +314,112 @@ Would you like me to analyze posting patterns over time or explore other user en
  psql -h localhost -U your_user -d your_database
  ```
 
-### Issue 5: Claude Desktop Configuration Issues
+### Issue 5: Registration Not Taking Effect
 
 **Symptoms:**
-- Configuration changes don't take effect
-- MCP server not loading
+- Changes to the registration don't appear
+- The server loads with stale arguments
 
 **Solutions:**
 
-1. **Validate JSON syntax:**
+1. **MCP servers are resolved when a session starts.** Exit Claude Code and start a new session after changing a registration.
+
+2. **Check for a duplicate at another scope.** A project-scoped `.mcp.json` entry and a user-scoped entry can both define `argos`; the narrower scope wins.
  ```bash
- # Use a JSON validator
- cat claude_desktop_config.json | python -m json.tool
+ claude mcp list
+ cat .mcp.json 2>/dev/null
  ```
 
-2. **Check file location:**
+3. **Read the server's own log.** Argos writes startup and connection failures to `argos-mcp.log` in the repository root — that is where a bad `config.ini` path shows up.
  ```bash
- # macOS
- ls -la ~/Library/Application\ Support/Claude/
- 
- # Linux
- ls -la ~/.config/Claude/
+ tail -n 50 /abs/path/to/Argos-MCP/argos-mcp.log
  ```
 
-3. **Completely restart Claude Desktop:**
- - Close all Claude Desktop windows
- - Wait 10 seconds
- - Check Task Manager/Activity Monitor for remaining processes
- - Kill any remaining Claude processes
- - Restart Claude Desktop
+4. **Remove and re-add** if the recorded entry looks wrong:
+ ```bash
+ claude mcp remove argos --scope user
+ claude mcp add argos --scope user -- node /abs/path/dist/index.js --config /abs/path/config.ini
+ ```
 
 ## Advanced Integration Configurations
 
 ### Multiple Database Servers
 
-You can configure multiple MCP servers for different database environments:
+Register one server per environment, each with its own config file:
 
-```json
-{
- "mcpServers": {
- "production-db": {
- "command": "mcp-sql-server",
- "args": ["--config", "/etc/sql-mcp/production.ini"]
- },
- "development-db": {
- "command": "mcp-sql-server",
- "args": ["--config", "/etc/sql-mcp/development.ini"]
- },
- "analytics-db": {
- "command": "mcp-sql-server",
- "args": ["--config", "/etc/sql-mcp/analytics.ini"]
- }
- }
-}
+```bash
+claude mcp add production-db --scope user -- \
+  node /abs/path/dist/index.js --config /etc/argos/production.ini
+
+claude mcp add development-db --scope user -- \
+  node /abs/path/dist/index.js --config /etc/argos/development.ini
+
+claude mcp add analytics-db --scope user -- \
+  node /abs/path/dist/index.js --config /etc/argos/analytics.ini
 ```
+
+The registration name becomes the tool namespace, so Claude sees `mcp__production-db__sql_query` and `mcp__development-db__sql_query` as distinct tools. Naming them for the environment rather than the database is what keeps a production query from being issued by accident.
 
 ### Configuration with SSH Tunnels
 
-For databases requiring SSH tunnels:
+For databases reached through a bastion host:
 
-```json
-{
- "mcpServers": {
- "secure-database": {
- "command": "mcp-sql-server",
- "args": ["--config", "/secure/path/config.ini"],
- "env": {
- "SSH_PRIVATE_KEY": "/path/to/ssh/private/key",
- "SSH_PASSPHRASE": "optional_key_passphrase",
- "DB_PASSWORD": "database_password"
- }
- }
- }
-}
+```bash
+claude mcp add secure-database --scope user \
+  -e SSH_PRIVATE_KEY=/path/to/ssh/private/key \
+  -e SSH_PASSPHRASE="$SSH_PASSPHRASE" \
+  -e DB_PASSWORD="$DB_PASSWORD" \
+  -- node /abs/path/dist/index.js --config /secure/path/config.ini
 ```
+
+The tunnel itself is described in `config.ini` (`ssh_host`, `ssh_username`, `ssh_private_key`); the environment is only for the secrets you would rather not write to disk.
 
 ### Development vs Production Configuration
 
-**Development Configuration:**
-```json
-{
- "mcpServers": {
- "sql-database": {
- "command": "mcp-sql-server",
- "args": ["--debug"],
- "env": {
- "NODE_ENV": "development",
- "DEBUG": "sql-mcp:*"
- }
- }
- }
-}
+**Development:**
+```bash
+claude mcp add argos-dev --scope user \
+  -e NODE_ENV=development \
+  -e LOG_LEVEL=DEBUG \
+  -- node /abs/path/dist/index.js --config /etc/argos/development.ini
 ```
 
-**Production Configuration:**
-```json
-{
- "mcpServers": {
- "sql-database": {
- "command": "mcp-sql-server",
- "args": ["--config", "/etc/claude-sql/production.ini"],
- "env": {
- "NODE_ENV": "production",
- "DB_PASSWORD": "${DB_PASSWORD}",
- "LOG_LEVEL": "warn"
- }
- }
- }
-}
+**Production:**
+```bash
+claude mcp add argos-prod --scope user \
+  -e NODE_ENV=production \
+  -e LOG_LEVEL=WARN \
+  -e DB_PASSWORD="$DB_PASSWORD" \
+  -- node /abs/path/dist/index.js --config /etc/argos/production.ini
 ```
+
+Pair the production registration with `select_only=true` in its config file. The scopes are independent, so a project-scoped `argos-dev` and a user-scoped `argos-prod` can coexist without either shadowing the other.
 
 ## Security Considerations
 
 ### Environment Variable Security
 
-Never store sensitive data directly in the Claude Desktop configuration:
+`claude mcp add` records what you type verbatim, so a literal password becomes a plaintext string in `~/.claude.json` — and in `.mcp.json`, which is committed to git.
 
-```json
-// Bad: Passwords in config file
-{
- "mcpServers": {
- "sql-database": {
- "env": {
- "DB_PASSWORD": "actual_password_here"
- }
- }
- }
-}
+```bash
+# Bad: the password is written into the registration and into shell history
+claude mcp add argos --scope user -e DB_PASSWORD=actual_password_here -- node ...
 
-// Good: Reference environment variables
-{
- "mcpServers": {
- "sql-database": {
- "env": {
- "DB_PASSWORD": "${DB_PASSWORD}"
- }
- }
- }
-}
+# Good: the value is expanded from your environment at registration time
+claude mcp add argos --scope user -e DB_PASSWORD="$DB_PASSWORD" -- node ...
 ```
+
+For a project-scoped registration, keep credentials out of the registration entirely and leave them in the local `config.ini` — `.mcp.json` should describe how to start the server and nothing more.
 
 ### File Permissions
 
 Protect your configuration files:
 
 ```bash
-# Secure Claude Desktop config
-chmod 600 ~/Library/Application\ Support/Claude/claude_desktop_config.json
+# Secure the Claude Code registration (it can hold env values)
+chmod 600 ~/.claude.json
 
-# Secure SQL MCP config
+# Secure Argos-MCP config
 chmod 600 config.ini
 
 # Secure SSH keys
@@ -619,7 +473,7 @@ Help me identify slow-running queries by analyzing the most complex queries in o
 
 ## Next Steps
 
-Now that Claude Desktop is integrated with your databases:
+Now that Claude Code is connected to your databases:
 
 1. **Learn Query Techniques** -> [Basic Queries Tutorial](04-basic-queries.md)
 2. **Explore Advanced Features** -> [Configuration Guide](../guides/configuration-guide.md)
@@ -628,35 +482,26 @@ Now that Claude Desktop is integrated with your databases:
 
 ## Configuration Reference
 
-### Complete Claude Desktop Configuration Example
+### Complete Registration Example
 
-```json
-{
- "mcpServers": {
- "sql-database": {
- "command": "mcp-sql-server",
- "args": [
- "--config", "/etc/claude-sql/config.ini"
- ],
- "env": {
- "NODE_ENV": "production",
- "DB_PROD_PASSWORD": "${DB_PROD_PASSWORD}",
- "DB_ANALYTICS_PASSWORD": "${DB_ANALYTICS_PASSWORD}",
- "SSH_PRIVATE_KEY": "/secure/path/ssh_key",
- "LOG_LEVEL": "info"
- }
- }
- }
-}
+```bash
+claude mcp add argos --scope user \
+  -e NODE_ENV=production \
+  -e LOG_LEVEL=INFO \
+  -e DB_PROD_PASSWORD="$DB_PROD_PASSWORD" \
+  -e DB_ANALYTICS_PASSWORD="$DB_ANALYTICS_PASSWORD" \
+  -e SSH_PRIVATE_KEY=/secure/path/ssh_key \
+  -- node /opt/argos-mcp/dist/index.js --config /etc/argos/config.ini
 ```
+
+Inspect what was stored with `claude mcp get argos`.
 
 ### Environment Variables Reference
 
 | Variable | Description | Example |
 |----------|-------------|---------|
 | `NODE_ENV` | Runtime environment | `production`, `development` |
-| `DEBUG` | Debug output control | `sql-mcp:*` |
-| `LOG_LEVEL` | Logging level | `info`, `warn`, `error` |
+| `LOG_LEVEL` | Logging level | `DEBUG`, `INFO`, `WARN`, `ERROR` |
 | `DB_PASSWORD` | Database password | `secure_password123` |
 | `SSH_PRIVATE_KEY` | SSH key path | `/path/to/ssh/key` |
 | `SSH_PASSPHRASE` | SSH key passphrase | `key_passphrase` |
@@ -664,4 +509,4 @@ Now that Claude Desktop is integrated with your databases:
 
 ---
 
-** Success!** Claude Desktop is now connected to your databases. Continue with the [Basic Queries Tutorial](04-basic-queries.md) to learn how to effectively use Claude for database operations.
+** Success!** Claude Code is now connected to your databases. Continue with the [Basic Queries Tutorial](04-basic-queries.md) to learn how to effectively use Claude for database operations.

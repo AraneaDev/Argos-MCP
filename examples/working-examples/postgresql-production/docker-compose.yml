@@ -3,7 +3,7 @@ version: '3.8'
 services:
   postgres:
     image: postgres:15
-    container_name: sql-mcp-postgres-demo
+    container_name: argos-postgres-demo
     environment:
       POSTGRES_DB: production_app
       POSTGRES_USER: postgres
@@ -27,7 +27,7 @@ services:
   # Optional: Redis for caching (production-like setup)
   redis:
     image: redis:7-alpine
-    container_name: sql-mcp-redis-demo
+    container_name: argos-redis-demo
     ports:
       - "6379:6379"
     volumes:
@@ -43,7 +43,7 @@ services:
   # Optional: pgAdmin for database management
   pgadmin:
     image: dpage/pgadmin4:latest
-    container_name: sql-mcp-pgadmin-demo
+    container_name: argos-pgadmin-demo
     environment:
       PGADMIN_DEFAULT_EMAIL: admin@example.com
       PGADMIN_DEFAULT_PASSWORD: admin123
@@ -60,12 +60,12 @@ services:
 
 volumes:
   postgres_data:
-    name: sql-mcp-postgres-data
+    name: argos-postgres-data
   redis_data:
-    name: sql-mcp-redis-data
+    name: argos-redis-data
   pgadmin_data:
-    name: sql-mcp-pgadmin-data
+    name: argos-pgadmin-data
 
 networks:
   default:
-    name: sql-mcp-network
+    name: argos-network

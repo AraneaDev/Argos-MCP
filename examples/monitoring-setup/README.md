@@ -1,6 +1,6 @@
 # Monitoring and Observability Setup
 
-This directory contains comprehensive examples for monitoring, logging, and observability of SQL MCP Server deployments. Learn how to set up production-grade monitoring, alerting, and performance tracking.
+This directory contains comprehensive examples for monitoring, logging, and observability of Argos-MCP deployments. Learn how to set up production-grade monitoring, alerting, and performance tracking.
 
 ## Directory Structure
 
@@ -9,12 +9,12 @@ monitoring-setup/
 |-- README.md # This file
 |-- prometheus/ # Prometheus monitoring setup
 | |-- prometheus.yml # Prometheus configuration
-| |-- sql-mcp-server-rules.yml # Alerting rules
+| |-- argos-mcp-rules.yml # Alerting rules
 | |-- docker-compose.yml # Prometheus stack
 | \-- README.md # Prometheus setup guide
 |-- grafana/ # Grafana dashboards and config
 | |-- dashboards/ # Pre-built dashboards
-| | |-- sql-mcp-overview.json # Main overview dashboard
+| | |-- argos-overview.json # Main overview dashboard
 | | |-- database-performance.json # Database performance metrics
 | | |-- query-analytics.json # Query analysis dashboard
 | | \-- security-monitoring.json # Security events dashboard
@@ -46,7 +46,7 @@ monitoring-setup/
 |-- kubernetes-monitoring/ # Kubernetes monitoring manifests
 | |-- prometheus-operator.yml # Prometheus operator setup
 | |-- grafana-deployment.yml # Grafana deployment
-| |-- service-monitor.yml # SQL MCP Server monitoring
+| |-- service-monitor.yml # Argos-MCP monitoring
 | \-- README.md # Kubernetes monitoring guide
 \-- troubleshooting.md # Monitoring troubleshooting guide
 ```
@@ -122,14 +122,14 @@ node health-checks/monitoring-agent.js
 - Prometheus server for metrics storage
 - Alertmanager for alert routing
 - Node Exporter for system metrics
-- Custom exporters for SQL MCP Server metrics
+- Custom exporters for Argos-MCP metrics
 
 **Key Metrics**:
 ```
-sql_mcp_queries_total{database, status}
-sql_mcp_query_duration_seconds{database}
-sql_mcp_connections_active{database}
-sql_mcp_errors_total{type, database}
+argos_queries_total{database, status}
+argos_query_duration_seconds{database}
+argos_connections_active{database}
+argos_errors_total{type, database}
 ```
 
 ### 2. Grafana Dashboards
@@ -176,7 +176,7 @@ global:
  evaluation_interval: 15s
 
 scrape_configs:
- - job_name: 'sql-mcp-server'
+ - job_name: 'argos-mcp'
  static_configs:
  - targets: ['localhost:3001']
  metrics_path: '/metrics'
@@ -186,14 +186,14 @@ scrape_configs:
 ### Grafana Dashboard Query Examples
 ```
 # Query success rate
-rate(sql_mcp_queries_total{status="success"}[5m]) / 
-rate(sql_mcp_queries_total[5m]) * 100
+rate(argos_queries_total{status="success"}[5m]) / 
+rate(argos_queries_total[5m]) * 100
 
 # Average query duration
-avg(sql_mcp_query_duration_seconds) by (database)
+avg(argos_query_duration_seconds) by (database)
 
 # Connection pool utilization
-sql_mcp_connections_active / sql_mcp_connections_max * 100
+argos_connections_active / argos_connections_max * 100
 ```
 
 ### Log Configuration
@@ -208,7 +208,7 @@ const logger = winston.createLogger({
  winston.format.errors({ stack: true }),
  winston.format.json()
  ),
- defaultMeta: { service: 'sql-mcp-server' },
+ defaultMeta: { service: 'argos-mcp' },
  transports: [
  new winston.transports.File({ filename: 'logs/error.log', level: 'error' }),
  new winston.transports.File({ filename: 'logs/combined.log' }),
@@ -312,10 +312,10 @@ const logger = winston.createLogger({
 3. Check resource utilization trends
 4. Review recent configuration changes
 
-## Integration with SQL MCP Server
+## Integration with Argos-MCP
 
 ### Built-in Monitoring Support
-SQL MCP Server includes built-in monitoring capabilities:
+Argos-MCP includes built-in monitoring capabilities:
 
 ```javascript
 // Enable metrics endpoint

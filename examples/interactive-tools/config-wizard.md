@@ -1,6 +1,6 @@
 # Interactive Configuration Wizard
 
-This interactive tool helps you generate configuration files for the SQL MCP Server based on your specific requirements.
+This interactive tool helps you generate configuration files for the Argos-MCP based on your specific requirements.
 
 ## Usage
 
@@ -209,9 +209,9 @@ CMD ["node", "config-wizard.js"]
 ### Kubernetes ConfigMap Generation
 ```bash
 # Generate ConfigMap from wizard output
-kubectl create configmap sql-mcp-config \
+kubectl create configmap argos-config \
  --from-file=config.ini=wizard-output.ini \
- --namespace sql-mcp-server
+ --namespace argos-mcp
 ```
 
 ## Security Considerations

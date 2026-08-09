@@ -1,8 +1,8 @@
-# SQL MCP Server Backup and Recovery Guide
+# Argos-MCP Backup and Recovery Guide
 
 ## Overview
 
-This comprehensive guide covers backup strategies, disaster recovery procedures, and data protection measures for the SQL MCP Server and associated databases.
+This comprehensive guide covers backup strategies, disaster recovery procedures, and data protection measures for the Argos-MCP and associated databases.
 
 ## Backup Architecture
 
@@ -48,10 +48,10 @@ This comprehensive guide covers backup strategies, disaster recovery procedures,
 set -euo pipefail
 
 # Configuration
-BACKUP_ROOT="/backups/sql-mcp-server"
+BACKUP_ROOT="/backups/argos-mcp"
 RETENTION_DAYS=30
-ENCRYPTION_KEY_FILE="/etc/sql-mcp/backup.key"
-S3_BUCKET="sql-mcp-backups"
+ENCRYPTION_KEY_FILE="/etc/argos/backup.key"
+S3_BUCKET="argos-backups"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 # Create backup directory
@@ -95,10 +95,10 @@ backup_application_state() {
  log "Backing up application state..."
  
  # Current process information
- ps aux | grep sql-mcp-server > "${BACKUP_DIR}/process_info.txt" 2>/dev/null || true
+ ps aux | grep argos-mcp > "${BACKUP_DIR}/process_info.txt" 2>/dev/null || true
  
  # Network connections
- netstat -tlnp | grep sql-mcp > "${BACKUP_DIR}/network_info.txt" 2>/dev/null || true
+ netstat -tlnp | grep argos > "${BACKUP_DIR}/network_info.txt" 2>/dev/null || true
  
  # Memory usage
  free -h > "${BACKUP_DIR}/memory_info.txt" 2>/dev/null || true
@@ -176,7 +176,7 @@ upload_to_cloud() {
  log "Uploading to Azure Blob Storage..."
  az storage blob upload \
  --file "${archive_file}" \
- --container-name "sql-mcp-backups" \
+ --container-name "argos-backups" \
  --name "config/config_${TIMESTAMP}.tar.gz" || log "Azure upload failed"
  fi
  
@@ -595,7 +595,7 @@ export class DisasterRecoveryOrchestrator {
  // Check service health
  const healthChecks = [
  'curl -f http://localhost:3000/health',
- 'systemctl is-active sql-mcp-server',
+ 'systemctl is-active argos-mcp',
  'pg_isready -h localhost -p 5432'
  ];
  
@@ -648,7 +648,7 @@ export class DisasterRecoveryOrchestrator {
  name: 'disaster_recovery',
  rules: [{
  alert: 'DisasterRecoveryCompleted',
- expr: 'up{job="sql-mcp-server"}',
+ expr: 'up{job="argos-mcp"}',
  labels: {
  severity: 'info',
  recovery_time: this.getRecoveryTime()
@@ -669,7 +669,7 @@ export class DisasterRecoveryOrchestrator {
  
  // Stop any partially started services
  try {
- execSync('systemctl stop sql-mcp-server', { timeout: 30000 });
+ execSync('systemctl stop argos-mcp', { timeout: 30000 });
  } catch {
  // Service may not be running
  }
@@ -734,12 +734,12 @@ export class DisasterRecoveryOrchestrator {
  console.log(logEntry);
  
  // Write to recovery log file
- fs.appendFileSync('/var/log/sql-mcp/disaster-recovery.log', logEntry + '\n');
+ fs.appendFileSync('/var/log/argos/disaster-recovery.log', logEntry + '\n');
  }
 }
 
 // Usage example
-const recovery = new DisasterRecoveryOrchestrator('/etc/sql-mcp/disaster-recovery.json');
+const recovery = new DisasterRecoveryOrchestrator('/etc/argos/disaster-recovery.json');
 recovery.initiateRecovery('database_failure');
 ```
 
@@ -783,7 +783,7 @@ test_config_recovery() {
  echo "corrupted_config=true" > config.ini
  
  # Run recovery
- ./scripts/config-backup.sh restore "$(find /backups/sql-mcp-server -name "config_*.tar.gz" | head -1)"
+ ./scripts/config-backup.sh restore "$(find /backups/argos-mcp -name "config_*.tar.gz" | head -1)"
  
  # Validate recovery
  if grep -q "database.production" config.ini; then
@@ -873,7 +873,7 @@ test_disaster_recovery() {
  {
  "type": "configuration",
  "location": "local",
- "path": "/backups/sql-mcp-server"
+ "path": "/backups/argos-mcp"
  }
  ],
  "recoveryTargets": [
@@ -920,7 +920,7 @@ test_recovery_performance() {
  log "Testing recovery performance..."
  
  local start_time=$(date +%s)
- local test_backup=$(find /backups/sql-mcp-server -name "config_*.tar.gz" | head -1)
+ local test_backup=$(find /backups/argos-mcp -name "config_*.tar.gz" | head -1)
  
  if [ -n "$test_backup" ]; then
  # Time the recovery process
@@ -968,7 +968,7 @@ generate_test_report() {
  </style>
 </head>
 <body>
- <h1>SQL MCP Server Recovery Test Report</h1>
+ <h1>Argos-MCP Recovery Test Report</h1>
  <p>Generated: $timestamp</p>
  
  <h2>Test Results Summary</h2>
@@ -1085,6 +1085,6 @@ main "$@"
 
 ## Conclusion
 
-This comprehensive backup and recovery guide provides the foundation for protecting the SQL MCP Server against data loss and ensuring rapid recovery from disasters. Regular testing and refinement of these procedures ensures they remain effective as the system evolves.
+This comprehensive backup and recovery guide provides the foundation for protecting the Argos-MCP against data loss and ensuring rapid recovery from disasters. Regular testing and refinement of these procedures ensures they remain effective as the system evolves.
 
 The combination of automated backups, tested recovery procedures, and orchestrated disaster recovery provides multiple layers of protection for critical data and services.

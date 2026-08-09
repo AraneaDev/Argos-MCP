@@ -1,25 +1,24 @@
 # Quick Start Guide
 
-Get the SQL MCP Server up and running with Claude Desktop in less than 5 minutes.
+Get Argos-MCP up and running with Claude Code in less than 5 minutes.
 
 ## Prerequisites
 
 Before you begin, ensure you have:
 
 - **Node.js 16+** and **npm 8+** installed
-- **Claude Desktop** application installed
+- **Claude Code CLI** installed and on your `PATH` (`claude --version`)
 - **Database credentials** for at least one supported database:
  - PostgreSQL, MySQL, SQLite, or SQL Server
  - Network access to your database (direct or via SSH)
 
 ## 5-Minute Setup
 
-### Step 1: Install the Server
+### Step 1: Build the Server
 
 ```bash
-# Clone or download the project
-git clone <repository-url>
-cd sql-ts
+git clone https://github.com/AraneaDev/Argos-MCP.git
+cd Argos-MCP
 
 # Install dependencies
 npm install
@@ -28,18 +27,10 @@ npm install
 npm run build
 ```
 
-```bash
-# Option A: Automatic installer (recommended)
-mcp-sql-install
-
-# Option B: Interactive setup wizard
-mcp-sql-setup
-```
-
 ### Step 2: Run Interactive Setup
 
 ```bash
-mcp-sql-setup
+npm run setup
 ```
 
 The setup wizard will guide you through:
@@ -104,46 +95,34 @@ Testing production...
  Access mode: SELECT-only
 ```
 
-### Step 4: Configure Claude Desktop
+### Step 4: Register with Claude Code
 
-> **Note:** If you used `mcp-sql-install` in Step 1, this step is handled automatically. You can skip to Step 5.
-
-Add the SQL MCP Server to your Claude Desktop configuration:
-
-**For macOS/Linux:**
-```json
-{
- "mcpServers": {
- "sql-database": {
- "command": "node",
- "args": ["/path/to/your/sql-ts/dist/index.js"],
- "env": {}
- }
- }
-}
-```
-
-**Configuration file locations:**
-- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-- **Linux**: `~/.config/claude/claude_desktop_config.json`
-
-### Step 5: Start the Server
+From the repository root:
 
 ```bash
-npm start
+claude mcp add argos --scope user -- \
+  node "$(pwd)/dist/index.js" --config "$HOME/.config/argos/config.ini"
 ```
 
-You should see:
+`--scope user` registers Argos for every project. Use `--scope project` instead to write a `.mcp.json` your team can commit, or omit the flag to keep it local to the current project.
+
+### Step 5: Verify
+
+```bash
+claude mcp list
 ```
-SQL MCP Server running on stdio
-Connection established: production
-Schema cached: production
+
+You should see `argos` reported as connected. Claude Code starts the server itself over stdio — there is no long-running process for you to launch. To check it by hand:
+
+```bash
+node dist/index.js --config ~/.config/argos/config.ini
 ```
+
+The process will sit waiting for JSON-RPC on stdin; `Ctrl+C` to exit. Errors surface in `argos-mcp.log` in the repository root.
 
 ## Your First Query
 
-Once configured, open Claude Desktop and try:
+Once registered, open Claude Code and try:
 
 > "Show me the users table schema from my production database"
 
@@ -291,14 +270,20 @@ npm run setup
 # Choose option 2: "Test existing connections"
 
 # Check logs
-tail -f sql-mcp-server.log
+tail -f argos-mcp.log
 ```
 
-### Claude Desktop Not Recognizing Server
-1. Verify the `claude_desktop_config.json` path is correct
-2. Check the server path in the configuration
-3. Restart Claude Desktop after configuration changes
-4. Ensure the server starts without errors: `npm start`
+### Claude Code Not Recognizing the Server
+1. Confirm it is registered: `claude mcp list` — Argos should appear as `argos`
+2. Check the recorded command and paths: `claude mcp get argos`
+3. Both paths in the command must be absolute — `~` and relative paths are not expanded when Claude Code spawns the process
+4. Re-register after moving or rebuilding the repository:
+ ```bash
+ claude mcp remove argos --scope user
+ claude mcp add argos --scope user -- \
+   node "$(pwd)/dist/index.js" --config "$HOME/.config/argos/config.ini"
+ ```
+5. Check `argos-mcp.log` in the repository root for startup errors
 
 ### Permission Denied
 ```sql

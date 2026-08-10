@@ -126,6 +126,32 @@
         "reason": "equivalent: the '' fallback is only reached when raw is null or undefined, and any non-numeric replacement parseInt cannot read yields NaN just as '' does, so the result is 30000 either way",
         "fingerprint": "618085852af1"
       }
+    ],
+    "src/database/adapters/sqlite.ts": [
+      {
+        "line": 119,
+        "mutator": "ConditionalExpression",
+        "addedAt": 1786382474898,
+        "change": "settled → false",
+        "reason": "equivalent through the returned promise: resolve/reject after settlement are no-ops per spec, so a second finish() cannot change the outcome. The guard still earns its place by stopping the body running twice when a query reports both a row error and completion.",
+        "fingerprint": "02ed967d30c2"
+      },
+      {
+        "line": 120,
+        "mutator": "BooleanLiteral",
+        "addedAt": 1786382474898,
+        "change": "true → false",
+        "reason": "equivalent: settled=false makes the guard on the previous line never fire, which is the same observable behaviour as removing it",
+        "fingerprint": "156654eed4a1"
+      },
+      {
+        "line": 121,
+        "mutator": "ConditionalExpression",
+        "addedAt": 1786382474898,
+        "change": "timer → true",
+        "reason": "equivalent: clearTimeout(undefined) is a documented no-op, so calling it unconditionally behaves exactly as the guarded call when no timer was armed",
+        "fingerprint": "f3b0efe69729"
+      }
     ]
   }
 }

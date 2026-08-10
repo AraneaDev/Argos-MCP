@@ -5,6 +5,39 @@ All notable changes to the Argos-MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.0](https://github.com/AraneaDev/Argos-MCP/compare/v3.0.1...v4.0.0) (2026-08-10)
+
+
+### ⚠ BREAKING CHANGES
+
+* close SELECT-only and TLS bypasses, fail secure on unreadable config ([#7](https://github.com/AraneaDev/Argos-MCP/issues/7))
+
+  **Unreadable booleans in `config.ini` now fail at startup.** Only
+  `true/1/yes/on/enabled` and `false/0/no/off/disabled` are accepted; anything
+  else raises a `ConfigValidationError` naming the database and the field.
+  Previously an unrecognised value was read as `false`, which put it on the
+  dangerous side of three security settings: `select_only = yes` granted write
+  access, `ssl_verify = yes` disabled certificate checking, and
+  `ssh_strict_host_key_checking = yes` disabled host-key checking. Check your
+  `config.ini` before upgrading. Configurations written by `npm run setup` or
+  copied from the template only ever contain `true`/`false` and are unaffected.
+
+  **Audit records moved** from `~/.sql-ts/audit` to `~/.argos-mcp/audit`.
+  Existing files are left in place rather than relocated; move or archive them
+  yourself if you need one continuous history.
+
+  **`ssl_verify` in the `add_database` and `update_database` tools accepts only
+  a literal `true`,** and any other value is now rejected with an error. The
+  guard previously tested `=== false`, so the JSON string `"false"`, the number
+  `0` and `"no"` all passed it, were stored, and then disabled certificate
+  verification once an adapter coerced them. Turning verification off is a
+  deliberate change to make in `config.ini`, not something a tool call should be
+  able to do.
+
+### Bug Fixes
+
+* close SELECT-only and TLS bypasses, fail secure on unreadable config ([#7](https://github.com/AraneaDev/Argos-MCP/issues/7)) ([8a0e085](https://github.com/AraneaDev/Argos-MCP/commit/8a0e085facdfec3815ac2bb493f2f6a17bce7ef7))
+
 ## [3.0.1](https://github.com/AraneaDev/Argos-MCP/compare/v3.0.0...v3.0.1) (2026-08-09)
 
 

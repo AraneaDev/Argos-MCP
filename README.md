@@ -1,4 +1,4 @@
-# Argos-MCP v3.0.1 <!-- x-release-please-version -->
+# Argos-MCP v4.0.0 <!-- x-release-please-version -->
 
 [![Release](https://img.shields.io/github/v/release/AraneaDev/Argos-MCP)](https://github.com/AraneaDev/Argos-MCP/releases)
 [![MCP Observatory risk grade](https://mcpobservatory.com/servers/github:AraneaDev/Argos-MCP/badge.svg)](https://mcpobservatory.com/servers/github:AraneaDev/Argos-MCP/security)

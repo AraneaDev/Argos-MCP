@@ -163,7 +163,7 @@ export {
 // ============================================================================
 
 export const MCP_PROTOCOL_VERSION = '2025-06-18';
-export const SERVER_VERSION = '3.0.1'; // x-release-please-version
+export const SERVER_VERSION = '4.0.0'; // x-release-please-version
 export const SERVER_NAME = 'argos-mcp';
 
 // ============================================================================

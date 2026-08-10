@@ -57,13 +57,12 @@ export class MySQLAdapter extends DatabaseAdapter {
         connectTimeout: this.connectionTimeout,
       };
 
-      // Handle SSL configuration
-      if (this.config.ssl !== undefined) {
-        const sslEnabled = this.parseConfigValue(this.config.ssl ?? false, 'boolean', false);
-        if (sslEnabled) {
-          const sslVerify = this.parseConfigValue(this.config.ssl_verify ?? true, 'boolean', true);
-          poolConfig.ssl = { rejectUnauthorized: sslVerify };
-        }
+      // Handle SSL configuration. No presence check is needed: parseConfigValue
+      // already maps an absent or null value to the default, so guarding on
+      // `!== undefined` only restated what the next line does.
+      const sslEnabled = this.parseConfigValue(this.config.ssl, 'boolean', false);
+      if (sslEnabled) {
+        poolConfig.ssl = { rejectUnauthorized: this.verifyServerCertificate() };
       }
 
       // Azure MariaDB/MySQL: force SSL and rewrite username to user@server
@@ -71,7 +70,7 @@ export class MySQLAdapter extends DatabaseAdapter {
         host.includes('.mariadb.database.azure.com') ||
         host.includes('.mysql.database.azure.com')
       ) {
-        const sslVerify = this.parseConfigValue(this.config.ssl_verify ?? true, 'boolean', true);
+        const sslVerify = this.verifyServerCertificate();
         poolConfig.ssl = { rejectUnauthorized: sslVerify };
         if (!username.includes('@')) {
           const serverName = host.split('.')[0];
@@ -300,6 +299,71 @@ export class MySQLAdapter extends DatabaseAdapter {
   buildExplainQuery(query: string): string {
     // Use JSON format for structured analysis (MySQL 5.7+)
     return `EXPLAIN FORMAT=JSON ${query}`;
+  }
+
+  private static readonly FULL_SCAN = ' MYSQL: Full table scan detected - add appropriate indexes';
+  private static readonly FILESORT =
+    ' MYSQL: Filesort operation - consider adding index on ORDER BY columns';
+  private static readonly TEMP_TABLE =
+    ' MYSQL: Temporary table created - optimize GROUP BY or DISTINCT operations';
+
+  /**
+   * A MySQL plan reaches us in one of two shapes, so both are read. The tabular
+   * shape carries one row per access with `type` and `Extra` columns; the JSON
+   * shape that buildExplainQuery actually asks for carries the whole plan in a
+   * single column, where the same facts are named access_type, using_filesort
+   * and using_temporary_table. Only one shape ever matches a given plan.
+   */
+  override getPerformanceRecommendations(explainResult: QueryResult, _query: string): string[] {
+    return [
+      ...this.tabularPlanRecommendations(explainResult),
+      ...this.jsonPlanRecommendations(explainResult),
+    ];
+  }
+
+  private tabularPlanRecommendations(explainResult: QueryResult): string[] {
+    const recommendations: string[] = [];
+
+    for (const row of explainResult.rows) {
+      const rowData = row as Record<string, unknown>;
+
+      if (rowData.type === 'ALL') {
+        recommendations.push(MySQLAdapter.FULL_SCAN);
+      }
+
+      if (rowData.Extra && String(rowData.Extra).includes('Using filesort')) {
+        recommendations.push(MySQLAdapter.FILESORT);
+      }
+
+      if (rowData.Extra && String(rowData.Extra).includes('Using temporary')) {
+        recommendations.push(MySQLAdapter.TEMP_TABLE);
+      }
+    }
+
+    return recommendations;
+  }
+
+  private jsonPlanRecommendations(explainResult: QueryResult): string[] {
+    // flattenExplainPlan lowercases, so the "ALL" access type matches as "all".
+    const planText = this.flattenExplainPlan(explainResult);
+    const recommendations: string[] = [];
+
+    // Reported once per plan rather than once per occurrence: a nested plan can
+    // mention the same problem for several tables, and repeating the identical
+    // sentence adds no information.
+    if (/"access_type":\s*"all"/.test(planText)) {
+      recommendations.push(MySQLAdapter.FULL_SCAN);
+    }
+
+    if (/"using_filesort":\s*true/.test(planText)) {
+      recommendations.push(MySQLAdapter.FILESORT);
+    }
+
+    if (/"using_temporary_table":\s*true/.test(planText)) {
+      recommendations.push(MySQLAdapter.TEMP_TABLE);
+    }
+
+    return recommendations;
   }
 
   // ============================================================================

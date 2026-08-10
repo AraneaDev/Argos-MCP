@@ -53,9 +53,18 @@ if [ -n "$staged" ]; then
 
     # Key material pasted into an otherwise innocent file (the SSH tunnel
     # config invites this) is caught by content rather than by filename.
+    #
+    # The header alone is not the signal: documentation tells the reader which
+    # header to look for in their own key file, and test fixtures use the header
+    # with an obvious stand-in body. What distinguishes real key material is the
+    # body, so the header only counts when a long base64 run follows it within a
+    # few lines. Encoded keys wrap at 64 characters, so a genuine one always has
+    # one; 'fake' and 'MIIabc...' do not.
     for file in $staged; do
         [ -f "$file" ] || continue
-        if git show ":$file" | grep -qE 'BEGIN (RSA |DSA |EC |OPENSSH |PGP )?PRIVATE KEY'; then
+        if git show ":$file" \
+            | grep -A 5 -E 'BEGIN (RSA |DSA |EC |OPENSSH |PGP )?PRIVATE KEY' \
+            | grep -qE '[A-Za-z0-9+/]{40,}'; then
             printf '%s\n' \
                 "Private key material found in staged file: $file" \
                 "" \

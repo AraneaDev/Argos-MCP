@@ -1,5 +1,5 @@
 {
-  "version": 1,
+  "version": 3,
   "entries": {
     "src/utils/circuit-breaker.ts": [
       {
@@ -21,6 +21,178 @@
         "mutator": "Regex",
         "reason": "equivalent: mutations to the api[_-]?key alternative are masked by the standalone 'key' alternative — the tail 'key=...' is redacted either way and $1=[REDACTED] preserves the prefix, so output is identical for all inputs",
         "addedAt": 1783182471827
+      }
+    ],
+    "src/database/adapters/mssql.ts": [
+      {
+        "line": 169,
+        "mutator": "ConditionalExpression",
+        "addedAt": 1786376376080,
+        "change": "next === \"'\" → false",
+        "reason": "equivalent: consuming '' as an escape leaves inSingle true; treating it as close-then-reopen also ends inSingle true because ' is an opener in the outside branch, and emits the same characters. Verified exhaustively over all strings up to length 5 from the significant alphabet (177156 inputs, 0 mismatches). Contrast ]] on line 195, which is killable because ] is not an opener.",
+        "fingerprint": "0a929850e730"
+      },
+      {
+        "line": 169,
+        "mutator": "StringLiteral",
+        "addedAt": 1786376376080,
+        "change": "\"'\" → \"\"",
+        "reason": "equivalent: \"'\" -> \"\" makes next === \"\" always false, which is the same close-then-reopen path as the ConditionalExpression mutant on this line",
+        "fingerprint": "0a929850e730"
+      },
+      {
+        "line": 182,
+        "mutator": "ConditionalExpression",
+        "addedAt": 1786376376080,
+        "change": "next === '\"' → false",
+        "reason": "equivalent: same close-then-reopen argument as line 169, since \" is also an opener in the outside branch",
+        "fingerprint": "cc9394157d23"
+      },
+      {
+        "line": 182,
+        "mutator": "StringLiteral",
+        "addedAt": 1786376376080,
+        "change": "'\"' → \"\"",
+        "reason": "equivalent: '\"' -> \"\" makes next === \"\" always false, which is the same close-then-reopen path as the ConditionalExpression mutant on this line",
+        "fingerprint": "cc9394157d23"
+      }
+    ],
+    "src/tools/handlers/config-handlers.ts": [
+      {
+        "line": 144,
+        "mutator": "OptionalChaining",
+        "addedAt": 1786376970134,
+        "change": "validationResult.errors[0]?.field → validationResult.errors[0].field",
+        "reason": "equivalent: validateDatabaseConfig returns { valid: errors.length === 0 }, so reaching this line (valid === false) guarantees errors.length > 0 and errors[0] is never undefined. The ?? branch is therefore unreachable and ?. behaves identically to . here. The LogicalOperator mutant on the same line IS killable and is tested, because ?? yields the field name while && yields 'config'.",
+        "fingerprint": "38e427d70abb"
+      }
+    ],
+    "src/database/adapters/mysql.ts": [
+      {
+        "line": 151,
+        "mutator": "ConditionalExpression",
+        "addedAt": 1786379194256,
+        "change": "!connection → false",
+        "reason": "equivalent: with the guard skipped, a null/undefined connection makes the next line throw on .connection and the surrounding try/catch returns false; a falsy non-null value falls through to `typeof execute === 'function'`, also false. Same result for every falsy input. The guard is kept because relying on a thrown TypeError for control flow is worse to read.",
+        "fingerprint": "215559e64f6b"
+      },
+      {
+        "line": 151,
+        "mutator": "BlockStatement",
+        "addedAt": 1786379194256,
+        "change": "{ return false; } → {}",
+        "reason": "equivalent: emptying the block has the same effect as skipping the guard - see the ConditionalExpression entry on this line",
+        "fingerprint": "215559e64f6b"
+      },
+      {
+        "line": 215,
+        "mutator": "ConditionalExpression",
+        "addedAt": 1786379194256,
+        "change": "settled → false",
+        "reason": "equivalent through the returned promise: resolve/reject after settlement are no-ops per spec, so a second finish() cannot change the outcome. The guard still earns its place by stopping finish's body from running twice when a stream emits both 'error' and 'end', which would repeat the redaction pass inside buildStreamedResult.",
+        "fingerprint": "02ed967d30c2"
+      },
+      {
+        "line": 216,
+        "mutator": "BooleanLiteral",
+        "addedAt": 1786379194256,
+        "change": "true → false",
+        "reason": "equivalent: settled=false makes the guard on the previous line never fire, which is the same observable behaviour as removing it - see the entry on line 215",
+        "fingerprint": "156654eed4a1"
+      }
+    ],
+    "src/database/adapters/base.ts": [
+      {
+        "line": 192,
+        "mutator": "ConditionalExpression",
+        "addedAt": 1786380254890,
+        "change": "typeof value === 'boolean' → false",
+        "reason": "equivalent: the fallthrough agrees with the early return for both boolean inputs - String(true) is 'true' so the comparison yields true, and String(false) is 'false' so it yields false. No boolean input distinguishes the two paths.",
+        "fingerprint": "83c015ab8cd2"
+      },
+      {
+        "line": 192,
+        "mutator": "StringLiteral",
+        "addedAt": 1786380254890,
+        "change": "'boolean' → \"\"",
+        "reason": "equivalent: 'boolean' -> \"\" makes typeof value === \"\" always false, which is the same fallthrough as the ConditionalExpression mutant on this line",
+        "fingerprint": "83c015ab8cd2"
+      },
+      {
+        "line": 268,
+        "mutator": "StringLiteral",
+        "addedAt": 1786380254890,
+        "change": "'' → \"Stryker was here!\"",
+        "reason": "equivalent: the '' fallback is only reached when raw is null or undefined, and any non-numeric replacement parseInt cannot read yields NaN just as '' does, so the result is 30000 either way",
+        "fingerprint": "618085852af1"
+      }
+    ],
+    "src/database/adapters/sqlite.ts": [
+      {
+        "line": 119,
+        "mutator": "ConditionalExpression",
+        "addedAt": 1786382474898,
+        "change": "settled → false",
+        "reason": "equivalent through the returned promise: resolve/reject after settlement are no-ops per spec, so a second finish() cannot change the outcome. The guard still earns its place by stopping the body running twice when a query reports both a row error and completion.",
+        "fingerprint": "02ed967d30c2"
+      },
+      {
+        "line": 120,
+        "mutator": "BooleanLiteral",
+        "addedAt": 1786382474898,
+        "change": "true → false",
+        "reason": "equivalent: settled=false makes the guard on the previous line never fire, which is the same observable behaviour as removing it",
+        "fingerprint": "156654eed4a1"
+      },
+      {
+        "line": 121,
+        "mutator": "ConditionalExpression",
+        "addedAt": 1786382474898,
+        "change": "timer → true",
+        "reason": "equivalent: clearTimeout(undefined) is a documented no-op, so calling it unconditionally behaves exactly as the guarded call when no timer was armed",
+        "fingerprint": "f3b0efe69729"
+      }
+    ],
+    "src/classes/SecurityManager.ts": [
+      {
+        "line": 1115,
+        "mutator": "ConditionalExpression",
+        "addedAt": 1786389853103,
+        "change": "query[i + 1] === ch → false",
+        "reason": "equivalent: the quote character is itself an opener, so treating a doubled quote as escape-and-continue consumes exactly what close-then-reopen consumes, and the literal is copied through verbatim either way. Verified by differential run over every string up to length 5 from the significant alphabet, both # modes - 354312 inputs, no difference. The i+1 -> i-1 mutant on the same line IS killable and is tested via an empty literal.",
+        "fingerprint": "7367688a269e"
+      },
+      {
+        "line": 1115,
+        "mutator": "BlockStatement",
+        "addedAt": 1786389853103,
+        "change": "{ out += ch + ch; i += 2; continue; } → {}",
+        "reason": "equivalent: emptying the escape branch falls through to close-and-reopen, which is the same consumption - see the ConditionalExpression entry on this line. Same 354312-input differential run, no difference.",
+        "fingerprint": "7367688a269e"
+      },
+      {
+        "line": 1131,
+        "mutator": "ConditionalExpression",
+        "addedAt": 1786389853103,
+        "change": "ch === '$' → true",
+        "reason": "equivalent: the dollar-quote opener regex is anchored and only matches when the character is '$', so testing it first is an optimisation, not a decision. No difference over 354312 inputs.",
+        "fingerprint": "19e5491de23f"
+      },
+      {
+        "line": 1144,
+        "mutator": "EqualityOperator",
+        "addedAt": 1786389853103,
+        "change": "i < query.length → i <= query.length",
+        "reason": "equivalent: at end of input query[i] is undefined, which is neither newline, so the extra iteration only advances i past the end before the outer loop exits. No difference over 354312 inputs.",
+        "fingerprint": "d07b33cf51d8"
+      },
+      {
+        "line": 1158,
+        "mutator": "EqualityOperator",
+        "addedAt": 1786389853103,
+        "change": "i < query.length → i <= query.length",
+        "reason": "equivalent: same end-of-input reasoning as the line-comment scan, and the outer loop bound stops the overshoot. No difference over 354312 inputs.",
+        "fingerprint": "4659c4d3009a"
       }
     ]
   }

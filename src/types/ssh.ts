@@ -75,14 +75,6 @@ export interface SSHEventPayload {
 // SSH Authentication Types
 // ============================================================================
 
-export type SSHAuthMethod = 'password' | 'privateKey' | 'agent';
-
-export interface SSHAuthInfo {
-  method: SSHAuthMethod;
-  username: string;
-  hasCredentials: boolean;
-}
-
 // ============================================================================
 // SSH Tunnel Status
 // ============================================================================
@@ -105,27 +97,6 @@ export interface SSHTunnelStatusInfo {
 // ============================================================================
 // Type Guards
 // ============================================================================
-
-/**
- *
- */
-export function isSSHConnectionEvent(value: string): value is SSHConnectionEvent {
-  return ['ready', 'error', 'close', 'end', 'timeout'].includes(value);
-}
-
-/**
- *
- */
-export function isSSHAuthMethod(value: string): value is SSHAuthMethod {
-  return ['password', 'privateKey', 'agent'].includes(value);
-}
-
-/**
- *
- */
-export function isSSHTunnelStatus(value: string): value is SSHTunnelStatus {
-  return ['connecting', 'connected', 'error', 'disconnected', 'reconnecting'].includes(value);
-}
 
 // ============================================================================
 // Utility Functions

@@ -556,8 +556,13 @@ export function sanitizeMessage(message: string): string {
 
   // Remove potential sensitive data leaks. Allow whitespace around the separator so
   // "password = secret" is caught as well as "password=secret".
+  //
+  // A quoted value is consumed whole. Matching only up to the first space left
+  // the tail of anything containing one in the message: password='my secret pass'
+  // became password=[REDACTED] secret pass'. An unquoted value still stops at
+  // whitespace, so an explanation following the value survives.
   message = message.replace(
-    /(password|passwd|pwd|passphrase|token|secret|key|api[_-]?key|authorization|credentials?)\s*[=:]\s*[^\s,;]+/gi,
+    /(password|passwd|pwd|passphrase|token|secret|key|api[_-]?key|authorization|credentials?)\s*[=:]\s*("[^"]*"|'[^']*'|[^\s,;]+)/gi,
     '$1=[REDACTED]'
   );
 

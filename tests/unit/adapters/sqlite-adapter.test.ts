@@ -357,6 +357,56 @@ describe('SQLiteAdapter', () => {
       );
       expect(mockInterrupt).toHaveBeenCalled();
     });
+
+    it('should not arm a timer when the timeout is disabled', async () => {
+      // A query that never completes: with the timeout disabled there is no
+      // timer to fire, so nothing ever interrupts it.
+      mockEach.mockImplementation(() => {
+        /* never invokes any callback */
+      });
+      const untimedAdapter = new SQLiteAdapter({
+        type: 'sqlite',
+        file: '/tmp/test.db',
+        select_only: true,
+        query_timeout: 0,
+      } as unknown as DatabaseConfig);
+      const conn = await untimedAdapter.connect();
+
+      void untimedAdapter.executeQuery(conn, 'SELECT * FROM huge');
+      await new Promise((resolve) => setTimeout(resolve, 80));
+
+      expect(mockInterrupt).not.toHaveBeenCalled();
+    });
+
+    it('should not interrupt a query that finished before the timeout', async () => {
+      mockEach.mockImplementation(eachEmits([{ id: 1 }]));
+      const timedAdapter = new SQLiteAdapter({
+        type: 'sqlite',
+        file: '/tmp/test.db',
+        select_only: true,
+        query_timeout: 40,
+      } as unknown as DatabaseConfig);
+      const conn = await timedAdapter.connect();
+
+      const result = await timedAdapter.executeQuery(conn, 'SELECT 1');
+
+      expect(result.rowCount).toBe(1);
+      // The timer is cleared on completion, so the interrupt never runs.
+      await new Promise((resolve) => setTimeout(resolve, 80));
+      expect(mockInterrupt).not.toHaveBeenCalled();
+    });
+
+    it('should reject when a row callback reports an error', async () => {
+      mockEach.mockImplementation(
+        (_sql: string, _params: unknown, rowCb: Function, _completeCb: Function) => {
+          process.nextTick(() => rowCb(new Error('row decode failed'), undefined));
+        }
+      );
+
+      await expect(adapter.executeQuery(connection, 'SELECT * FROM users')).rejects.toThrow(
+        'sqlite adapter error: Failed to execute SQLite query - row decode failed'
+      );
+    });
   });
 
   // ============================================================================
@@ -520,8 +570,12 @@ describe('SQLiteAdapter', () => {
         process.nextTick(() => callback(schemaError, null));
       });
 
+      // The whole chain, not just the outer wrapper: asserting only the outer
+      // message passes just as well when the table listing ignores the error and
+      // the failure surfaces later as something unrelated.
       await expect(adapter.captureSchema(connection)).rejects.toThrow(
-        'sqlite adapter error: Failed to capture SQLite schema'
+        'sqlite adapter error: Failed to capture SQLite schema - sqlite adapter error: ' +
+          'Failed to get SQLite tables - Schema query failed'
       );
     });
 
@@ -853,6 +907,45 @@ describe('SQLiteAdapter', () => {
       await expect(adapter.vacuum(connection)).rejects.toThrow(
         'sqlite adapter error: Failed to vacuum SQLite database - Vacuum failed'
       );
+    });
+  });
+
+  // ============================================================================
+  // Performance Recommendations
+  // ============================================================================
+
+  describe('getPerformanceRecommendations', () => {
+    const explain = (rows: Record<string, unknown>[]): QueryResult => ({
+      rows,
+      rowCount: rows.length,
+      fields: rows.length > 0 ? Object.keys(rows[0]!) : [],
+      truncated: false,
+      execution_time_ms: 1,
+    });
+
+    const advise = (rows: Record<string, unknown>[], query = 'SELECT id FROM users'): string =>
+      adapter.getPerformanceRecommendations(explain(rows), query).join('\n');
+
+    it('should flag a table scan', () => {
+      expect(advise([{ detail: 'SCAN TABLE users' }])).toContain('Table scan detected');
+    });
+
+    it('should flag a temporary b-tree', () => {
+      expect(advise([{ detail: 'USE TEMP B-TREE FOR ORDER BY' }])).toContain(
+        'Temporary B-tree created'
+      );
+    });
+
+    it('should always advise running ANALYZE', () => {
+      expect(advise([{ detail: 'SEARCH TABLE users USING INDEX users_name' }])).toContain(
+        'Run ANALYZE command periodically'
+      );
+    });
+
+    it('should advise running ANALYZE even for an empty plan', () => {
+      expect(adapter.getPerformanceRecommendations(explain([]), 'SELECT 1')).toEqual([
+        expect.stringContaining('Run ANALYZE command periodically'),
+      ]);
     });
   });
 });

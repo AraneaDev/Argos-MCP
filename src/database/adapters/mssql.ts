@@ -23,11 +23,17 @@ import type {
 // SQL Server Adapter Implementation
 // ============================================================================
 
+/**
+ *
+ */
 export class MSSQLAdapter extends DatabaseAdapter {
   // ============================================================================
   // Connection Management
   // ============================================================================
 
+  /**
+   *
+   */
   async connect(): Promise<DatabaseConnection> {
     this.validateConfig(['host', 'database', 'username', 'password']);
 
@@ -46,11 +52,7 @@ export class MSSQLAdapter extends DatabaseAdapter {
       requestTimeout: this.connectionTimeout,
       options: {
         encrypt: this.parseConfigValue(this.config.encrypt ?? true, 'boolean', true),
-        trustServerCertificate: !this.parseConfigValue(
-          this.config.ssl_verify ?? true,
-          'boolean',
-          true
-        ),
+        trustServerCertificate: !this.verifyServerCertificate(),
         enableArithAbort: true,
       },
       pool: {
@@ -69,6 +71,9 @@ export class MSSQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   async disconnect(connection: DatabaseConnection): Promise<void> {
     try {
       const mssqlPool = connection as MSSQLConnectionPool;
@@ -78,6 +83,9 @@ export class MSSQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   isConnected(connection: DatabaseConnection): boolean {
     try {
       const mssqlPool = connection as MSSQLConnectionPool;
@@ -91,6 +99,9 @@ export class MSSQLAdapter extends DatabaseAdapter {
   // Query Execution
   // ============================================================================
 
+  /**
+   *
+   */
   async executeQuery(
     connection: DatabaseConnection,
     query: string,
@@ -120,7 +131,10 @@ export class MSSQLAdapter extends DatabaseAdapter {
 
   /**
    * Convert positional '?' placeholders to @paramN, ignoring '?' inside string
-   * literals so a literal question mark in a string does not shift parameter order.
+   * literals and comments so a literal question mark does not shift parameter
+   * order. Parameters are bound positionally as @param0..@paramN-1, so a slot
+   * consumed by a question mark that was never a placeholder leaves the real
+   * one referring to a variable that was never declared.
    */
   private replacePlaceholders(query: string): string {
     let out = '';
@@ -128,11 +142,37 @@ export class MSSQLAdapter extends DatabaseAdapter {
     let inSingle = false;
     let inDouble = false;
     let inBracket = false;
+    let inLineComment = false;
+    // T-SQL block comments nest, so this is a depth rather than a flag.
+    let blockCommentDepth = 0;
 
     for (let i = 0; i < query.length; i++) {
       const ch = query[i];
       const next = query[i + 1];
 
+      // Inside a -- line comment: it ends at the newline, which is kept.
+      if (inLineComment) {
+        out += ch;
+        if (ch === '\n') {
+          inLineComment = false;
+        }
+        continue;
+      }
+      // Inside a /* block comment */, which may contain further nested ones.
+      if (blockCommentDepth > 0) {
+        if (ch === '/' && next === '*') {
+          out += ch + next;
+          i++;
+          blockCommentDepth++;
+        } else if (ch === '*' && next === '/') {
+          out += ch + next;
+          i++;
+          blockCommentDepth--;
+        } else {
+          out += ch;
+        }
+        continue;
+      }
       // Inside a single-quoted string literal: '' is an escaped quote (stays in string).
       if (inSingle) {
         out += ch;
@@ -173,8 +213,18 @@ export class MSSQLAdapter extends DatabaseAdapter {
         continue;
       }
 
-      // Not inside any quoted/bracketed context.
-      if (ch === "'") {
+      // Not inside any quoted/bracketed/comment context. Comment openers are
+      // tested before the quote openers so a '?' after them is never bound, and
+      // after them so a '--' inside a string is still just text.
+      if (ch === '-' && next === '-') {
+        inLineComment = true;
+        out += ch + next;
+        i++;
+      } else if (ch === '/' && next === '*') {
+        blockCommentDepth = 1;
+        out += ch + next;
+        i++;
+      } else if (ch === "'") {
         inSingle = true;
         out += ch;
       } else if (ch === '"') {
@@ -210,6 +260,9 @@ export class MSSQLAdapter extends DatabaseAdapter {
   // Transaction Management
   // ============================================================================
 
+  /**
+   *
+   */
   async beginTransaction(connection: DatabaseConnection): Promise<void> {
     try {
       const mssqlPool = connection as MSSQLConnectionPool;
@@ -220,6 +273,9 @@ export class MSSQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   async commitTransaction(connection: DatabaseConnection): Promise<void> {
     try {
       const mssqlPool = connection as MSSQLConnectionPool;
@@ -230,6 +286,9 @@ export class MSSQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   async rollbackTransaction(connection: DatabaseConnection): Promise<void> {
     try {
       const mssqlPool = connection as MSSQLConnectionPool;
@@ -244,6 +303,9 @@ export class MSSQLAdapter extends DatabaseAdapter {
   // Performance Analysis
   // ============================================================================
 
+  /**
+   *
+   */
   buildExplainQuery(query: string): string {
     return `SET SHOWPLAN_ALL ON; ${query}; SET SHOWPLAN_ALL OFF`;
   }
@@ -252,6 +314,9 @@ export class MSSQLAdapter extends DatabaseAdapter {
   // Schema Capture
   // ============================================================================
 
+  /**
+   *
+   */
   async captureSchema(connection: DatabaseConnection): Promise<DatabaseSchema> {
     try {
       const schema = this.createBaseSchema(this.config.database ?? '');

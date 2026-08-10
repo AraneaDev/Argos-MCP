@@ -208,8 +208,9 @@ export function parseDatabaseConfig(name: string, config: Record<string, string>
     type: config.type.toLowerCase() as DatabaseTypeString,
     // Fail secure: default to SELECT-only (read-only) unless explicitly disabled.
     // An omitted select_only must NOT silently grant write access.
-    select_only: config.select_only === undefined ? true : parseBool(config.select_only),
-    mcp_configurable: parseBool(config.mcp_configurable),
+    select_only:
+      config.select_only === undefined ? true : parseBool(config.select_only, 'select_only', name),
+    mcp_configurable: parseBool(config.mcp_configurable, 'mcp_configurable', name),
   };
 
   // Handle SQLite specific configuration
@@ -233,7 +234,7 @@ export function parseDatabaseConfig(name: string, config: Record<string, string>
   }
 
   // Parse redaction configuration if present
-  if (parseBool(config.redaction_enabled)) {
+  if (parseBool(config.redaction_enabled, 'redaction_enabled', name)) {
     dbConfig.redaction = parseRedactionConfig(name, config);
   }
 
@@ -270,11 +271,11 @@ function validateNetworkedDatabase(
   dbConfig.database = config.database;
   dbConfig.username = config.username;
   dbConfig.password = config.password;
-  dbConfig.ssl = parseBool(config.ssl);
+  dbConfig.ssl = parseBool(config.ssl, 'ssl', name);
   // Leave ssl_verify undefined when unset so the adapter default (verify ON) applies.
   // parseBool(undefined) would return false and silently disable certificate validation.
   if (config.ssl_verify !== undefined) {
-    dbConfig.ssl_verify = parseBool(config.ssl_verify);
+    dbConfig.ssl_verify = parseBool(config.ssl_verify, 'ssl_verify', name);
   }
 
   // Validate timeout
@@ -324,7 +325,7 @@ function parseSSHConfig(
   dbConfig.ssh_strict_host_key_checking =
     config.ssh_strict_host_key_checking === undefined
       ? true
-      : parseBool(config.ssh_strict_host_key_checking);
+      : parseBool(config.ssh_strict_host_key_checking, 'ssh_strict_host_key_checking', name);
 
   // Parse local_port for SSH tunnel (new feature)
   if (config.local_port !== undefined && config.local_port !== '') {
@@ -361,9 +362,17 @@ function parseRedactionConfig(
   const redactionConfig: DatabaseRedactionConfig = {
     enabled: true,
     rules: [],
-    log_redacted_access: parseBool(config.redaction_log_access),
-    audit_redacted_queries: parseBool(config.redaction_audit_queries),
-    case_sensitive_matching: parseBool(config.redaction_case_sensitive),
+    log_redacted_access: parseBool(config.redaction_log_access, 'redaction_log_access', dbName),
+    audit_redacted_queries: parseBool(
+      config.redaction_audit_queries,
+      'redaction_audit_queries',
+      dbName
+    ),
+    case_sensitive_matching: parseBool(
+      config.redaction_case_sensitive,
+      'redaction_case_sensitive',
+      dbName
+    ),
   };
 
   // Parse redaction rules from configuration
@@ -749,9 +758,43 @@ export function saveConfigFile(config: ParsedServerConfig, configPath?: string):
 /**
  * Helper to parse boolean values robustly
  */
-function parseBool(val: unknown): boolean {
-  if (val === undefined || val === null) return false;
-  if (typeof val === 'boolean') return val;
-  const str = String(val).toLowerCase();
-  return str === 'true' || str === '1';
+const TRUE_WORDS = ['true', '1', 'yes', 'on', 'enabled'];
+const FALSE_WORDS = ['false', '0', 'no', 'off', 'disabled'];
+
+/**
+ * Read a boolean setting, refusing to guess.
+ *
+ * The ini parser only turns bare `true` and `false` into real booleans, so every
+ * other spelling arrives here as a string. Mapping the ones this does not
+ * recognise to `false` made an affirmative the operator wrote, or a typo, select
+ * the dangerous side of a security setting: `select_only = yes` granted write
+ * access, and `ssl_verify = yes` turned certificate checking off. A value that
+ * cannot be read is now a startup error naming the field, which is how the rest
+ * of this module treats configuration it cannot make sense of.
+ *
+ * An absent key is not an error: callers decide what missing means, and the
+ * security-relevant ones already default to the safe side before calling here.
+ * A key written as `null` is not absent, though - the ini parser turns it into a
+ * real null - so it is refused like any other value that says nothing about
+ * which way the setting should go.
+ *
+ * Booleans need no special case: the ini parser produces them for bare `true`
+ * and `false`, and those stringify onto the right list.
+ * @param val - the raw value from the config file
+ * @param field - field name, for the error message
+ * @param dbName - owning database
+ */
+function parseBool(val: unknown, field: string, dbName: string): boolean {
+  if (val === undefined) return false;
+
+  const str = String(val).trim().toLowerCase();
+  if (TRUE_WORDS.includes(str)) return true;
+  if (FALSE_WORDS.includes(str)) return false;
+
+  throw new ConfigValidationError(
+    `Database '${dbName}' has an unreadable value for '${field}': '${String(val)}'. ` +
+      `Use one of ${[...TRUE_WORDS, ...FALSE_WORDS].join(', ')}.`,
+    field,
+    dbName
+  );
 }

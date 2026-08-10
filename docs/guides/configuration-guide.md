@@ -77,6 +77,21 @@ host=localhost # Required: Database host (except SQLite)
 - `sqlite`
 - `mssql` / `sqlserver`
 
+### Boolean Values
+
+Anywhere a parameter takes a yes/no answer, write one of:
+
+| Meaning | Accepted |
+|---------|----------|
+| on | `true`, `1`, `yes`, `on`, `enabled` |
+| off | `false`, `0`, `no`, `off`, `disabled` |
+
+Case and surrounding spaces do not matter. Anything else is refused at startup
+with an error naming the database and the field, rather than being read as
+`off`. Several of these parameters are security settings: `select_only`,
+`ssl_verify` and `ssh_strict_host_key_checking` all protect something, so a
+value Argos cannot read is reported instead of guessed.
+
 ### Common Database Parameters
 
 #### Required Parameters

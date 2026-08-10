@@ -1003,6 +1003,34 @@ describe('error-handler', () => {
       expect(sanitizeMessage('login token: abc123 rest')).toBe('login token=[REDACTED] rest');
     });
 
+    // The value matcher stopped at the first space, so a quoted secret was only
+    // partly removed: password='my secret pass' left "secret pass'" in a message
+    // that goes back to the caller.
+    // Asserted exactly, not with a "does it still contain the password" check:
+    // the old behaviour ate the opening quote and the first word, which passes a
+    // loose check while the tail of the secret is still in the message.
+    it.each([
+      ['double quotes', 'Access denied: password="hunter 2"', 'Access denied: password=[REDACTED]'],
+      [
+        'single quotes',
+        "Access denied: password='my secret pass'",
+        'Access denied: password=[REDACTED]',
+      ],
+      [
+        'a quoted passphrase',
+        'Config: ssh_passphrase="a b c"',
+        'Config: ssh_passphrase=[REDACTED]',
+      ],
+      ['a quoted value after a colon', 'Config: secret: "top level"', 'Config: secret=[REDACTED]'],
+    ])('redacts a quoted credential containing spaces (%s)', (_label, message, expected) => {
+      expect(sanitizeMessage(message)).toBe(expected);
+    });
+
+    it('still stops at whitespace for an unquoted value', () => {
+      // Consuming the rest of the line would swallow the explanation with it.
+      expect(sanitizeMessage('password=abc is invalid')).toBe('password=[REDACTED] is invalid');
+    });
+
     it('redacts bearer tokens case-insensitively and repeatedly', () => {
       expect(sanitizeMessage('bearer tok123 and Bearer tok456')).toBe(
         'Bearer [REDACTED] and Bearer [REDACTED]'

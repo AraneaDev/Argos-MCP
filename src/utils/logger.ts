@@ -102,7 +102,10 @@ export class Logger {
 
   constructor(config: LoggerConfig = {}) {
     this.config = {
-      logFile: join(PROJECT_ROOT, 'mcp-server.log'),
+      // Both entry points pass this explicitly; the default only applies to a
+      // Logger built without one, and it names the same file so that never
+      // produces a second log under an older name.
+      logFile: join(PROJECT_ROOT, 'argos-mcp.log'),
       enableConsole: true,
       enableFile: true,
       rotateOnStart: true,

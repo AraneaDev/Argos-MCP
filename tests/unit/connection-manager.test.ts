@@ -925,6 +925,217 @@ describe('ConnectionManager', () => {
   });
 
   // ============================================================================
+  // Performance Recommendations
+  // ============================================================================
+
+  describe('generatePerformanceRecommendations', () => {
+    const silentAdapter = { getPerformanceRecommendations: (): string[] => [] };
+
+    const generate = (
+      options: {
+        query?: string;
+        executionTime?: number;
+        rowCount?: number;
+        fields?: string[];
+        adapter?: unknown;
+      } = {}
+    ): string =>
+      (connectionManager as any).generatePerformanceRecommendations({
+        query: options.query ?? 'SELECT id FROM users',
+        result: {
+          rows: [],
+          rowCount: options.rowCount ?? 0,
+          fields: options.fields ?? [],
+          truncated: false,
+          execution_time_ms: 0,
+        },
+        explainResult: {
+          rows: [{ step: 'SCAN users' }],
+          rowCount: 1,
+          fields: ['step'],
+          truncated: false,
+          execution_time_ms: 0,
+        },
+        executionTime: options.executionTime ?? 10,
+        adapter: options.adapter ?? silentAdapter,
+      });
+
+    describe('adapter delegation', () => {
+      test('should include the dialect advice the adapter reports', () => {
+        const adapter = {
+          getPerformanceRecommendations: jest.fn().mockReturnValue(['DIALECT: add an index']),
+        };
+
+        expect(generate({ adapter })).toContain('DIALECT: add an index');
+      });
+
+      test('should ask the adapter about the explain result and the original query', () => {
+        const adapter = { getPerformanceRecommendations: jest.fn().mockReturnValue([]) };
+
+        generate({ adapter, query: 'SELECT name FROM widget' });
+
+        expect(adapter.getPerformanceRecommendations).toHaveBeenCalledWith(
+          expect.objectContaining({ rows: [{ step: 'SCAN users' }] }),
+          'SELECT name FROM widget'
+        );
+      });
+
+      test('should still report the generic advice when the adapter has none', () => {
+        const output = generate({ query: 'SELECT * FROM users' });
+
+        expect(output).toContain('Performance Analysis Results:');
+        expect(output).toContain('Use specific column names instead of SELECT *');
+      });
+    });
+
+    test('should report the measured timing and result shape', () => {
+      const output = generate({ executionTime: 42, rowCount: 7, fields: ['id', 'name'] });
+
+      expect(output).toContain('Query executed successfully in 42ms');
+      expect(output).toContain('Returned 7 rows with 2 columns');
+    });
+
+    // The handler renders this block verbatim, so the separator is the only
+    // thing keeping it from arriving as one run-on line.
+    test('should put each recommendation on its own line', () => {
+      const lines = generate({ executionTime: 42, rowCount: 7, fields: ['id', 'name'] }).split(
+        '\n'
+      );
+
+      expect(lines[0]).toBe('Performance Analysis Results:');
+      expect(lines).toContain('- Query executed successfully in 42ms');
+    });
+
+    // Each threshold is asserted on both sides of its boundary. Without the
+    // exact-value cases, widening any of these comparisons to >= would leave
+    // every test passing while a whole severity band shifted.
+    describe('execution time bands', () => {
+      test('should call a query over five seconds critical', () => {
+        expect(generate({ executionTime: 5001 })).toContain('CRITICAL: Query took over 5 seconds');
+      });
+
+      test('should call exactly five seconds slow rather than critical', () => {
+        const output = generate({ executionTime: 5000 });
+
+        expect(output).toContain('WARNING: Slow query detected');
+        expect(output).not.toContain('CRITICAL');
+      });
+
+      test('should call a query over one second slow', () => {
+        expect(generate({ executionTime: 1001 })).toContain('WARNING: Slow query detected');
+      });
+
+      test('should call exactly one second moderate rather than slow', () => {
+        const output = generate({ executionTime: 1000 });
+
+        expect(output).toContain('Moderate execution time');
+        expect(output).not.toContain('WARNING: Slow query detected');
+      });
+
+      test('should call a query over half a second moderate', () => {
+        expect(generate({ executionTime: 501 })).toContain('Moderate execution time');
+      });
+
+      test('should call exactly half a second acceptable', () => {
+        const output = generate({ executionTime: 500 });
+
+        expect(output).toContain('GOOD: Query performance is acceptable');
+        expect(output).not.toContain('Moderate execution time');
+      });
+    });
+
+    describe('result size bands', () => {
+      test('should flag more than ten thousand rows as a large dataset', () => {
+        expect(generate({ rowCount: 10001 })).toContain('LARGE DATASET');
+      });
+
+      test('should call exactly ten thousand rows a large result set, not a large dataset', () => {
+        const output = generate({ rowCount: 10000 });
+
+        expect(output).toContain('Large result set');
+        expect(output).not.toContain('LARGE DATASET');
+      });
+
+      test('should flag more than a thousand rows as a large result set', () => {
+        expect(generate({ rowCount: 1001 })).toContain('Large result set');
+      });
+
+      test('should say nothing about exactly a thousand rows', () => {
+        const output = generate({ rowCount: 1000 });
+
+        expect(output).not.toContain('Large result set');
+        expect(output).not.toContain('LARGE DATASET');
+      });
+    });
+
+    describe('query shape', () => {
+      test('should say nothing about a query that names its columns', () => {
+        expect(generate({ query: 'SELECT id FROM users' })).not.toContain(
+          'Use specific column names'
+        );
+      });
+
+      test('should suggest a LIMIT when the query has neither LIMIT nor TOP', () => {
+        expect(generate({ query: 'SELECT id FROM users' })).toContain(
+          'Consider adding LIMIT clause'
+        );
+      });
+
+      test('should not suggest a LIMIT when the query already has one', () => {
+        expect(generate({ query: 'SELECT id FROM users LIMIT 10' })).not.toContain(
+          'Consider adding LIMIT clause'
+        );
+      });
+
+      test('should not suggest a LIMIT when the query uses TOP instead', () => {
+        expect(generate({ query: 'SELECT TOP 10 id FROM users' })).not.toContain(
+          'Consider adding LIMIT clause'
+        );
+      });
+
+      // LIMIT and TOP are keywords, not substrings. Matching them loosely lets
+      // an ordinary column name suppress the advice: 'stop_id' contains 'TOP'.
+      test('should still suggest a LIMIT when a column name merely contains TOP', () => {
+        expect(generate({ query: 'SELECT stop_id FROM stops' })).toContain(
+          'Consider adding LIMIT clause'
+        );
+      });
+
+      test('should still suggest a LIMIT when a column name merely contains LIMIT', () => {
+        expect(generate({ query: 'SELECT rate_limit_id FROM quotas' })).toContain(
+          'Consider adding LIMIT clause'
+        );
+      });
+
+      test('should discourage SELECT * however it is spaced', () => {
+        expect(generate({ query: 'SELECT  * FROM users LIMIT 1' })).toContain(
+          'Use specific column names'
+        );
+      });
+    });
+
+    describe('join analysis', () => {
+      const withJoins = (count: number): string =>
+        `SELECT id FROM a ${Array.from({ length: count }, (_, i) => `JOIN t${i} ON 1=1`).join(' ')} LIMIT 1`;
+
+      test('should call more than three joins complex', () => {
+        expect(generate({ query: withJoins(4) })).toContain('COMPLEX: Multiple JOINs detected');
+      });
+
+      test('should treat exactly three joins as ordinary', () => {
+        const output = generate({ query: withJoins(3) });
+
+        expect(output).toContain('[INFO]: JOINs detected');
+        expect(output).not.toContain('COMPLEX');
+      });
+
+      test('should say nothing about a query with no joins', () => {
+        expect(generate({ query: withJoins(0) })).not.toContain('JOINs detected');
+      });
+    });
+  });
+
+  // ============================================================================
   // Batch Execution
   // ============================================================================
 

@@ -43,22 +43,6 @@ export interface MCPNotification extends MCPMessage {
 // MCP Capabilities and Server Info
 // ============================================================================
 
-export interface MCPCapabilities {
-  tools?: Record<string, unknown>;
-  logging?: Record<string, unknown>;
-}
-
-export interface MCPServerInfo {
-  name: string;
-  version: string;
-}
-
-export interface MCPInitializeResult {
-  protocolVersion: string;
-  capabilities: MCPCapabilities;
-  serverInfo: MCPServerInfo;
-}
-
 // ============================================================================
 // MCP Tool Types
 // ============================================================================
@@ -72,23 +56,6 @@ export interface MCPToolParameter {
   enum?: string[];
   default?: unknown;
   additionalProperties?: boolean;
-}
-
-export interface MCPToolInputSchema {
-  type: 'object';
-  properties: Record<string, MCPToolParameter>;
-  required?: string[];
-  additionalProperties?: boolean;
-}
-
-export interface MCPTool {
-  name: string;
-  description: string;
-  inputSchema: MCPToolInputSchema;
-}
-
-export interface MCPToolsListResult {
-  tools: MCPTool[];
 }
 
 export interface MCPToolCallParams {
@@ -153,31 +120,13 @@ export interface SQLRefreshSchemaArgs {
 }
 
 // Type alias for list_databases (no arguments required)
-export type SQLListDatabasesArgs = Record<string, never>;
-
 // ============================================================================
 // MCP Tool Validation Types
 // ============================================================================
 
-export interface MCPToolValidationError {
-  message: string;
-  field?: string;
-  value?: unknown;
-  expectedType?: string;
-}
-
 // ============================================================================
 // MCP Message Handlers Type
 // ============================================================================
-
-export type MCPMessageHandler = (_message: MCPRequest) => Promise<void> | void;
-
-export interface MCPMessageHandlers {
-  initialize: MCPMessageHandler;
-  'tools/list': MCPMessageHandler;
-  'tools/call': MCPMessageHandler;
-  'notifications/initialized': MCPMessageHandler;
-}
 
 // ============================================================================
 // Type Guards for MCP Messages

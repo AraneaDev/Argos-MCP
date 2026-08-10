@@ -1071,22 +1071,101 @@ export class SecurityManager extends EventEmitter implements ISecurityManager {
       );
     }
 
-    let normalized = query
-      .replace(/\/\*[\s\S]*?\*\//g, '') // Remove /* */ comments
-      .replace(/--[^\r\n]*/g, ''); // Remove -- comments
-
-    // '#' begins a line comment ONLY in MySQL/MariaDB. In PostgreSQL (and others) '#' is
-    // a valid operator (integer bitwise XOR, geometric ops), so stripping '#'-to-EOL there
-    // would delete a stacked '; DROP ...' from the validator's view while the pg simple
-    // query protocol still executes it — a full SELECT-only bypass. Only strip for MySQL.
-    const t = (dbType || '').toLowerCase();
-    if (t === 'mysql' || t === 'mariadb') {
-      normalized = normalized.replace(/#[^\r\n]*/g, ''); // Remove # comments (MySQL only)
-    }
-
-    return normalized
+    return this.stripComments(query, dbType)
       .replace(/\s+/g, ' ') // Normalize whitespace
       .trim();
+  }
+
+  /**
+   * Remove SQL comments, leaving string and identifier literals untouched.
+   *
+   * This walks the statement rather than running a regex over it, because a
+   * regex cannot tell a comment from the same characters inside a literal. A
+   * '--' in a string used to swallow the rest of the line, carrying a stacked
+   * "; DROP ..." out of the validator's view while PostgreSQL's simple query
+   * protocol and SQL Server's batch API still executed it.
+   *
+   * Each comment is replaced by a space, not by nothing: a comment separates the
+   * tokens either side of it, so removing it outright welded them together and
+   * made SEL(comment)ECT read as SELECT.
+   * @param query - the raw statement
+   * @param dbType - decides whether '#' starts a comment
+   */
+  private stripComments(query: string, dbType: string): string {
+    // '#' begins a line comment ONLY in MySQL/MariaDB. In PostgreSQL (and others)
+    // '#' is a valid operator (integer bitwise XOR, geometric ops), so treating it
+    // as a comment there would hide a stacked statement (FIND-101).
+    const t = (dbType || '').toLowerCase();
+    const hashStartsComment = t === 'mysql' || t === 'mariadb';
+
+    let out = '';
+    let i = 0;
+
+    while (i < query.length) {
+      const ch = query[i]!;
+      const next = query[i + 1];
+
+      // Quoted string or delimited identifier: copied through verbatim, with the
+      // doubled quote treated as an escape rather than as a close.
+      if (ch === "'" || ch === '"' || ch === '`') {
+        out += ch;
+        i++;
+        while (i < query.length) {
+          if (query[i] === ch) {
+            if (query[i + 1] === ch) {
+              out += ch + ch;
+              i += 2;
+              continue;
+            }
+            out += ch;
+            i++;
+            break;
+          }
+          out += query[i];
+          i++;
+        }
+        continue;
+      }
+
+      // PostgreSQL dollar quoting: $$ ... $$ or $tag$ ... $tag$, no escapes inside.
+      if (ch === '$') {
+        const opener = /^\$([A-Za-z_][A-Za-z0-9_]*)?\$/.exec(query.slice(i));
+        if (opener) {
+          const tag = opener[0];
+          const close = query.indexOf(tag, i + tag.length);
+          const stop = close === -1 ? query.length : close + tag.length;
+          out += query.slice(i, stop);
+          i = stop;
+          continue;
+        }
+      }
+
+      if ((ch === '-' && next === '-') || (hashStartsComment && ch === '#')) {
+        while (i < query.length && query[i] !== '\n' && query[i] !== '\r') i++;
+        out += ' ';
+        continue;
+      }
+
+      if (ch === '/' && next === '*') {
+        // Ends at the FIRST '*/', deliberately, even though PostgreSQL and T-SQL
+        // nest block comments. MySQL and SQLite do not, so in
+        //     /* a /* b */ ; DROP TABLE users */
+        // the tail really does execute there. Closing at the first '*/' leaves
+        // that tail visible to the validator on every engine. The cost is
+        // rejecting a genuinely nested comment on PostgreSQL; the alternative
+        // costs a SELECT-only bypass on MySQL.
+        i += 2;
+        while (i < query.length && !(query[i] === '*' && query[i + 1] === '/')) i++;
+        i += 2;
+        out += ' ';
+        continue;
+      }
+
+      out += ch;
+      i++;
+    }
+
+    return out;
   }
 
   private tokenizeQuery(query: string): SQLToken[] {

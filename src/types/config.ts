@@ -101,29 +101,6 @@ export interface RawConfigFile {
 // Parsed Configuration Types
 // ============================================================================
 
-export interface ParsedDatabaseConfig {
-  type: DatabaseTypeString;
-  host?: string;
-  port?: number;
-  database?: string;
-  username?: string;
-  password?: string;
-  ssl?: boolean;
-  select_only?: boolean;
-  timeout?: number;
-  file?: string;
-  encrypt?: boolean;
-
-  // SSH Configuration
-  ssh_host?: string;
-  ssh_port?: number;
-  ssh_username?: string;
-  ssh_password?: string;
-  ssh_private_key?: string;
-  ssh_passphrase?: string;
-  local_port?: number;
-}
-
 export interface ParsedSecurityConfig {
   max_joins: number;
   max_subqueries: number;
@@ -157,23 +134,9 @@ export interface ConfigValidationError {
   severity: 'error' | 'warning';
 }
 
-export interface ConfigValidationResult {
-  isValid: boolean;
-  errors: ConfigValidationError[];
-  warnings: ConfigValidationError[];
-  parsedConfig?: ParsedServerConfig;
-}
-
 // ============================================================================
 // Configuration Loading Interface
 // ============================================================================
-
-export interface IConfigLoader {
-  loadConfig(_configPath?: string): Promise<ParsedServerConfig>;
-  validateConfig(_rawConfig: RawConfigFile): ConfigValidationResult;
-  getDefaultConfig(): ParsedServerConfig;
-  parseDatabaseConfig(_raw: DatabaseSectionConfig, _dbName: string): ParsedDatabaseConfig;
-}
 
 // ============================================================================
 // Configuration Defaults

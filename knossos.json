@@ -1,0 +1,50 @@
+{
+  "version": 1,
+  "boundaries": [
+    { "name": "types", "path_prefix": "src/types" },
+    { "name": "utils", "path_prefix": "src/utils" },
+    { "name": "adapters", "path_prefix": "src/database" },
+    { "name": "domain", "path_prefix": "src/classes" },
+    { "name": "mcp-tools", "path_prefix": "src/tools" },
+    { "name": "setup-cli", "path_prefix": "src/setup" },
+    { "name": "tests", "path_prefix": "tests" },
+    { "name": "examples", "path_prefix": "examples" },
+    { "name": "scripts", "path_prefix": "scripts" }
+  ],
+  "policies": [
+    {
+      "id": "types-never-reach-up-a-layer",
+      "from_boundary": "types",
+      "deny_targets": ["adapters", "domain", "mcp-tools", "setup-cli"]
+    },
+    {
+      "id": "utils-stay-below-the-domain",
+      "from_boundary": "utils",
+      "deny_targets": ["adapters", "domain", "mcp-tools", "setup-cli"]
+    },
+    {
+      "id": "adapters-do-not-know-the-mcp-layer",
+      "from_boundary": "adapters",
+      "deny_targets": ["mcp-tools", "setup-cli"]
+    },
+    {
+      "id": "domain-does-not-depend-on-the-cli",
+      "from_boundary": "domain",
+      "deny_targets": ["setup-cli"]
+    },
+    {
+      "id": "mcp-tools-do-not-depend-on-the-cli",
+      "from_boundary": "mcp-tools",
+      "deny_targets": ["setup-cli"]
+    },
+    {
+      "id": "production-code-never-imports-tests",
+      "from_boundary": "domain",
+      "deny_targets": ["tests", "examples"]
+    }
+  ],
+  "quality_budgets": {
+    "new_cycles": 0,
+    "boundary_violations": 0
+  }
+}

@@ -38,19 +38,28 @@ claude mcp add argos --scope user -- \
 
 Then add your databases with the `sql_add_database` MCP tool directly from Claude, or run `npm run setup` to write `~/.config/argos/config.ini` by hand.
 
-### Method 1: NPM Global Installation (Recommended)
+### Install from source
 
-Install globally for system-wide access:
+This is the only supported installation today. Argos is not on the npm registry
+yet — the publish step in the release workflow is deliberately dormant until the
+first public release — so `npm install -g argos-mcp` will not resolve.
 
 ```bash
-# Install the Argos-MCP globally
-npm install -g argos-mcp
-
-# Verify installation
-argos-mcp --version
+git clone https://github.com/AraneaDev/Argos-MCP.git
+cd Argos-MCP
+npm install
+npm run build
 ```
 
-**Expected Output:**
+`npm run build` type-checks before compiling, so a successful build has already
+been type-checked. It produces two executables:
+
+```
+dist/index.js   the MCP server
+dist/setup.js   the configuration wizard
+```
+
+**Version:**
 
 <!-- x-release-please-start-version -->
 ```
@@ -58,42 +67,14 @@ Argos-MCP v3.0.1
 ```
 <!-- x-release-please-end-version -->
 
-### Method 2: Local Project Installation
+The version comes from `package.json`; the server itself takes no `--version`
+flag. Started without a client it simply waits on stdin, which is what an MCP
+server does.
 
-Install locally in a specific project:
-
-```bash
-# Create project directory
-mkdir my-argos
-cd my-argos
-
-# Initialize npm project
-npm init -y
-
-# Install Argos-MCP locally
-npm install argos-mcp
-
-# Verify installation
-npx argos-mcp --version
-```
-
-### Method 3: Development Installation
-
-For development or customization:
+Optionally put the two commands on your `PATH`:
 
 ```bash
-# Clone the repository
-git clone https://github.com/AraneaDev/Argos-MCP.git
-cd Argos-MCP
-
-# Install dependencies
-npm install
-
-# Build the project
-npm run build
-
-# Run locally
-npm start
+npm link      # provides argos-mcp and argos-setup
 ```
 
 ## Initial Configuration
@@ -515,30 +496,20 @@ pm2 save
 ### Docker Deployment
 
 ```dockerfile
-FROM node:18-alpine
+FROM node:22-alpine
 
 WORKDIR /app
+RUN git clone https://github.com/AraneaDev/Argos-MCP.git . \
+ && npm ci && npm run build
 
-# Copy configuration
-COPY config.ini ./
-
-# Install Argos-MCP
-RUN npm install -g argos-mcp
-
-# Expose port (if using HTTP mode)
-EXPOSE 3000
-
-# Start server
-CMD ["argos-mcp"]
+COPY config.ini /etc/argos/config.ini
 ```
 
-```bash
-# Build and run
-docker build -t argos-mcp .
-docker run -d --name argos \
- -v $(pwd)/config.ini:/app/config.ini \
- argos-mcp
-```
+There is no port to expose and no long-running container to start. Argos speaks
+over stdio, so the image is only useful if the MCP client runs inside it and
+starts `node /app/dist/index.js --config /etc/argos/config.ini` as a child
+process. An image that runs the server on its own has nothing talking to it and
+exits immediately.
 
 ## Next Steps
 
@@ -553,9 +524,9 @@ After successful installation:
 
 ### Installation Commands
 ```bash
-npm install -g argos-mcp # Global installation
-npm install argos-mcp # Local installation
-git clone <repo-url> # Development installation
+git clone https://github.com/AraneaDev/Argos-MCP.git   # the supported install
+npm install && npm run build
+npm link                                               # optional: argos-mcp, argos-setup on PATH
 ```
 
 ### Configuration Commands

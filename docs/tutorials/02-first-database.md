@@ -525,4 +525,4 @@ Once you have a working database connection:
 
 ---
 
-**Need help?** Check the [troubleshooting guide](../guides/troubleshooting-guide.md) or ask in [GitHub Discussions](<repository-discussions-url>).
+**Need help?** Check the [troubleshooting guide](../guides/troubleshooting-guide.md) or ask in [GitHub Discussions](https://github.com/AraneaDev/Argos-MCP/discussions).

@@ -17,6 +17,9 @@ import type {
 // PostgreSQL Adapter Implementation
 // ============================================================================
 
+/**
+ *
+ */
 export class PostgreSQLAdapter extends DatabaseAdapter {
   private _pool?: pg.Pool;
 
@@ -31,8 +34,11 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
       const username = this.config.username as string;
       const password = this.config.password as string;
 
-      const statementTimeout =
-        typeof this.config.query_timeout === 'number' ? this.config.query_timeout : 30000;
+      // Same resolution as every other adapter: query_timeout, else the
+      // connection timeout, else 30s. This used to read query_timeout directly
+      // and ignore both a numeric string and the timeout fallback, so the same
+      // configuration could mean one thing here and another on MySQL.
+      const statementTimeout = this.getStatementTimeoutMs();
 
       const poolConfig: pg.PoolConfig = {
         host,
@@ -52,7 +58,7 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
       if (this.config.ssl !== undefined) {
         const sslEnabled = this.parseConfigValue(this.config.ssl, 'boolean', false);
         if (sslEnabled) {
-          const sslVerify = this.parseConfigValue(this.config.ssl_verify ?? true, 'boolean', true);
+          const sslVerify = this.verifyServerCertificate();
           poolConfig.ssl = { rejectUnauthorized: sslVerify };
         } else {
           poolConfig.ssl = false; // explicitly disable
@@ -64,6 +70,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     return this._pool;
   }
 
+  /**
+   *
+   */
   async connect(): Promise<DatabaseConnection> {
     this.validateConfig(['host', 'database', 'username', 'password']);
     try {
@@ -74,6 +83,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   async disconnect(connection: DatabaseConnection): Promise<void> {
     try {
       const poolClient = connection as PoolClient;
@@ -83,6 +95,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   async destroyPool(): Promise<void> {
     if (this._pool) {
       await this._pool.end();
@@ -90,6 +105,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   isConnected(connection: DatabaseConnection): boolean {
     try {
       const pgClient = connection as PgClient & {
@@ -106,6 +124,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
   // Query Execution
   // ============================================================================
 
+  /**
+   *
+   */
   async executeQuery(
     connection: DatabaseConnection,
     query: string,
@@ -137,6 +158,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
   // Transaction Management
   // ============================================================================
 
+  /**
+   *
+   */
   async beginTransaction(connection: DatabaseConnection): Promise<void> {
     try {
       const pgClient = connection as PgClient;
@@ -146,6 +170,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   async commitTransaction(connection: DatabaseConnection): Promise<void> {
     try {
       const pgClient = connection as PgClient;
@@ -155,6 +182,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   async rollbackTransaction(connection: DatabaseConnection): Promise<void> {
     try {
       const pgClient = connection as PgClient;
@@ -168,15 +198,45 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
   // Performance Analysis
   // ============================================================================
 
+  /**
+   *
+   */
   buildExplainQuery(query: string): string {
     // Use JSON format for better parsing and analysis
     return `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${query}`;
+  }
+
+  /**
+   *
+   */
+  override getPerformanceRecommendations(explainResult: QueryResult, query: string): string[] {
+    const recommendations: string[] = [];
+    const planText = this.flattenExplainPlan(explainResult);
+
+    if (planText.includes('seq scan')) {
+      recommendations.push(' POSTGRESQL: Sequential scan detected - consider adding indexes');
+    }
+
+    if (planText.includes('nested loop') && planText.includes('buffers')) {
+      recommendations.push(' POSTGRESQL: Nested loops with buffer usage - check join conditions');
+    }
+
+    if (query.toUpperCase().includes('LIKE') && query.includes('%')) {
+      recommendations.push(
+        ' POSTGRESQL: LIKE with wildcards - consider full-text search (GIN indexes)'
+      );
+    }
+
+    return recommendations;
   }
 
   // ============================================================================
   // Schema Capture
   // ============================================================================
 
+  /**
+   *
+   */
   async captureSchema(connection: DatabaseConnection): Promise<DatabaseSchema> {
     try {
       const schema = this.createBaseSchema(this.config.database ?? '');

@@ -148,3 +148,7 @@ SECURITY-AUDIT.md
 
 # Local agent instructions (not committed)
 CLAUDE.md
+
+# Knossos architecture graph state and CI reports (derived, never committed)
+.knossos-ci/
+artifacts/

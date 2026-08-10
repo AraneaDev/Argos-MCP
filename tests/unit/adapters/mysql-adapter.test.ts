@@ -3,6 +3,7 @@
  * Tests the MySQL-specific database adapter implementation
  */
 
+import { EventEmitter } from 'events';
 import { MySQLAdapter } from '../../../src/database/adapters/mysql.js';
 import type {
   DatabaseConnection,
@@ -153,6 +154,48 @@ describe('MySQLAdapter', () => {
         expect.objectContaining({
           ssl: { rejectUnauthorized: false },
         })
+      );
+    });
+
+    // A security control must not be switched off by a value nobody recognises.
+    // ssl_verify reaches the adapter as a boolean when it came through the
+    // config-file parser, but nothing guarantees that for every caller.
+    it('should keep verifying when ssl_verify holds an unrecognised value', async () => {
+      const sslAdapter = new MySQLAdapter({ ...config, ssl: true, ssl_verify: 'yes' as never });
+
+      await sslAdapter.connect();
+
+      expect(mysql.createPool).toHaveBeenCalledWith(
+        expect.objectContaining({ ssl: { rejectUnauthorized: true } })
+      );
+    });
+
+    it('should stop verifying for a recognised false spelling', async () => {
+      const sslAdapter = new MySQLAdapter({ ...config, ssl: true, ssl_verify: 'false' as never });
+
+      await sslAdapter.connect();
+
+      expect(mysql.createPool).toHaveBeenCalledWith(
+        expect.objectContaining({ ssl: { rejectUnauthorized: false } })
+      );
+    });
+
+    it('should not configure SSL when it is not asked for', async () => {
+      const { ssl: _ssl, ...withoutSsl } = config;
+      const plainAdapter = new MySQLAdapter(withoutSsl as DatabaseConfig);
+
+      await plainAdapter.connect();
+
+      expect(mysql.createPool).toHaveBeenCalledWith(
+        expect.not.objectContaining({ ssl: expect.anything() })
+      );
+    });
+
+    it('should queue callers rather than fail when the pool is exhausted', async () => {
+      await adapter.connect();
+
+      expect(mysql.createPool).toHaveBeenCalledWith(
+        expect.objectContaining({ waitForConnections: true, connectionLimit: 10 })
       );
     });
 
@@ -854,6 +897,200 @@ describe('MySQLAdapter', () => {
       };
       expect(adapter.isConnected(mockConn as any)).toBe(true);
     });
+
+    it('should return false for a missing connection', () => {
+      expect(adapter.isConnected(null as any)).toBe(false);
+      expect(adapter.isConnected(undefined as any)).toBe(false);
+    });
+  });
+
+  // ============================================================================
+  // Server-side Statement Timeout
+  // ============================================================================
+
+  // A runaway query has to be cancelled by the server, not just abandoned by the
+  // client, or the connection stays busy. MySQL spells this max_execution_time
+  // (milliseconds); MariaDB spells it max_statement_time (seconds).
+  describe('applyStatementTimeout', () => {
+    const connectWith = async (
+      query: jest.Mock,
+      overrides: Partial<DatabaseConfig> = {}
+    ): Promise<void> => {
+      mockGetConnection.mockResolvedValueOnce({ ...mockConnection, query });
+      const timeoutAdapter = new MySQLAdapter({ ...config, ...overrides });
+      await timeoutAdapter.connect();
+    };
+
+    it('should set the MySQL statement timeout in milliseconds', async () => {
+      const query = jest.fn().mockResolvedValue(undefined);
+
+      await connectWith(query);
+
+      expect(query).toHaveBeenCalledWith('SET SESSION max_execution_time = ?', [30000]);
+    });
+
+    it('should fall back to the MariaDB variable in seconds', async () => {
+      const query = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Unknown system variable'))
+        .mockResolvedValueOnce(undefined);
+
+      await connectWith(query);
+
+      expect(query).toHaveBeenNthCalledWith(2, 'SET SESSION max_statement_time = ?', [30]);
+    });
+
+    it('should round the MariaDB timeout up to a whole second', async () => {
+      const query = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Unknown system variable'))
+        .mockResolvedValueOnce(undefined);
+
+      await connectWith(query, { query_timeout: 500 });
+
+      expect(query).toHaveBeenNthCalledWith(2, 'SET SESSION max_statement_time = ?', [1]);
+    });
+
+    it('should still connect when the server supports neither variable', async () => {
+      const query = jest.fn().mockRejectedValue(new Error('Unknown system variable'));
+
+      await expect(connectWith(query)).resolves.toBeUndefined();
+      expect(query).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not set a timeout when it is disabled', async () => {
+      const query = jest.fn().mockResolvedValue(undefined);
+
+      await connectWith(query, { query_timeout: 0 });
+
+      expect(query).not.toHaveBeenCalled();
+    });
+  });
+
+  // ============================================================================
+  // Pool Teardown
+  // ============================================================================
+
+  describe('destroyPool', () => {
+    it('should end the pool so the next connect builds a fresh one', async () => {
+      await adapter.connect();
+
+      await adapter.destroyPool();
+
+      expect(mockPoolEnd).toHaveBeenCalled();
+      await adapter.connect();
+      expect(mysql.createPool).toHaveBeenCalledTimes(2);
+    });
+
+    it('should do nothing when no pool was ever created', async () => {
+      await adapter.destroyPool();
+
+      expect(mockPoolEnd).not.toHaveBeenCalled();
+    });
+  });
+
+  // ============================================================================
+  // Row Streaming
+  // ============================================================================
+
+  // executeQuery streams rows rather than buffering them, so a huge result set
+  // never fully materializes in the heap. Only the connections that expose the
+  // core .connection take this path; the others fall back to buffered execute.
+  describe('row streaming', () => {
+    const streamingConnection = (
+      rows: Record<string, unknown>[],
+      opts: { error?: Error; throwOnQuery?: Error; trailing?: () => void } = {}
+    ): Record<string, unknown> => {
+      const stream = new EventEmitter();
+      const core = {
+        query: jest.fn(() => {
+          if (opts.throwOnQuery) throw opts.throwOnQuery;
+          return { stream: () => stream };
+        }),
+      };
+
+      // Emit once the adapter has attached its listeners.
+      process.nextTick(() => {
+        for (const row of rows) stream.emit('data', row);
+        if (opts.error) stream.emit('error', opts.error);
+        else stream.emit('end');
+        opts.trailing?.();
+      });
+
+      return { ...mockConnection, connection: core };
+    };
+
+    const streamAdapter = (overrides: Partial<DatabaseConfig> = {}): MySQLAdapter =>
+      new MySQLAdapter({ ...config, ...overrides });
+
+    it('should fall back to buffered execute when the core cannot stream', async () => {
+      // A connection object that has .connection but no usable query on it.
+      const conn = { ...mockConnection, connection: { notQuery: true } };
+
+      const result = await streamAdapter().executeQuery(conn as any, 'SELECT id FROM users');
+
+      expect(mockExecute).toHaveBeenCalled();
+      expect(result.rows).toEqual([{ id: 1, name: 'test' }]);
+    });
+
+    it('should return the streamed rows', async () => {
+      const conn = streamingConnection([{ id: 1 }, { id: 2 }]);
+
+      const result = await streamAdapter().executeQuery(conn as any, 'SELECT id FROM users');
+
+      expect(result.rows).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(result.rowCount).toBe(2);
+      expect(result.fields).toEqual(['id']);
+      expect(result.truncated).toBe(false);
+    });
+
+    it('should retain only max_rows and report the full observed count', async () => {
+      const conn = streamingConnection([{ id: 1 }, { id: 2 }, { id: 3 }]);
+
+      const result = await streamAdapter({ max_rows: 2 }).executeQuery(conn as any, 'SELECT 1');
+
+      expect(result.rows).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(result.rowCount).toBe(3);
+      expect(result.truncated).toBe(true);
+    });
+
+    it('should not mark a result truncated at exactly max_rows', async () => {
+      const conn = streamingConnection([{ id: 1 }, { id: 2 }]);
+
+      const result = await streamAdapter({ max_rows: 2 }).executeQuery(conn as any, 'SELECT 1');
+
+      expect(result.rows).toHaveLength(2);
+      expect(result.truncated).toBe(false);
+    });
+
+    it('should reject when the stream errors', async () => {
+      const conn = streamingConnection([{ id: 1 }], { error: new Error('connection lost') });
+
+      await expect(streamAdapter().executeQuery(conn as any, 'SELECT 1')).rejects.toThrow(
+        'mysql adapter error: Failed to execute MySQL query - connection lost'
+      );
+    });
+
+    it('should reject when the stream cannot be created', async () => {
+      const conn = streamingConnection([], { throwOnQuery: new Error('bad SQL') });
+
+      await expect(streamAdapter().executeQuery(conn as any, 'SELECT 1')).rejects.toThrow(
+        'mysql adapter error: Failed to execute MySQL query - bad SQL'
+      );
+    });
+
+    it('should ignore an error that arrives after the stream ended', async () => {
+      const conn = streamingConnection([{ id: 1 }]);
+      const stream = ((conn.connection as any).query() as { stream: () => EventEmitter }).stream();
+
+      const result = streamAdapter().executeQuery(conn as any, 'SELECT 1');
+      process.nextTick(() => {
+        stream.emit('end');
+        stream.emit('error', new Error('too late'));
+      });
+
+      await expect(result).resolves.toMatchObject({ rowCount: 1 });
+    });
   });
 });
 
@@ -879,5 +1116,153 @@ describe('MySQLAdapter - connection pooling', () => {
     await adapter.disconnect(conn);
     expect(mockRelease).toHaveBeenCalled();
     expect(mockConn.end).not.toHaveBeenCalled();
+  });
+
+  // ============================================================================
+  // Performance Recommendations
+  // ============================================================================
+
+  describe('getPerformanceRecommendations', () => {
+    let adapter: MySQLAdapter;
+
+    beforeEach(() => {
+      adapter = new MySQLAdapter({
+        type: 'mysql',
+        host: 'localhost',
+        port: 3306,
+        database: 'test',
+        username: 'root',
+        password: 'test',
+        select_only: true,
+        mcp_configurable: false,
+      });
+    });
+
+    const explain = (rows: Record<string, unknown>[]): QueryResult => ({
+      rows,
+      rowCount: rows.length,
+      fields: rows.length > 0 ? Object.keys(rows[0]!) : [],
+      truncated: false,
+      execution_time_ms: 1,
+    });
+
+    const advise = (rows: Record<string, unknown>[], query = 'SELECT id FROM users'): string =>
+      adapter.getPerformanceRecommendations(explain(rows), query).join('\n');
+
+    it('should flag a full table scan', () => {
+      expect(advise([{ type: 'ALL' }])).toContain('Full table scan detected');
+    });
+
+    // Each branch asserts the advice it does NOT give as well. A guard that
+    // fired on the mere presence of an Extra column, rather than on what that
+    // column says, would otherwise pass every positive assertion here while
+    // recommending an index on ORDER BY for a query that never sorts.
+    it('should flag a filesort in the Extra column', () => {
+      const output = advise([{ type: 'ref', Extra: 'Using where; Using filesort' }]);
+
+      expect(output).toContain('Filesort operation');
+      expect(output).not.toContain('Temporary table created');
+    });
+
+    it('should flag a temporary table in the Extra column', () => {
+      const output = advise([{ type: 'ref', Extra: 'Using temporary' }]);
+
+      expect(output).toContain('Temporary table created');
+      expect(output).not.toContain('Filesort operation');
+    });
+
+    it('should report each row of a multi-row plan', () => {
+      const output = advise([{ type: 'ALL' }, { type: 'ref', Extra: 'Using temporary' }]);
+
+      expect(output).toContain('Full table scan detected');
+      expect(output).toContain('Temporary table created');
+    });
+
+    // buildExplainQuery asks for EXPLAIN FORMAT=JSON, which returns a single
+    // column holding the whole plan rather than the tabular `type` / `Extra`
+    // columns. Advice that only reads those columns never fires in production.
+    describe('EXPLAIN FORMAT=JSON plans', () => {
+      // Pretty-printed, because that is how MySQL returns the plan: the value
+      // arrives indented, with a space after each colon.
+      const jsonPlan = (queryBlock: Record<string, unknown>): Record<string, unknown>[] => [
+        { EXPLAIN: JSON.stringify({ query_block: { select_id: 1, ...queryBlock } }, null, 2) },
+      ];
+
+      it('should flag a full table scan', () => {
+        const output = advise(
+          jsonPlan({
+            table: { table_name: 'users', access_type: 'ALL', rows_examined_per_scan: 425 },
+          })
+        );
+
+        expect(output).toContain('Full table scan detected');
+      });
+
+      it('should flag a filesort', () => {
+        const output = advise(
+          jsonPlan({
+            ordering_operation: {
+              using_filesort: true,
+              table: { table_name: 'users', access_type: 'ref' },
+            },
+          })
+        );
+
+        expect(output).toContain('Filesort operation');
+        expect(output).not.toContain('Temporary table created');
+      });
+
+      it('should flag a temporary table', () => {
+        const output = advise(
+          jsonPlan({
+            grouping_operation: {
+              using_temporary_table: true,
+              using_filesort: false,
+              table: { table_name: 'users', access_type: 'ref' },
+            },
+          })
+        );
+
+        expect(output).toContain('Temporary table created');
+        expect(output).not.toContain('Filesort operation');
+      });
+
+      it('should read a plan that is not pretty-printed', () => {
+        const compact = JSON.stringify({
+          query_block: {
+            select_id: 1,
+            grouping_operation: {
+              using_temporary_table: true,
+              using_filesort: true,
+              table: { table_name: 'users', access_type: 'ALL' },
+            },
+          },
+        });
+
+        const output = advise([{ EXPLAIN: compact }]);
+
+        expect(output).toContain('Full table scan detected');
+        expect(output).toContain('Filesort operation');
+        expect(output).toContain('Temporary table created');
+      });
+
+      it('should say nothing about a healthy plan', () => {
+        const output = advise(
+          jsonPlan({ table: { table_name: 'users', access_type: 'const', key: 'PRIMARY' } })
+        );
+
+        expect(output).toBe('');
+      });
+    });
+
+    it('should say nothing about a plan with no problems', () => {
+      expect(
+        adapter.getPerformanceRecommendations(explain([{ type: 'const' }]), 'SELECT 1')
+      ).toEqual([]);
+    });
+
+    it('should say nothing about an empty plan', () => {
+      expect(adapter.getPerformanceRecommendations(explain([]), 'SELECT 1')).toEqual([]);
+    });
   });
 });

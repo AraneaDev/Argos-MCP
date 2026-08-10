@@ -29,7 +29,8 @@ describe('writeAuditLog', () => {
   beforeEach(() => jest.clearAllMocks());
   it('calls mkdir and appendFile with correct paths', async () => {
     await writeAuditLog('mydb', 'SELECT 1', 42, 'success');
-    expect(mkdir).toHaveBeenCalledWith(expect.stringContaining('.sql-ts/audit'), {
+    // Named for the product, not for what it was called before the rebrand.
+    expect(mkdir).toHaveBeenCalledWith(expect.stringContaining('.argos-mcp/audit'), {
       recursive: true,
       mode: 0o700,
     });

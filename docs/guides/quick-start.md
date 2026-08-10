@@ -330,4 +330,4 @@ Once you have the basic setup working:
 
 ---
 
-**Need help?** Check the [troubleshooting guide](troubleshooting-guide.md) or [join our discussions](<repository-discussions-url>).
+**Need help?** Check the [troubleshooting guide](troubleshooting-guide.md) or [join our discussions](https://github.com/AraneaDev/Argos-MCP/discussions).

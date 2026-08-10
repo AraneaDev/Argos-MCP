@@ -1143,7 +1143,7 @@ export class ConnectionManager extends EventEmitter {
         result,
         explainResult,
         executionTime,
-        databaseType: connectionInfo.type,
+        adapter,
       });
 
       return {
@@ -1186,9 +1186,9 @@ export class ConnectionManager extends EventEmitter {
     result: QueryResult;
     explainResult: QueryResult;
     executionTime: number;
-    databaseType: string;
+    adapter: DatabaseAdapter;
   }): string {
-    const { query, result, explainResult, executionTime, databaseType } = options;
+    const { query, result, explainResult, executionTime, adapter } = options;
     const recommendations: string[] = ['Performance Analysis Results:'];
 
     // Basic execution metrics
@@ -1218,30 +1218,25 @@ export class ConnectionManager extends EventEmitter {
     // Query analysis recommendations
     const upperQuery = query.toUpperCase();
 
-    if (upperQuery.includes('SELECT *')) {
+    // These match keywords, not substrings. `includes('TOP')` fired on any
+    // identifier containing the letters - stop_id, laptop, topic - and silently
+    // suppressed the advice for perfectly ordinary queries; `includes('SELECT *')`
+    // missed the same query written with two spaces or a newline. The join
+    // analysis below already had this right.
+    if (/\bSELECT\s+\*/.test(upperQuery)) {
       recommendations.push(
         ' TIP: Use specific column names instead of SELECT * for better performance'
       );
     }
 
-    if (!upperQuery.includes('LIMIT') && !upperQuery.includes('TOP')) {
+    if (!/\bLIMIT\b/.test(upperQuery) && !/\bTOP\b/.test(upperQuery)) {
       recommendations.push(
         ' TIP: Consider adding LIMIT clause to prevent unexpected large results'
       );
     }
 
-    // Database-specific recommendations
-    switch (databaseType) {
-      case 'postgresql':
-        this.addPostgreSQLRecommendations(recommendations, explainResult, query);
-        break;
-      case 'mysql':
-        this.addMySQLRecommendations(recommendations, explainResult, query);
-        break;
-      case 'sqlite':
-        this.addSQLiteRecommendations(recommendations, explainResult, query);
-        break;
-    }
+    // Database-specific recommendations: only the adapter knows the shape of its own plan.
+    recommendations.push(...adapter.getPerformanceRecommendations(explainResult, query));
 
     // Join analysis
     const joinCount = (upperQuery.match(/\bJOIN\b/g) || []).length;
@@ -1254,88 +1249,5 @@ export class ConnectionManager extends EventEmitter {
     }
 
     return recommendations.join('\n');
-  }
-
-  /**
-   * Add PostgreSQL-specific recommendations
-   */
-  private addPostgreSQLRecommendations(
-    recommendations: string[],
-    explainResult: QueryResult,
-    query: string
-  ): void {
-    const planText = explainResult.rows
-      .map((row) => Object.values(row).join(' '))
-      .join(' ')
-      .toLowerCase();
-
-    if (planText.includes('seq scan')) {
-      recommendations.push(' POSTGRESQL: Sequential scan detected - consider adding indexes');
-    }
-
-    if (planText.includes('nested loop') && planText.includes('buffers')) {
-      recommendations.push(' POSTGRESQL: Nested loops with buffer usage - check join conditions');
-    }
-
-    if (query.toUpperCase().includes('LIKE') && query.includes('%')) {
-      recommendations.push(
-        ' POSTGRESQL: LIKE with wildcards - consider full-text search (GIN indexes)'
-      );
-    }
-  }
-
-  /**
-   * Add MySQL-specific recommendations
-   */
-  private addMySQLRecommendations(
-    recommendations: string[],
-    explainResult: QueryResult,
-    _query: string
-  ): void {
-    for (const row of explainResult.rows) {
-      const rowData = row as Record<string, unknown>;
-
-      if (rowData.type === 'ALL') {
-        recommendations.push(' MYSQL: Full table scan detected - add appropriate indexes');
-      }
-
-      if (rowData.Extra && String(rowData.Extra).includes('Using filesort')) {
-        recommendations.push(
-          ' MYSQL: Filesort operation - consider adding index on ORDER BY columns'
-        );
-      }
-
-      if (rowData.Extra && String(rowData.Extra).includes('Using temporary')) {
-        recommendations.push(
-          ' MYSQL: Temporary table created - optimize GROUP BY or DISTINCT operations'
-        );
-      }
-    }
-  }
-
-  /**
-   * Add SQLite-specific recommendations
-   */
-  private addSQLiteRecommendations(
-    recommendations: string[],
-    explainResult: QueryResult,
-    _query: string
-  ): void {
-    const planText = explainResult.rows
-      .map((row) => Object.values(row).join(' '))
-      .join(' ')
-      .toLowerCase();
-
-    if (planText.includes('scan table')) {
-      recommendations.push(' SQLITE: Table scan detected - consider adding indexes');
-    }
-
-    if (planText.includes('temp b-tree')) {
-      recommendations.push(' SQLITE: Temporary B-tree created - optimize sorting operations');
-    }
-
-    recommendations.push(
-      '[INFO] SQLITE: Run ANALYZE command periodically to update query planner statistics'
-    );
   }
 }

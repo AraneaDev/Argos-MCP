@@ -1,0 +1,133 @@
+name: Architecture
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+# Knossos builds a dependency graph of the codebase and enforces the boundary
+# rules declared in knossos.json. Two gates run here:
+#
+#   check-architecture  always runs, needs no history, fails on any boundary
+#                       violation (e.g. src/utils reaching up into src/classes).
+#   quality-gate        compares this commit against a reviewed baseline
+#                       snapshot and fails on regressions such as a new
+#                       dependency cycle. It only runs once the
+#                       KNOSSOS_BASELINE_SNAPSHOT repository variable points at
+#                       a snapshot that was reviewed on main - see the README
+#                       section "Architecture gate" for how to adopt one.
+jobs:
+  knossos:
+    name: Boundaries & budgets
+    runs-on: ubuntu-latest
+    env:
+      # Pin the analyzer so a graph change is always a change in this repository,
+      # never a silent change in the tool. Override with the KNOSSOS_VERSION
+      # repository variable to roll forward.
+      KNOSSOS_VERSION: ${{ vars.KNOSSOS_VERSION || 'v0.10.4' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Checkout Knossos
+        uses: actions/checkout@v4
+        with:
+          repository: AraneaDev/Knossos-MCP
+          ref: ${{ env.KNOSSOS_VERSION }}
+          path: .knossos-src
+
+      # Retained snapshots live in .knossos-ci. Restoring them is what makes a
+      # baseline comparison possible at all; without a hit, the boundary check
+      # still runs and only the budget step is skipped.
+      - name: Restore architecture history
+        uses: actions/cache/restore@v4
+        with:
+          path: .knossos-ci
+          key: knossos-${{ runner.os }}-${{ env.KNOSSOS_VERSION }}-main
+          restore-keys: |
+            knossos-${{ runner.os }}-${{ env.KNOSSOS_VERSION }}-
+
+      - name: Build the pinned analyzer image
+        working-directory: .knossos-src
+        run: docker build --target runtime --tag knossos-mcp:ci .
+
+      # knossos.json is the single source of truth for boundaries, policies and
+      # budgets. The CLI wants the policy and budget sections as standalone JSON
+      # documents, so derive them here rather than duplicating them on disk.
+      - name: Derive policy and budget inputs
+        run: |
+          set -euo pipefail
+          mkdir -p .knossos-ci artifacts
+          chmod 0777 .knossos-ci
+          jq -e '.policies' knossos.json > artifacts/policies.json
+          jq -e '.quality_budgets' knossos.json > artifacts/budgets.json
+
+      - name: Scan
+        run: |
+          set -euo pipefail
+          docker run --rm --network none \
+            --mount type=bind,source="$PWD",target=/workspace,readonly \
+            --mount type=bind,source="$PWD/.knossos-ci",target=/data \
+            knossos-mcp:ci scan /workspace --mode=full --json > artifacts/scan.json
+          jq -r '.project_id' artifacts/scan.json > artifacts/project-id.txt
+
+          # A scanner that dies mid-run still writes a graph, just an incomplete
+          # one. Treating that as a pass would let real violations through.
+          degraded="$(jq -r '.data.degraded_languages | length' artifacts/scan.json)"
+          if [ "$degraded" != "0" ]; then
+            echo "::error::Knossos scan was degraded; the graph is incomplete:"
+            jq -r '.warnings[]?' artifacts/scan.json >&2
+            exit 2
+          fi
+
+      - name: Check boundaries
+        run: |
+          set -euo pipefail
+          docker run --rm --network none \
+            --mount type=bind,source="$PWD",target=/workspace,readonly \
+            --mount type=bind,source="$PWD/.knossos-ci",target=/data \
+            knossos-mcp:ci check-architecture "$(cat artifacts/project-id.txt)" \
+              --policies=/workspace/artifacts/policies.json --json \
+              > artifacts/check-architecture.json
+
+      - name: Check budgets against the reviewed baseline
+        if: vars.KNOSSOS_BASELINE_SNAPSHOT != ''
+        run: |
+          set -euo pipefail
+          docker run --rm --network none \
+            --mount type=bind,source="$PWD",target=/workspace,readonly \
+            --mount type=bind,source="$PWD/.knossos-ci",target=/data \
+            knossos-mcp:ci quality-gate "$(cat artifacts/project-id.txt)" \
+              "${{ vars.KNOSSOS_BASELINE_SNAPSHOT }}" \
+              --budgets=/workspace/artifacts/budgets.json \
+              --policies=/workspace/artifacts/policies.json --sarif --json \
+              > artifacts/quality-gate.json
+
+      - name: Report the baseline is not yet adopted
+        if: vars.KNOSSOS_BASELINE_SNAPSHOT == ''
+        run: |
+          echo "::notice::Boundary policies were enforced. Budget regressions" \
+               "(new cycles, hub growth) are not, because no baseline snapshot" \
+               "has been adopted. Set the KNOSSOS_BASELINE_SNAPSHOT repository" \
+               "variable to a reviewed snapshot ID from a main-branch run."
+
+      - name: Upload architecture reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: knossos-architecture
+          path: artifacts/
+          if-no-files-found: warn
+
+      # Only main advances the reviewed history, so a pull request can never
+      # move the baseline it is measured against.
+      - name: Save architecture history
+        if: github.ref == 'refs/heads/main'
+        uses: actions/cache/save@v4
+        with:
+          path: .knossos-ci
+          key: knossos-${{ runner.os }}-${{ env.KNOSSOS_VERSION }}-main-${{ github.run_id }}

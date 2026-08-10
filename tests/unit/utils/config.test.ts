@@ -285,6 +285,100 @@ describe('config', () => {
       expect(config.mcp_configurable).toBe(true);
     });
 
+    // Booleans in config.ini come from a human. Guessing at a spelling this does
+    // not recognise means guessing at a security setting, so an unrecognised
+    // value is a startup error rather than a silent false.
+    describe('boolean vocabulary', () => {
+      const base = { type: 'mysql', host: 'localhost', username: 'root' };
+
+      it.each(['true', 'TRUE', 'True', '1', 'yes', 'YES', 'on', 'enabled', ' true '])(
+        'should read %s as true',
+        (value) => {
+          expect(parseDatabaseConfig('db', { ...base, select_only: value }).select_only).toBe(true);
+        }
+      );
+
+      it.each(['false', 'FALSE', '0', 'no', 'off', 'disabled', ' false '])(
+        'should read %s as false',
+        (value) => {
+          expect(parseDatabaseConfig('db', { ...base, select_only: value }).select_only).toBe(
+            false
+          );
+        }
+      );
+
+      it('should accept a real boolean, which the ini parser produces for true/false', () => {
+        const config = parseDatabaseConfig('db', {
+          ...base,
+          select_only: false as unknown as string,
+        });
+        expect(config.select_only).toBe(false);
+      });
+
+      it.each(['ture', 'maybe', 'y', '', '2'])('should reject %s rather than guess', (value) => {
+        expect(() => parseDatabaseConfig('db', { ...base, select_only: value })).toThrow(
+          ConfigValidationError
+        );
+      });
+
+      // `select_only=null` in an ini file parses to a real null, not the string.
+      // That is a value someone wrote, not an omission, and it says nothing about
+      // whether writes should be allowed, so it is refused like any other.
+      it('should reject a literal null rather than read it as off', () => {
+        expect(() =>
+          parseDatabaseConfig('db', { ...base, select_only: null as unknown as string })
+        ).toThrow(ConfigValidationError);
+      });
+
+      it('should still treat an absent key as the caller default', () => {
+        const config = parseDatabaseConfig('db', { ...base });
+
+        expect(config.select_only).toBe(true);
+        expect(config.mcp_configurable).toBe(false);
+      });
+
+      it('should name the field, the database and the accepted values', () => {
+        expect(() => parseDatabaseConfig('reports', { ...base, select_only: 'ture' })).toThrow(
+          /Database 'reports'.*select_only.*'ture'.*true, 1, yes, on, enabled, false, 0, no, off, disabled/s
+        );
+      });
+
+      // Every security flag goes through the same gate. Each of these silently
+      // meant "off" before, so an operator writing an affirmative got the
+      // dangerous setting: writes enabled, or certificate checking disabled.
+      it.each([
+        ['select_only', {}],
+        ['ssl', {}],
+        ['ssl_verify', {}],
+        ['mcp_configurable', {}],
+        ['redaction_enabled', {}],
+        ['ssh_strict_host_key_checking', { ssh_host: 'b', ssh_username: 'u', ssh_password: 'p' }],
+      ])('should reject an unrecognised %s', (field, extra) => {
+        expect(() =>
+          parseDatabaseConfig('db', { ...base, ...(extra as object), [field]: 'ture' })
+        ).toThrow(ConfigValidationError);
+      });
+
+      it('should keep reading an affirmative spelling as on for ssl_verify', () => {
+        const config = parseDatabaseConfig('db', { ...base, ssl: 'yes', ssl_verify: 'yes' });
+
+        expect(config.ssl).toBe(true);
+        expect(config.ssl_verify).toBe(true);
+      });
+
+      it('should keep host key checking on for an affirmative spelling', () => {
+        const config = parseDatabaseConfig('db', {
+          ...base,
+          ssh_host: 'b',
+          ssh_username: 'u',
+          ssh_password: 'p',
+          ssh_strict_host_key_checking: 'yes',
+        });
+
+        expect(config.ssh_strict_host_key_checking).toBe(true);
+      });
+    });
+
     it('should fail secure: select_only defaults to true, mcp_configurable to false', () => {
       const config = parseDatabaseConfig('db', {
         type: 'mysql',

@@ -130,6 +130,28 @@ class TestAdapter extends DatabaseAdapter {
     return this.createBaseSchema(databaseName);
   }
 
+  public testVerifyServerCertificate(): boolean {
+    return this.verifyServerCertificate();
+  }
+
+  public testGetMaxRows(): number {
+    return this.getMaxRows();
+  }
+
+  public testGetStatementTimeoutMs(): number {
+    return this.getStatementTimeoutMs();
+  }
+
+  public testBuildStreamedResult(
+    rows: Record<string, unknown>[],
+    observedRowCount: number,
+    truncated: boolean,
+    startTime: number,
+    query?: string
+  ) {
+    return this.buildStreamedResult(rows, observedRowCount, truncated, startTime, query);
+  }
+
   public testUpdateSchemaSummary(schema: DatabaseSchema) {
     return this.updateSchemaSummary(schema);
   }
@@ -301,6 +323,12 @@ describe('DatabaseAdapter Base Class', () => {
       expect(adapter.testParseConfigValue(null, 'number', 777)).toBe(777);
     });
 
+    // A number is returned as given rather than re-parsed, which only shows up
+    // on a value parseInt would truncate.
+    it('should keep the fractional part of a number', () => {
+      expect(adapter.testParseConfigValue(3.7, 'number', 0)).toBe(3.7);
+    });
+
     it('should parse boolean values', () => {
       expect(adapter.testParseConfigValue('true', 'boolean', false)).toBe(true);
       expect(adapter.testParseConfigValue('TRUE', 'boolean', false)).toBe(true);
@@ -321,6 +349,100 @@ describe('DatabaseAdapter Base Class', () => {
   // ============================================================================
   // Error Handling Tests
   // ============================================================================
+
+  // ============================================================================
+  // Configuration Resolvers
+  // ============================================================================
+
+  describe('verifyServerCertificate', () => {
+    const verifyWith = (ssl_verify: unknown): boolean =>
+      new TestAdapter({
+        ...testConfig,
+        ssl_verify,
+      } as DatabaseConfig).testVerifyServerCertificate();
+
+    it.each([
+      ['an explicit boolean false', false],
+      ['the string "false"', 'false'],
+      ['the string "0"', '0'],
+      ['the string "no"', 'no'],
+      ['the string "off"', 'off'],
+      ['mixed case', 'OFF'],
+      ['surrounding whitespace', ' false '],
+      ['the number 0', 0],
+    ])('should stop verifying for %s', (_label, value) => {
+      expect(verifyWith(value)).toBe(false);
+    });
+
+    // Anything not recognised as an explicit "off" must leave the check on: an
+    // unparseable value is not consent to disable certificate verification.
+    it.each([
+      ['an explicit boolean true', true],
+      ['the string "true"', 'true'],
+      ['an unset value', undefined],
+      ['a null value', null],
+      ['an affirmative spelling', 'yes'],
+      ['a typo', 'flase'],
+      ['an empty string', ''],
+      ['the number 1', 1],
+    ])('should keep verifying for %s', (_label, value) => {
+      expect(verifyWith(value)).toBe(true);
+    });
+  });
+
+  describe('getMaxRows', () => {
+    const maxRowsFor = (max_rows: unknown): number =>
+      new TestAdapter({ ...testConfig, max_rows } as DatabaseConfig).testGetMaxRows();
+
+    it('should use a configured positive cap', () => {
+      expect(maxRowsFor(250)).toBe(250);
+    });
+
+    it.each([
+      ['unset', undefined],
+      ['zero', 0],
+      ['negative', -1],
+      ['a string', '250'],
+    ])('should fall back to 1000 when the cap is %s', (_label, value) => {
+      expect(maxRowsFor(value)).toBe(1000);
+    });
+  });
+
+  describe('getStatementTimeoutMs', () => {
+    const timeoutFor = (overrides: Record<string, unknown>): number =>
+      new TestAdapter({
+        ...testConfig,
+        ...overrides,
+      } as DatabaseConfig).testGetStatementTimeoutMs();
+
+    it('should prefer query_timeout over the connection timeout', () => {
+      expect(timeoutFor({ query_timeout: 5000, timeout: 30000 })).toBe(5000);
+    });
+
+    it('should fall back to the connection timeout', () => {
+      expect(timeoutFor({ query_timeout: undefined, timeout: 7000 })).toBe(7000);
+    });
+
+    it('should accept a numeric string', () => {
+      expect(timeoutFor({ query_timeout: '4500' })).toBe(4500);
+    });
+
+    it('should treat zero as disabling the timeout rather than as missing', () => {
+      expect(timeoutFor({ query_timeout: 0 })).toBe(0);
+    });
+
+    it('should keep the fractional part of a numeric timeout', () => {
+      expect(timeoutFor({ query_timeout: 1500.5 })).toBe(1500.5);
+    });
+
+    it.each([
+      ['unparseable', 'soon'],
+      ['negative', -1],
+      ['absent', undefined],
+    ])('should fall back to 30000 when the timeout is %s', (_label, value) => {
+      expect(timeoutFor({ query_timeout: value, timeout: value })).toBe(30000);
+    });
+  });
 
   describe('createError', () => {
     it('should create error with adapter prefix', () => {
@@ -365,6 +487,80 @@ describe('DatabaseAdapter Base Class', () => {
       expect(result.rows).toEqual([]);
       expect(result.truncated).toBe(false);
     });
+
+    // A result that exactly fills the cap is complete, not truncated. Reporting
+    // it as truncated would tell callers rows were dropped when none were.
+    it('should not report truncation at exactly the limit', () => {
+      const result = adapter.testTruncateResults([1, 2, 3], 3);
+
+      expect(result.rows).toEqual([1, 2, 3]);
+      expect(result.truncated).toBe(false);
+    });
+
+    it('should report truncation one row past the limit', () => {
+      const result = adapter.testTruncateResults([1, 2, 3, 4], 3);
+
+      expect(result.rows).toEqual([1, 2, 3]);
+      expect(result.truncated).toBe(true);
+    });
+  });
+
+  describe('buildStreamedResult', () => {
+    it('should keep the observed count and take fields from the first row', () => {
+      const result = adapter.testBuildStreamedResult(
+        [{ id: 1, name: 'a' }],
+        42,
+        true,
+        Date.now(),
+        'SELECT id, name FROM t'
+      );
+
+      expect(result.rows).toEqual([{ id: 1, name: 'a' }]);
+      expect(result.rowCount).toBe(42);
+      expect(result.truncated).toBe(true);
+      expect(result.fields).toEqual(['id', 'name']);
+    });
+
+    it('should report no fields for an empty result', () => {
+      const result = adapter.testBuildStreamedResult([], 0, false, Date.now());
+
+      expect(result.fields).toEqual([]);
+    });
+
+    // Elapsed time, not a timestamp: a sign slip here would report the epoch.
+    it('should report the elapsed time rather than a clock reading', () => {
+      const result = adapter.testBuildStreamedResult([{ id: 1 }], 1, false, Date.now() - 50);
+
+      expect(result.execution_time_ms).toBeGreaterThanOrEqual(50);
+      expect(result.execution_time_ms).toBeLessThan(60000);
+    });
+
+    // The streamed path must redact too; it does not share normalizeQueryResult.
+    it('should apply redaction when it is configured', () => {
+      const redactingAdapter = new TestAdapter({
+        ...testConfig,
+        redaction: {
+          enabled: true,
+          rules: [
+            {
+              field_pattern: 'email',
+              pattern_type: 'exact',
+              redaction_type: 'full_mask',
+            },
+          ],
+        },
+      } as unknown as DatabaseConfig);
+
+      const result = redactingAdapter.testBuildStreamedResult(
+        [{ email: 'someone@example.com' }],
+        1,
+        false,
+        Date.now(),
+        'SELECT email FROM users'
+      );
+
+      expect(result.rows[0].email).not.toBe('someone@example.com');
+    });
   });
 
   describe('normalizeQueryResult', () => {
@@ -387,6 +583,32 @@ describe('DatabaseAdapter Base Class', () => {
       expect(normalized.fields).toEqual(['id', 'name']);
       expect(normalized.truncated).toBe(false);
       expect(normalized.execution_time_ms).toBeGreaterThanOrEqual(100);
+      // Elapsed time, not a clock reading: without a ceiling this passes just as
+      // happily when the subtraction becomes an addition.
+      expect(normalized.execution_time_ms).toBeLessThan(60000);
+    });
+
+    it('should apply redaction when it is configured', () => {
+      const redactingAdapter = new TestAdapter({
+        ...testConfig,
+        redaction: {
+          enabled: true,
+          rules: [
+            {
+              field_pattern: 'name',
+              pattern_type: 'exact',
+              redaction_type: 'full_mask',
+            },
+          ],
+        },
+      } as unknown as DatabaseConfig);
+
+      const normalized = redactingAdapter.testNormalizeQueryResult(
+        { rows: [{ id: 1, name: 'test' }] },
+        Date.now()
+      );
+
+      expect(normalized.rows[0].name).not.toBe('test');
     });
 
     it('should handle truncation in normalization', () => {

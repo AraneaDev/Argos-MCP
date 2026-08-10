@@ -100,10 +100,14 @@ password=secure_pass
 ssh_host=jump.company.com
 ssh_username=service_user
 ssh_private_key=-----BEGIN OPENSSH PRIVATE KEY-----
-b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAFwAAAAdzc2gtcn
-...key content...
+<the key body, unwrapped>
 -----END OPENSSH PRIVATE KEY-----
 ```
+
+Prefer a path over inline content. A key pasted into `config.ini` cannot have
+its own permissions checked — the file's mode is all that protects it — and it
+is one careless `cat` away from a terminal history. With a path, Argos refuses
+to read a key that group or others can read.
 
 #### 3. Password Authentication
 
@@ -666,87 +670,63 @@ ssh_private_key=/path/to/cross-cloud-key
 
 ## Automation and Orchestration
 
-### Environment Variables
+### Credentials in config.ini
 
-Use environment variables for sensitive data:
+The configuration file is read literally. There is no environment-variable
+interpolation, so `password=${DB_PASSWORD}` is taken as a password whose value
+is the eleven characters `${DB_PASSWORD}`, and the connection fails with an
+authentication error that gives no hint why.
 
-```bash
-# Export SSH credentials
-export SSH_TUNNEL_KEY="/secure/path/tunnel_key"
-export SSH_TUNNEL_PASSPHRASE="key_passphrase"
-export DB_PASSWORD="database_password"
-```
+Put the real values in the file and protect the file instead:
 
 ```ini
-[database.env_based]
+[database.production]
 type=mysql
 host=mysql.internal.net
 database=production
 username=readonly
-password=${DB_PASSWORD}
+password=the-actual-password
 ssh_host=bastion.company.com
 ssh_username=service_account
-ssh_private_key=${SSH_TUNNEL_KEY}
-ssh_passphrase=${SSH_TUNNEL_PASSPHRASE}
+ssh_private_key=/secure/path/tunnel_key
+ssh_passphrase=the-actual-passphrase
 ```
 
-### Docker Integration
+```bash
+chmod 600 config.ini            # the server warns on startup if it is not
+chmod 600 /secure/path/tunnel_key   # and refuses a key file others can read
+```
+
+If your secrets live in a manager, write the file at deploy time from that
+manager rather than expecting the server to expand references at read time.
+
+### Containers
+
+A container only helps if the MCP client runs inside it as well. The client
+starts the server as a child process over stdio, so an image that runs the
+server on its own has nothing talking to it and exits immediately.
+
+Where the client is containerised, add the key and the configuration to that
+image:
 
 ```dockerfile
-# Dockerfile for containerized MCP server with SSH keys
-FROM node:18-alpine
+FROM node:22-alpine
 
-# Copy SSH keys
-COPY --chown=node:node ssh-keys/ /home/node/.ssh/
-RUN chmod 700 /home/node/.ssh && chmod 600 /home/node/.ssh/*
+COPY --chown=node:node tunnel_key /home/node/.ssh/tunnel_key
+RUN chmod 700 /home/node/.ssh && chmod 600 /home/node/.ssh/tunnel_key
 
-# Copy application
-COPY . /app
+COPY --chown=node:node . /app
 WORKDIR /app
-
 USER node
-CMD ["npm", "start"]
 ```
 
-### Kubernetes Deployment
+Point `ssh_private_key` at the path inside the image. The permission check runs
+on the file as the container sees it, so a key baked in world-readable is
+refused there just as it would be on a host.
 
-```yaml
-# kubernetes-ssh-secret.yaml
-apiVersion: v1
-kind: Secret
-metadata:
- name: ssh-tunnel-keys
-type: Opaque
-data:
- tunnel_key: LS0tLS1CRUdJTi... # base64 encoded private key
- tunnel_key.pub: c3NoLXJzYS... # base64 encoded public key
-
----
-# deployment.yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
- name: argos-mcp
-spec:
- replicas: 1
- template:
- spec:
- containers:
- - name: mcp-server
- image: argos-mcp:latest
- volumeMounts:
- - name: ssh-keys
- mountPath: /app/ssh-keys
- readOnly: true
- env:
- - name: SSH_PRIVATE_KEY
- value: "/app/ssh-keys/tunnel_key"
- volumes:
- - name: ssh-keys
- secret:
- secretName: ssh-tunnel-keys
- defaultMode: 0600
-```
+There is no Kubernetes deployment for this. A `Deployment` expects a process
+that stays up; this one exits with the session that started it, so it would
+restart in a loop without ever being used.
 
 ## Performance Optimization
 

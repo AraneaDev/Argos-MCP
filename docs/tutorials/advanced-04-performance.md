@@ -136,70 +136,11 @@ autovacuum_max_workers = 3
 autovacuum_naptime = 30s
 ```
 
-**PostgreSQL Connection Optimization**:
-```typescript
-// postgres-optimizer.ts
-export class PostgreSQLOptimizer {
- 
- buildOptimizedConnectionString(config: PostgreSQLConfig): string {
- const params = new URLSearchParams({
- // Connection management
- 'connect_timeout': '10',
- 'application_name': 'SQL-MCP-Server',
- 'statement_timeout': '30000',
- 'lock_timeout': '10000',
- 'idle_in_transaction_session_timeout': '300000',
- 
- // Performance optimizations
- 'tcp_keepalives_idle': '600',
- 'tcp_keepalives_interval': '60',
- 'tcp_keepalives_count': '3',
- 
- // Memory and processing
- 'work_mem': '8MB',
- 'maintenance_work_mem': '64MB',
- 'search_path': 'public,analytics',
- 
- // SSL optimizations
- 'sslmode': config.ssl ? 'require' : 'disable',
- 'sslcompression': '0', // Disable SSL compression for performance
- 
- // Prepared statements
- 'prepare_threshold': '5',
- 'prepared_statement_cache_queries': '256',
- 'prepared_statement_cache_size_mb': '32'
- });
- 
- return `postgresql://${config.username}:${config.password}@${config.host}:${config.port}/${config.database}?${params}`;
- }
- 
- async optimizeDatabase(connection: PostgreSQLConnection): Promise<OptimizationResult> {
- const optimizations: OptimizationStep[] = [];
- 
- // Enable query plan caching
- await connection.query('SET plan_cache_mode = auto');
- optimizations.push({ step: 'plan_cache', status: 'enabled' });
- 
- // Set optimal work_mem for session
- await connection.query('SET work_mem = \'16MB\'');
- optimizations.push({ step: 'work_mem', status: 'optimized' });
- 
- // Enable parallel query execution
- await connection.query('SET max_parallel_workers_per_gather = 4');
- optimizations.push({ step: 'parallel_workers', status: 'configured' });
- 
- // Optimize random page cost for SSD
- await connection.query('SET random_page_cost = 1.1');
- optimizations.push({ step: 'random_page_cost', status: 'optimized' });
- 
- return {
- database: 'PostgreSQL',
- optimizations,
- timestamp: new Date()
- };
- }
-}
-```
+**Connection settings Argos passes through**: `timeout` becomes the driver's
+connection timeout and `query_timeout` becomes the server-side statement
+timeout. The pool is fixed at 10 connections per database and is not
+configurable; a single stdio session does not generate the concurrency that
+would make tuning it worthwhile.
 
 ### 2. MySQL Performance Tuning
 
@@ -286,731 +227,72 @@ ALTER DATABASE tempdb ADD FILE (NAME = tempdev3, FILENAME = 'C:\TempDB\tempdev3.
 ALTER DATABASE tempdb ADD FILE (NAME = tempdev4, FILENAME = 'C:\TempDB\tempdev4.mdf', SIZE = 1024MB, FILEGROWTH = 256MB);
 ```
 
-## Advanced Memory Management
+## What Argos itself does about performance
 
-### 1. Memory Optimizer Implementation
+The tuning above is the database's. These are the levers on the MCP side, and
+they are all in `config.ini` or in the tools.
 
-**Memory Management System**:
-```typescript
-// memory-optimizer.ts
-export class AdvancedMemoryOptimizer {
- private heapMetrics: HeapMetrics[] = [];
- private memoryPressureThresholds: MemoryThresholds;
- private optimizationStrategies: OptimizationStrategy[];
- 
- constructor(config: MemoryConfig) {
- this.memoryPressureThresholds = {
- low: config.lowThreshold || 0.6,
- medium: config.mediumThreshold || 0.8,
- high: config.highThreshold || 0.9
- };
- 
- this.initializeOptimizationStrategies();
- this.startMemoryMonitoring();
- }
- 
- private initializeOptimizationStrategies(): void {
- this.optimizationStrategies = [
- {
- name: 'query_buffer_optimization',
- priority: 'high',
- execute: () => this.optimizeQueryBuffers(),
- memoryImpact: 'high'
- },
- {
- name: 'connection_pool_optimization',
- priority: 'medium',
- execute: () => this.optimizeConnectionPools(),
- memoryImpact: 'medium'
- },
- {
- name: 'cache_optimization',
- priority: 'medium',
- execute: () => this.optimizeCaches(),
- memoryImpact: 'medium'
- },
- {
- name: 'garbage_collection',
- priority: 'low',
- execute: () => this.forceGarbageCollection(),
- memoryImpact: 'low'
- }
- ];
- }
- 
- private startMemoryMonitoring(): void {
- // Collect metrics every 10 seconds
- setInterval(() => {
- this.collectMemoryMetrics();
- }, 10000);
- 
- // Check for memory pressure every 5 seconds
- setInterval(() => {
- this.checkMemoryPressure();
- }, 5000);
- 
- // Proactive optimization every minute
- setInterval(() => {
- this.proactiveOptimization();
- }, 60000);
- }
- 
- private collectMemoryMetrics(): void {
- const memUsage = process.memoryUsage();
- const heapStats = require('v8').getHeapStatistics();
- 
- const metrics: HeapMetrics = {
- timestamp: Date.now(),
- rss: memUsage.rss,
- heapTotal: memUsage.heapTotal,
- heapUsed: memUsage.heapUsed,
- external: memUsage.external,
- arrayBuffers: memUsage.arrayBuffers,
- heapSizeLimit: heapStats.heap_size_limit,
- totalPhysicalSize: heapStats.total_physical_size,
- usedHeapSize: heapStats.used_heap_size,
- mallocedMemory: heapStats.malloced_memory,
- numberOfNativeContexts: heapStats.number_of_native_contexts,
- numberOfDetachedContexts: heapStats.number_of_detached_contexts
- };
- 
- this.heapMetrics.push(metrics);
- 
- // Keep only last 100 measurements (~ 16 minutes of history)
- if (this.heapMetrics.length > 100) {
- this.heapMetrics = this.heapMetrics.slice(-100);
- }
- 
- // Update Prometheus metrics
- this.updatePrometheusMetrics(metrics);
- }
- 
- private checkMemoryPressure(): void {
- const latest = this.heapMetrics[this.heapMetrics.length - 1];
- if (!latest) return;
- 
- const heapUsagePercent = latest.heapUsed / latest.heapTotal;
- const physicalUsagePercent = latest.totalPhysicalSize / latest.heapSizeLimit;
- 
- let pressureLevel: MemoryPressureLevel = 'none';
- 
- if (heapUsagePercent >= this.memoryPressureThresholds.high || 
- physicalUsagePercent >= this.memoryPressureThresholds.high) {
- pressureLevel = 'high';
- } else if (heapUsagePercent >= this.memoryPressureThresholds.medium ||
- physicalUsagePercent >= this.memoryPressureThresholds.medium) {
- pressureLevel = 'medium';
- } else if (heapUsagePercent >= this.memoryPressureThresholds.low ||
- physicalUsagePercent >= this.memoryPressureThresholds.low) {
- pressureLevel = 'low';
- }
- 
- if (pressureLevel !== 'none') {
- this.handleMemoryPressure(pressureLevel, latest);
- }
- }
- 
- private async handleMemoryPressure(level: MemoryPressureLevel, metrics: HeapMetrics): Promise<void> {
- logger.warn('Memory pressure detected', { 
- level, 
- heapUsedMB: Math.round(metrics.heapUsed / 1024 / 1024),
- heapTotalMB: Math.round(metrics.heapTotal / 1024 / 1024),
- usagePercent: ((metrics.heapUsed / metrics.heapTotal) * 100).toFixed(1)
- });
- 
- // Execute appropriate optimization strategies
- const strategies = this.getStrategiesForPressureLevel(level);
- 
- for (const strategy of strategies) {
- try {
- await strategy.execute();
- logger.info('Memory optimization strategy executed', { strategy: strategy.name });
- } catch (error) {
- logger.error('Memory optimization strategy failed', { 
- strategy: strategy.name, 
- error: error.message 
- });
- }
- }
- 
- // Send alerts for high pressure
- if (level === 'high') {
- await this.sendMemoryAlert('critical', metrics);
- }
- }
- 
- private getStrategiesForPressureLevel(level: MemoryPressureLevel): OptimizationStrategy[] {
- switch (level) {
- case 'high':
- return this.optimizationStrategies; // All strategies
- case 'medium':
- return this.optimizationStrategies.filter(s => s.priority !== 'low');
- case 'low':
- return this.optimizationStrategies.filter(s => s.priority === 'high');
- default:
- return [];
- }
- }
- 
- async optimizeQueryBuffers(): Promise<void> {
- // Clear query result buffers that are older than 5 minutes
- const now = Date.now();
- const fiveMinutesAgo = now - (5 * 60 * 1000);
- 
- // Implementation would clear internal query buffers
- logger.debug('Query buffers optimized');
- }
- 
- async optimizeConnectionPools(): Promise<void> {
- // Reduce connection pool sizes temporarily
- // Implementation would interact with connection pool manager
- logger.debug('Connection pools optimized');
- }
- 
- async optimizeCaches(): Promise<void> {
- // Clear expired cache entries
- // Implementation would interact with cache manager
- logger.debug('Caches optimized');
- }
- 
- forceGarbageCollection(): void {
- if (global.gc) {
- global.gc();
- logger.debug('Garbage collection forced');
- }
- }
-}
+### Result size
+
+`max_rows` in `[extension]` caps how many rows are returned, defaulting to 1000.
+Rows are streamed and counted as they arrive rather than buffered, so a query
+matching a million rows does not pull a million rows into memory before the cap
+is applied; the retained set stops at `max_rows` and the response reports the
+full count with `truncated` set.
+
+```ini
+[extension]
+max_rows=1000
+query_timeout=30000
 ```
 
-### 2. Query Result Streaming
+Reducing `max_rows` is the single most effective change for a workload that
+keeps returning large result sets, because everything downstream — redaction,
+formatting, the model's context — scales with it.
 
-**Streaming Large Results**:
-```typescript
-// result-streamer.ts
-export class QueryResultStreamer {
- private streamingThreshold: number = 1000; // rows
- private chunkSize: number = 100;
- private maxBufferSize: number = 10 * 1024 * 1024; // 10MB
- 
- async streamQueryResult(
- query: string, 
- connection: DatabaseConnection,
- options: StreamOptions = {}
- ): Promise<Readable> {
- const threshold = options.streamingThreshold || this.streamingThreshold;
- const chunkSize = options.chunkSize || this.chunkSize;
- 
- // Estimate result size first
- const estimate = await this.estimateResultSize(query, connection);
- 
- if (estimate.estimatedRows < threshold) {
- // Use normal query execution for small results
- const result = await connection.query(query);
- return this.createMemoryStream(result);
- }
- 
- // Use streaming for large results
- return this.createDatabaseStream(query, connection, chunkSize);
- }
- 
- private async estimateResultSize(
- query: string, 
- connection: DatabaseConnection
- ): Promise<ResultEstimate> {
- // Use EXPLAIN to estimate result size
- const explainQuery = `EXPLAIN (ANALYZE false, FORMAT JSON) ${query}`;
- 
- try {
- const explainResult = await connection.query(explainQuery);
- const plan = explainResult.rows[0]['QUERY PLAN'][0];
- 
- return {
- estimatedRows: plan['Plan']['Plan Rows'] || 0,
- estimatedCost: plan['Plan']['Total Cost'] || 0,
- estimatedWidth: plan['Plan']['Plan Width'] || 0
- };
- } catch (error) {
- // Fallback estimation
- return {
- estimatedRows: 10000,
- estimatedCost: 1000,
- estimatedWidth: 100
- };
- }
- }
- 
- private createDatabaseStream(
- query: string, 
- connection: DatabaseConnection, 
- chunkSize: number
- ): Readable {
- let offset = 0;
- let hasMore = true;
- let buffer: any[] = [];
- 
- const stream = new Readable({
- objectMode: true,
- highWaterMark: chunkSize,
- 
- async read() {
- if (!hasMore && buffer.length === 0) {
- this.push(null); // End stream
- return;
- }
- 
- if (buffer.length > 0) {
- // Emit buffered data
- const chunk = buffer.splice(0, chunkSize);
- this.push({ type: 'data', rows: chunk });
- return;
- }
- 
- try {
- // Fetch next chunk from database
- const chunkQuery = this.addLimitOffset(query, chunkSize, offset);
- const result = await connection.query(chunkQuery);
- 
- if (result.rows.length === 0) {
- hasMore = false;
- this.push(null); // End stream
- return;
- }
- 
- if (result.rows.length < chunkSize) {
- hasMore = false;
- }
- 
- offset += result.rows.length;
- buffer = result.rows;
- 
- // Emit first chunk
- const chunk = buffer.splice(0, Math.min(chunkSize, buffer.length));
- this.push({ type: 'data', rows: chunk });
- 
- } catch (error) {
- this.emit('error', error);
- }
- }
- });
- 
- return stream;
- }
- 
- private addLimitOffset(query: string, limit: number, offset: number): string {
- // Simple implementation - would need more sophisticated SQL parsing
- const trimmedQuery = query.trim().replace(/;$/, '');
- return `${trimmedQuery} LIMIT ${limit} OFFSET ${offset}`;
- }
-}
+### Timeouts
+
+`query_timeout` is enforced by the database, not just abandoned by the client:
+PostgreSQL gets `statement_timeout`, MySQL `max_execution_time` (MariaDB
+`max_statement_time`), and SQLite is interrupted through the driver. A runaway
+query stops consuming server resources rather than continuing unwatched.
+
+Set it low enough that a mistake is cheap. Thirty seconds is generous for
+interactive use.
+
+### Caching
+
+Repeated identical `SELECT`s are served from an in-memory cache, per database,
+capped at 100 entries and expiring after that database's `cache_ttl_seconds`,
+which defaults to 60. Statements that
+are not `SELECT`, or that contain non-deterministic constructs, are never
+cached, and a write to a database drops that database's entries.
+
+The cache is per process, so it lives as long as the session. `sql_get_metrics`
+reports `cache.hitRate`; a rate near zero means the workload does not repeat
+queries, which is normal for exploratory analysis and not worth chasing.
+
+### Circuit breaker
+
+Repeated failures against one database trip a breaker, after which queries are
+rejected immediately instead of waiting for another timeout. It closes again
+after a cool-off. The transitions appear in `sql_get_metrics` under `circuit`,
+and are the quickest way to tell "the database is down" from "this query is
+wrong".
+
+### Finding the slow query
+
+`sql_analyze_performance` runs the statement, then its `EXPLAIN`, and returns
+the timings, the plan and dialect-specific advice — sequential scans and
+unbuffered nested loops on PostgreSQL, full table scans, filesorts and temporary
+tables on MySQL, table scans and temporary B-trees on SQLite.
+
+```
+Analyse the performance of: SELECT * FROM orders WHERE customer_email = 'x@y.z'
 ```
 
-## Performance Monitoring and Alerting
-
-### 1. Performance Metrics Collection
-
-**Comprehensive Metrics System**:
-```typescript
-// performance-metrics.ts
-export class PerformanceMetricsCollector {
- private metrics = new Map<string, MetricValue[]>();
- private prometheus: PrometheusRegistry;
- private alertManager: AlertManager;
- 
- constructor() {
- this.initializePrometheusMetrics();
- this.startMetricsCollection();
- }
- 
- private initializePrometheusMetrics(): void {
- this.prometheus = new PrometheusRegistry();
- 
- // Query performance metrics
- this.registerMetric('query_duration_seconds', 'histogram', 
- 'Query execution duration in seconds');
- this.registerMetric('query_rows_returned', 'histogram', 
- 'Number of rows returned by queries');
- this.registerMetric('active_connections', 'gauge', 
- 'Number of active database connections');
- 
- // Memory metrics
- this.registerMetric('heap_used_bytes', 'gauge', 
- 'Node.js heap memory used');
- this.registerMetric('heap_total_bytes', 'gauge', 
- 'Node.js heap memory total');
- this.registerMetric('memory_pressure_level', 'gauge', 
- 'Current memory pressure level (0=none, 1=low, 2=medium, 3=high)');
- 
- // Cache metrics
- this.registerMetric('cache_hit_ratio', 'gauge', 
- 'Cache hit ratio percentage');
- this.registerMetric('cache_size_bytes', 'gauge', 
- 'Current cache size in bytes');
- 
- // Connection pool metrics
- this.registerMetric('pool_size', 'gauge', 
- 'Connection pool size by database');
- this.registerMetric('pool_available', 'gauge', 
- 'Available connections in pool');
- this.registerMetric('pool_pending', 'gauge', 
- 'Pending connection requests');
- }
- 
- recordQueryMetrics(queryMetrics: QueryPerformanceMetrics): void {
- // Record to Prometheus
- this.prometheus.getMetric('query_duration_seconds')
- .labels({ database: queryMetrics.database, query_type: queryMetrics.queryType })
- .observe(queryMetrics.executionTimeMs / 1000);
- 
- this.prometheus.getMetric('query_rows_returned')
- .labels({ database: queryMetrics.database })
- .observe(queryMetrics.rowsReturned);
- 
- // Store for trend analysis
- const key = `query_${queryMetrics.database}`;
- if (!this.metrics.has(key)) {
- this.metrics.set(key, []);
- }
- 
- this.metrics.get(key)!.push({
- timestamp: Date.now(),
- value: queryMetrics.executionTimeMs,
- metadata: queryMetrics
- });
- 
- // Check for performance anomalies
- this.checkQueryPerformanceAnomaly(queryMetrics);
- }
- 
- private checkQueryPerformanceAnomaly(metrics: QueryPerformanceMetrics): void {
- const historicalData = this.getHistoricalQueryData(metrics.database, metrics.queryType);
- 
- if (historicalData.length < 10) return; // Need baseline data
- 
- const avgExecutionTime = historicalData.reduce((sum, d) => sum + d.value, 0) / historicalData.length;
- const stdDev = this.calculateStandardDeviation(historicalData.map(d => d.value));
- 
- // Alert if current execution time is more than 3 standard deviations from mean
- if (metrics.executionTimeMs > avgExecutionTime + (3 * stdDev)) {
- this.alertManager.sendAlert({
- type: 'performance_anomaly',
- severity: 'warning',
- message: `Query execution time anomaly detected: ${metrics.executionTimeMs}ms vs avg ${avgExecutionTime.toFixed(2)}ms`,
- metadata: metrics
- });
- }
- }
- 
- generatePerformanceReport(timeRange: TimeRange): PerformanceReport {
- const report: PerformanceReport = {
- timeRange,
- generatedAt: new Date(),
- summary: {
- totalQueries: 0,
- averageQueryTime: 0,
- slowestQuery: null,
- cacheHitRatio: 0,
- memoryUsage: this.getCurrentMemoryUsage(),
- connectionPoolHealth: this.getConnectionPoolHealth()
- },
- trends: [],
- recommendations: []
- };
- 
- // Calculate summary statistics
- const queryMetrics = this.getQueryMetricsInRange(timeRange);
- report.summary.totalQueries = queryMetrics.length;
- 
- if (queryMetrics.length > 0) {
- report.summary.averageQueryTime = 
- queryMetrics.reduce((sum, m) => sum + m.executionTimeMs, 0) / queryMetrics.length;
- 
- report.summary.slowestQuery = queryMetrics.reduce((max, current) => 
- current.executionTimeMs > max.executionTimeMs ? current : max
- );
- }
- 
- // Generate performance trends
- report.trends = this.calculatePerformanceTrends(timeRange);
- 
- // Generate recommendations
- report.recommendations = this.generatePerformanceRecommendations(report);
- 
- return report;
- }
- 
- private generatePerformanceRecommendations(report: PerformanceReport): PerformanceRecommendation[] {
- const recommendations: PerformanceRecommendation[] = [];
- 
- // High average query time
- if (report.summary.averageQueryTime > 1000) {
- recommendations.push({
- type: 'query_optimization',
- priority: 'high',
- title: 'High average query execution time',
- description: `Average query time is ${report.summary.averageQueryTime.toFixed(2)}ms. Consider optimizing slow queries.`,
- action: 'Review slow query log and add appropriate indexes',
- expectedImpact: 'Reduce query time by 30-50%'
- });
- }
- 
- // Low cache hit ratio
- if (report.summary.cacheHitRatio < 0.8) {
- recommendations.push({
- type: 'cache_optimization',
- priority: 'medium',
- title: 'Low cache hit ratio',
- description: `Cache hit ratio is ${(report.summary.cacheHitRatio * 100).toFixed(1)}%. Improve caching strategy.`,
- action: 'Increase cache TTL for stable queries and add cache warming',
- expectedImpact: 'Improve response time by 20-40%'
- });
- }
- 
- // High memory usage
- if (report.summary.memoryUsage.heapUsedPercent > 80) {
- recommendations.push({
- type: 'memory_optimization',
- priority: 'high',
- title: 'High memory usage',
- description: `Memory usage is ${report.summary.memoryUsage.heapUsedPercent.toFixed(1)}%. Risk of performance degradation.`,
- action: 'Implement memory optimization strategies and increase heap size if needed',
- expectedImpact: 'Prevent memory-related performance issues'
- });
- }
- 
- return recommendations;
- }
-}
-```
-
-### 2. Automated Performance Testing
-
-**Performance Benchmark Suite**:
-```typescript
-// performance-benchmarks.ts
-export class PerformanceBenchmarkSuite {
- private benchmarkConfig: BenchmarkConfig;
- private results: BenchmarkResult[] = [];
- 
- constructor(config: BenchmarkConfig) {
- this.benchmarkConfig = config;
- }
- 
- async runFullBenchmarkSuite(): Promise<BenchmarkSuiteResult> {
- const suiteResult: BenchmarkSuiteResult = {
- startTime: new Date(),
- endTime: null,
- results: [],
- summary: {
- totalTests: 0,
- passed: 0,
- failed: 0,
- averagePerformance: 0,
- regressionDetected: false
- }
- };
- 
- logger.info('Starting performance benchmark suite');
- 
- // Query performance benchmarks
- await this.runQueryPerformanceBenchmarks(suiteResult);
- 
- // Connection pool benchmarks
- await this.runConnectionPoolBenchmarks(suiteResult);
- 
- // Memory usage benchmarks
- await this.runMemoryBenchmarks(suiteResult);
- 
- // Concurrent load benchmarks
- await this.runConcurrentLoadBenchmarks(suiteResult);
- 
- // Cache performance benchmarks
- await this.runCacheBenchmarks(suiteResult);
- 
- suiteResult.endTime = new Date();
- suiteResult.summary = this.calculateSummary(suiteResult.results);
- 
- // Check for regressions
- await this.checkForRegressions(suiteResult);
- 
- // Generate detailed report
- await this.generateBenchmarkReport(suiteResult);
- 
- return suiteResult;
- }
- 
- private async runQueryPerformanceBenchmarks(suite: BenchmarkSuiteResult): Promise<void> {
- const queryBenchmarks = [
- {
- name: 'simple_select',
- query: 'SELECT 1 as test',
- expectedMaxTime: 10,
- iterations: 100
- },
- {
- name: 'complex_join',
- query: 'SELECT u.*, o.total FROM users u JOIN orders o ON u.id = o.user_id LIMIT 100',
- expectedMaxTime: 200,
- iterations: 50
- },
- {
- name: 'aggregation_query',
- query: 'SELECT COUNT(*), AVG(total), MAX(created_at) FROM orders GROUP BY status',
- expectedMaxTime: 500,
- iterations: 20
- }
- ];
- 
- for (const benchmark of queryBenchmarks) {
- const result = await this.runQueryBenchmark(benchmark);
- suite.results.push(result);
- }
- }
- 
- private async runQueryBenchmark(benchmark: QueryBenchmark): Promise<BenchmarkResult> {
- const times: number[] = [];
- let errors = 0;
- 
- for (let i = 0; i < benchmark.iterations; i++) {
- try {
- const startTime = process.hrtime();
- await this.executeTestQuery(benchmark.query);
- const [seconds, nanoseconds] = process.hrtime(startTime);
- const executionTime = seconds * 1000 + nanoseconds / 1e6;
- times.push(executionTime);
- } catch (error) {
- errors++;
- logger.error('Benchmark query failed', { benchmark: benchmark.name, error });
- }
- }
- 
- const avgTime = times.reduce((sum, time) => sum + time, 0) / times.length;
- const minTime = Math.min(...times);
- const maxTime = Math.max(...times);
- const p95Time = this.calculatePercentile(times, 0.95);
- 
- return {
- name: benchmark.name,
- category: 'query_performance',
- passed: avgTime <= benchmark.expectedMaxTime && errors === 0,
- executionTime: avgTime,
- expectedTime: benchmark.expectedMaxTime,
- iterations: benchmark.iterations,
- statistics: {
- min: minTime,
- max: maxTime,
- avg: avgTime,
- p95: p95Time,
- stdDev: this.calculateStandardDeviation(times)
- },
- errors,
- timestamp: new Date()
- };
- }
- 
- private async runConcurrentLoadBenchmarks(suite: BenchmarkSuiteResult): Promise<void> {
- const concurrencyLevels = [10, 50, 100, 200];
- const testQuery = 'SELECT * FROM users ORDER BY id LIMIT 10';
- 
- for (const concurrency of concurrencyLevels) {
- const result = await this.runConcurrentLoadTest(testQuery, concurrency);
- suite.results.push(result);
- }
- }
- 
- private async runConcurrentLoadTest(query: string, concurrency: number): Promise<BenchmarkResult> {
- const promises: Promise<number>[] = [];
- const startTime = process.hrtime();
- 
- // Create concurrent requests
- for (let i = 0; i < concurrency; i++) {
- promises.push(this.measureQueryTime(query));
- }
- 
- try {
- const times = await Promise.all(promises);
- const [totalSeconds, totalNanos] = process.hrtime(startTime);
- const totalTime = totalSeconds * 1000 + totalNanos / 1e6;
- 
- const avgResponseTime = times.reduce((sum, time) => sum + time, 0) / times.length;
- const throughput = (concurrency / totalTime) * 1000; // requests per second
- 
- return {
- name: `concurrent_load_${concurrency}`,
- category: 'load_testing',
- passed: avgResponseTime < 2000, // 2 second threshold
- executionTime: totalTime,
- expectedTime: concurrency * 100, // Expected linear scaling baseline
- iterations: concurrency,
- statistics: {
- min: Math.min(...times),
- max: Math.max(...times),
- avg: avgResponseTime,
- p95: this.calculatePercentile(times, 0.95),
- throughput
- },
- errors: 0,
- timestamp: new Date()
- };
- } catch (error) {
- return {
- name: `concurrent_load_${concurrency}`,
- category: 'load_testing',
- passed: false,
- executionTime: -1,
- expectedTime: concurrency * 100,
- iterations: concurrency,
- errors: 1,
- error: error.message,
- timestamp: new Date()
- };
- }
- }
- 
- private async checkForRegressions(suite: BenchmarkSuiteResult): Promise<void> {
- // Load previous benchmark results
- const previousResults = await this.loadPreviousBenchmarkResults();
- 
- if (!previousResults || previousResults.length === 0) {
- logger.info('No previous benchmark results found for regression analysis');
- return;
- }
- 
- let regressionsFound = 0;
- 
- for (const currentResult of suite.results) {
- const previousResult = previousResults.find(r => r.name === currentResult.name);
- 
- if (!previousResult) continue;
- 
- // Check for performance regression (>20% slower)
- const regressionThreshold = previousResult.executionTime * 1.2;
- 
- if (currentResult.executionTime > regressionThreshold) {
- regressionsFound++;
- 
- logger.warn('Performance regression detected', {
- test: currentResult.name,
- previousTime: previousResult.executionTime,
- currentTime: currentResult.executionTime,
- regressionPercent: ((currentResult.executionTime / previousResult.executionTime - 1) * 100).toFixed(1)
- });
- 
- currentResult.regression = {
- detected: true,
- previousTime: previousResult.executionTime,
- regressionPercent: (currentResult.executionTime / previousResult.executionTime - 1) * 100
- };
- }
- }
- 
- suite.summary.regressionDetected = regressionsFound > 0;
- 
- if (regressionsFound > 0) {
- await this.sendRegressionAlert(suite, regressionsFound);
- }
- }
-}
-```
+Act on the plan rather than the timing: the index it suggests belongs in the
+database, and this tool cannot create it.
 
 ## Best Practices Summary
 
@@ -1055,10 +337,10 @@ export class PerformanceBenchmarkSuite {
 
 After mastering performance optimization:
 
-1. **Review Other Tutorials**: [Complete Tutorial Series](README.md)
+1. **Review Other Tutorials**: [Complete Tutorial Series](../README.md)
 2. **Operations Documentation**: [Production Deployment](../operations/)
 3. **Monitoring Setup**: [System Monitoring](../operations/monitoring.md)
-4. **Scaling Strategies**: [Horizontal Scaling](../operations/scaling.md)
+4. **Operational limits**: [Deployment Guide](../operations/deployment-guide.md) — why there is no horizontal scaling dimension for a process the client spawns
 
 ## Additional Resources
 

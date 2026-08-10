@@ -55,18 +55,11 @@ claude mcp remove argos --scope user
 
 > Paths passed to `claude mcp add` must be absolute — Claude Code spawns the server directly and does not expand `~` or resolve relative paths.
 
-### Option 1: NPM Package (Recommended)
+### Option 1: NPM Package
 
-```bash
-# Install globally
-npm install -g argos-mcp
-
-# Or install locally in a project
-npm install argos-mcp
-
-# Run setup
-argos-setup
-```
+Not yet available. Argos is not published to the npm registry — the publish step
+in the release workflow is deliberately dormant until the first public release —
+so `npm install -g argos-mcp` will not resolve. Install from source.
 
 ### Option 2: From Source
 
@@ -103,15 +96,11 @@ npm run setup
 
 #### Install Argos-MCP
 ```cmd
-# Open Command Prompt or PowerShell as Administrator
-npm install -g argos-mcp
-
-# Create project directory
-mkdir C:\argos-mcp
+git clone https://github.com/AraneaDev/Argos-MCP.git C:\argos-mcp
 cd C:\argos-mcp
-
-# Run setup wizard
-argos-setup
+npm install
+npm run build
+npm run setup
 ```
 
 #### Windows-Specific Configuration
@@ -143,15 +132,15 @@ ssh_private_key=C:\Users\username\.ssh\id_rsa
 
 #### Install Argos-MCP
 ```bash
-# Install globally
-sudo npm install -g argos-mcp
+git clone https://github.com/AraneaDev/Argos-MCP.git
+cd Argos-MCP
+npm install
+npm run build
 
-# Create project directory
-mkdir ~/argos-mcp
-cd ~/argos-mcp
+# Optional: put argos-mcp and argos-setup on your PATH
+npm link
 
-# Run setup
-argos-setup
+npm run setup
 ```
 
 #### macOS-Specific Notes
@@ -172,16 +161,13 @@ sudo apt-get install -y nodejs
 # Install build tools (if building from source)
 sudo apt-get install -y build-essential
 
-# Install Argos-MCP
-sudo npm install -g argos-mcp
-
-# Create application directory
+# Install Argos-MCP from source
 sudo mkdir -p /opt/argos-mcp
 sudo chown $USER:$USER /opt/argos-mcp
+git clone https://github.com/AraneaDev/Argos-MCP.git /opt/argos-mcp
 cd /opt/argos-mcp
-
-# Run setup
-argos-setup
+npm install && npm run build
+npm run setup
 ```
 
 #### CentOS/RHEL/Rocky Linux
@@ -193,38 +179,29 @@ sudo dnf install -y nodejs
 # Install development tools (if building from source)
 sudo dnf groupinstall -y "Development Tools"
 
-# Install Argos-MCP
-sudo npm install -g argos-mcp
-
-# Create application directory
+# Install Argos-MCP from source
 sudo mkdir -p /opt/argos-mcp
 sudo chown $USER:$USER /opt/argos-mcp
+git clone https://github.com/AraneaDev/Argos-MCP.git /opt/argos-mcp
 cd /opt/argos-mcp
-
-# Run setup
-argos-setup
+npm install && npm run build
+npm run setup
 ```
 
 ## Installation Directories
 
-### Global Installation Structure
+### Installed From Source
 ```
-Global npm packages/
-+-- argos-mcp/
-    +-- dist/ # Compiled JavaScript
-    +-- package.json # Package information
-    +-- README.md # Documentation
+Argos-MCP/
++-- dist/ # Compiled output; index.js and setup.js are executable
++-- config.ini # Your configuration, if you keep it here
++-- config.ini.template # Starting point for a manual configuration
++-- schemas/ # Schema cache, written at runtime
++-- argos-mcp.log # Log file, rotated to .log.1 on each start
 ```
 
-### Local Project Structure
-```
-your-project/
-+-- node_modules/
-|   +-- argos-mcp/ # Package files
-+-- config.ini # Your configuration
-+-- package.json # Project dependencies
-+-- argos-mcp.log # Log file (created at runtime)
-```
+The configuration does not have to live in the checkout. The convention is
+`~/.config/argos/config.ini`, passed with `--config`.
 
 ## Configuration
 
@@ -232,9 +209,9 @@ your-project/
 After installation, run the setup wizard:
 
 ```bash
+npm run setup
+# or, after npm link:
 argos-setup
-# or if installed locally:
-npx argos-setup
 ```
 
 > **Tip:** `argos-setup` only writes `config.ini`. Registering the server with Claude Code is a separate step — see [Option 0](#option-0-register-with-claude-code-easiest) above.
@@ -259,7 +236,7 @@ If you prefer manual configuration, copy and edit the template:
 
 ```bash
 # Copy configuration template
-cp node_modules/argos-mcp/config.ini.template config.ini
+cp config.ini.template config.ini
 
 # Edit configuration
 nano config.ini # Linux/macOS
@@ -632,4 +609,4 @@ For production deployments:
 
 ---
 
-**Need help?** Check the [troubleshooting guide](troubleshooting-guide.md) or ask in [GitHub Discussions](<repository-discussions-url>).
+**Need help?** Check the [troubleshooting guide](troubleshooting-guide.md) or ask in [GitHub Discussions](https://github.com/AraneaDev/Argos-MCP/discussions).

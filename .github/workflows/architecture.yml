@@ -62,7 +62,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .knossos-ci artifacts
-          chmod 0777 .knossos-ci
+          # The runtime image runs as www-data (uid 33), but actions/cache
+          # extracts the restored snapshot database as the runner user with its
+          # archived 0644 mode. The container then cannot write the file it owns
+          # the contents of, and SQLite reports "attempt to write a readonly
+          # database" - so every run after the first cache hit fails. Widen the
+          # whole tree, not just the directory: the -wal and -shm files a killed
+          # run leaves behind are cached too.
+          chmod -R a+rwX .knossos-ci
           jq -e '.policies' knossos.json > artifacts/policies.json
           jq -e '.quality_budgets' knossos.json > artifacts/budgets.json
 

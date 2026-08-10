@@ -3,6 +3,9 @@
  * Tests SSH key permission checks and tunnel configuration validation
  */
 
+import { chmodSync, mkdtempSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
 import { EnhancedSSHTunnelManager } from '../../src/classes/EnhancedSSHTunnelManager.js';
 
 // Mock the logger
@@ -36,57 +39,73 @@ describe('SSH tunnel', () => {
     tunnelManager.initialize();
   });
 
-  it('throws error for world-readable key file via buildSSHConnectOptions', async () => {
-    // Mock stat to return mode 0o644 (world-readable)
-    (mockStat as jest.Mock).mockResolvedValue({ mode: 0o100644 });
+  // These use a real file on disk rather than spying on fs. The source does
+  // `import * as fs`, and under the transpiler's interop the namespace it binds
+  // is a copy, so jest.spyOn(require('fs'), ...) never reached it: existsSync
+  // returned the real answer (false) for the made-up path, the key was treated
+  // as inline content, and the permission check never ran at all.
+  describe('private key file permissions', () => {
+    const realStat = jest.requireActual('node:fs/promises').stat;
+    let keyDir: string;
 
-    // Mock fs.existsSync to return true so the key is treated as a file path
-    const fs = require('fs');
-    const existsSyncSpy = jest.spyOn(fs, 'existsSync').mockReturnValue(true);
+    beforeEach(() => {
+      (mockStat as jest.Mock).mockImplementation(realStat);
+      keyDir = mkdtempSync(join(tmpdir(), 'argos-ssh-key-'));
+    });
 
-    // Call the private method directly to test key permission validation
-    const buildOptions = (tunnelManager as any).buildSSHConnectOptions.bind(tunnelManager);
+    afterEach(() => {
+      rmSync(keyDir, { recursive: true, force: true });
+    });
 
-    try {
-      await buildOptions({
+    const writeKeyFile = (mode: number): string => {
+      const keyPath = join(keyDir, 'id_rsa');
+      writeFileSync(keyPath, `${PEM_HEADER}\nfake\n-----END RSA PRIVATE KEY-----`);
+      chmodSync(keyPath, mode);
+      return keyPath;
+    };
+
+    const buildWithKey = async (keyPath: string): Promise<Record<string, unknown>> => {
+      const buildOptions = (tunnelManager as any).buildSSHConnectOptions.bind(tunnelManager);
+      return buildOptions({
         host: 'bastion.example.com',
         port: 22,
         username: 'user',
-        privateKey: '/home/user/.ssh/id_rsa',
+        privateKey: keyPath,
       });
-      throw new Error('Expected error for world-readable key');
-    } catch (err: any) {
-      // The error is wrapped: "Failed to read SSH private key: SSH private key ... is world-readable"
-      expect(err.message).toContain('world-readable');
-    }
+    };
 
-    existsSyncSpy.mockRestore();
-  });
+    it('refuses a key file that group or others can read', async () => {
+      const keyPath = writeKeyFile(0o644);
 
-  it('accepts key file with safe permissions (mode 600)', async () => {
-    // Mock stat to return mode 0o600 (safe)
-    (mockStat as jest.Mock).mockResolvedValue({ mode: 0o100600 });
-
-    const fs = require('fs');
-    const existsSyncSpy = jest.spyOn(fs, 'existsSync').mockReturnValue(true);
-    const readFileSyncSpy = jest
-      .spyOn(fs, 'readFileSync')
-      .mockReturnValue(Buffer.from(`${PEM_HEADER}\nfake\n-----END RSA PRIVATE KEY-----`));
-
-    const buildOptions = (tunnelManager as any).buildSSHConnectOptions.bind(tunnelManager);
-
-    const options = await buildOptions({
-      host: 'bastion.example.com',
-      port: 22,
-      username: 'user',
-      privateKey: '/home/user/.ssh/id_rsa',
+      await expect(buildWithKey(keyPath)).rejects.toThrow(
+        /has group or other permissions \(mode 644\)/
+      );
     });
 
-    expect(options.privateKey).toBeDefined();
-    expect(options.host).toBe('bastion.example.com');
+    it('refuses a key file that others can only execute', async () => {
+      const keyPath = writeKeyFile(0o601);
 
-    existsSyncSpy.mockRestore();
-    readFileSyncSpy.mockRestore();
+      await expect(buildWithKey(keyPath)).rejects.toThrow(/group or other permissions/);
+    });
+
+    it('reads a key file with owner-only permissions', async () => {
+      const keyPath = writeKeyFile(0o600);
+
+      const options = await buildWithKey(keyPath);
+
+      // The file contents, not the path: proof the file branch actually ran.
+      expect(Buffer.isBuffer(options.privateKey)).toBe(true);
+      expect(String(options.privateKey)).toContain('fake');
+      expect(String(options.privateKey)).not.toBe(keyPath);
+    });
+
+    it('checks the permissions of the file it is about to read', async () => {
+      const keyPath = writeKeyFile(0o600);
+
+      await buildWithKey(keyPath);
+
+      expect(mockStat).toHaveBeenCalledWith(keyPath);
+    });
   });
 
   it('treats inline key content (-----BEGIN) as content, not file path', async () => {

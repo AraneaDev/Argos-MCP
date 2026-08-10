@@ -108,6 +108,24 @@ describe('SSH tunnel', () => {
     });
   });
 
+  it('accepts a private key given as a Buffer', async () => {
+    // SSHConnectionConfig declares privateKey as Buffer | string, and a Buffer is
+    // what readFileSync hands back, so a caller passing one is doing the obvious
+    // thing. Dropping it silently leaves the connection to fail authentication
+    // with nothing to explain why.
+    const buildOptions = (tunnelManager as any).buildSSHConnectOptions.bind(tunnelManager);
+    const keyBuffer = Buffer.from(`${PEM_HEADER}\nfakekey\n-----END RSA PRIVATE KEY-----`);
+
+    const options = await buildOptions({
+      host: 'bastion.example.com',
+      port: 22,
+      username: 'user',
+      privateKey: keyBuffer,
+    });
+
+    expect(options.privateKey).toBe(keyBuffer);
+  });
+
   it('treats inline key content (-----BEGIN) as content, not file path', async () => {
     const buildOptions = (tunnelManager as any).buildSSHConnectOptions.bind(tunnelManager);
 

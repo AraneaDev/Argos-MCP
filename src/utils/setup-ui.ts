@@ -273,12 +273,5 @@ export class SetupUI {
 // Convenience Functions
 // ============================================================================
 
-/**
- *
- */
-export function getSetupUI(): SetupUI {
-  return SetupUI.getInstance();
-}
-
 // Export commonly used functions for easier imports
 export const ui = SetupUI.getInstance();

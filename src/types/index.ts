@@ -10,21 +10,16 @@ export type {
   DatabaseConnection,
   ConnectionInfo,
   QueryResult,
-  ExecutionResult,
   ColumnInfo,
   TableInfo,
   DatabaseSchema,
   SchemaInfo,
-  SSHTunnel,
   QueryObject,
   BatchResultItem,
   BatchResult,
-  BatchAnalysis,
   ExtensionConfig,
-  ServerConfig,
   DatabaseListItem,
   TestConnectionResult,
-  StandardErrorResponse,
   // Field Redaction types
   FieldPatternType,
   RedactionType,
@@ -42,27 +37,17 @@ export type {
   MCPRequest,
   MCPResponse,
   MCPNotification,
-  MCPCapabilities,
-  MCPServerInfo,
-  MCPInitializeResult,
-  MCPTool,
-  MCPToolsListResult,
   MCPToolCallParams,
   MCPToolCallRequest,
   MCPToolContent,
   MCPToolResponse,
   MCPToolParameter,
-  MCPToolInputSchema,
   SQLQueryArgs,
   SQLBatchQueryArgs,
   SQLAnalyzePerformanceArgs,
   SQLGetSchemaArgs,
   SQLTestConnectionArgs,
   SQLRefreshSchemaArgs,
-  SQLListDatabasesArgs,
-  MCPToolValidationError,
-  MCPMessageHandler,
-  MCPMessageHandlers,
 } from './mcp.js';
 
 // Security types
@@ -80,8 +65,6 @@ export type {
   AuditLogEntry,
   SecurityConfig,
   SecurityManagerConfig,
-  DangerousPattern,
-  DangerousPatternCategory,
   ISecurityManager,
 } from './security.js';
 
@@ -94,8 +77,6 @@ export type {
   ISSHTunnelManager,
   SSHConnectionEvent,
   SSHEventPayload,
-  SSHAuthMethod,
-  SSHAuthInfo,
   SSHTunnelStatus,
   SSHTunnelStatusInfo,
   SSHTunnelValidationResult,
@@ -105,80 +86,16 @@ export type {
 export type {
   DatabaseSectionConfig,
   RawConfigFile,
-  ParsedDatabaseConfig,
   ParsedServerConfig,
   ParsedSecurityConfig,
   ParsedExtensionConfig,
   ConfigValidationError,
-  ConfigValidationResult,
-  IConfigLoader,
 } from './config.js';
 
 // Performance types
-export type {
-  PerformanceAnalysisResult,
-  QueryMetrics,
-  DetailedQueryMetrics,
-  ExecutionStage,
-  ExecutionPlan,
-  ResourceUsage,
-  LockInfo,
-  PerformanceRecommendation,
-  RecommendationType,
-  PostgreSQLPerformanceData,
-  MySQLPerformanceData,
-  SQLitePerformanceData,
-  PerformanceAnalysisOptions,
-  PerformanceThresholds,
-  PerformanceHistoryEntry,
-  PerformanceHistorySummary,
-} from './performance.js';
+export type { ExecutionStage } from './performance.js';
 
 // Enhanced Schema types
-export type {
-  EnhancedTableInfo,
-  EnhancedColumnInfo,
-  BasicForeignKeyInfo,
-  DetailedForeignKeyInfo,
-  ForeignKeyAction,
-  BasicIndexInfo,
-  DetailedIndexInfo,
-  IndexType,
-  ConstraintInfo,
-  ConstraintType,
-  TableStatistics,
-  ColumnStatistics,
-  IndexStatistics,
-  HistogramBucket,
-  EnhancedViewInfo,
-  ViewSecurity,
-  SchemaRelationships,
-  TableRelationship,
-  ViewRelationship,
-  CircularReference,
-  SchemaAnalysis,
-  SchemaOverview,
-  SchemaIssue,
-  SchemaIssueType,
-  SchemaRecommendation,
-  SchemaComplexity,
-  ComplexityFactor,
-  PostgreSQLSchemaExtensions,
-  ExtensionInfo,
-  EnumTypeInfo,
-  DomainTypeInfo,
-  AggregateInfo,
-  SchemaChangeTracking,
-  SchemaChange,
-} from './schema.js';
-
-// Import specific types for aliases to avoid scoping issues
-import type { EnhancedViewInfo, BasicForeignKeyInfo, BasicIndexInfo } from './schema.js';
-
-// Type aliases for documentation compatibility
-export type ViewInfo = EnhancedViewInfo;
-export type ForeignKeyInfo = BasicForeignKeyInfo;
-export type IndexInfo = BasicIndexInfo;
 
 // Error classes (single source of truth in error-handler.ts)
 export {
@@ -218,12 +135,7 @@ export {
 
 export { isComplexityRiskLevel, isTokenType, isLogSeverity } from './security.js';
 
-export {
-  isSSHConnectionEvent,
-  isSSHAuthMethod,
-  isSSHTunnelStatus,
-  validateSSHConfig,
-} from './ssh.js';
+export { validateSSHConfig } from './ssh.js';
 
 export {
   isDatabaseSectionConfig,
@@ -235,22 +147,7 @@ export {
   validateRequiredFields,
 } from './config.js';
 
-export {
-  isPerformanceAnalysisResult,
-  isRecommendationType,
-  isPerformancePriority,
-  generateBasicRecommendations,
-} from './performance.js';
-
-export {
-  isEnhancedTableInfo,
-  isForeignKeyInfo,
-  isIndexInfo,
-  isConstraintType,
-  isIndexType,
-  calculateTableComplexity,
-  findMissingIndexes,
-} from './schema.js';
+export {} from './performance.js';
 
 // Constants
 export {

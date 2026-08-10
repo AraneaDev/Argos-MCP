@@ -25,11 +25,17 @@ import type {
 // SQLite Adapter Implementation
 // ============================================================================
 
+/**
+ *
+ */
 export class SQLiteAdapter extends DatabaseAdapter {
   // ============================================================================
   // Connection Management
   // ============================================================================
 
+  /**
+   *
+   */
   async connect(): Promise<DatabaseConnection> {
     this.validateConfig(['file']);
 
@@ -54,6 +60,9 @@ export class SQLiteAdapter extends DatabaseAdapter {
     });
   }
 
+  /**
+   *
+   */
   async disconnect(connection: DatabaseConnection): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const sqliteDb = connection as SQLiteDatabase;
@@ -67,15 +76,16 @@ export class SQLiteAdapter extends DatabaseAdapter {
     });
   }
 
+  /**
+   *
+   */
   isConnected(connection: DatabaseConnection): boolean {
     try {
-      const sqliteDb = connection as SQLiteDatabase;
-      // SQLite database is considered connected if it's not null and open property is true
-      return !!(
-        sqliteDb &&
-        'open' in sqliteDb &&
-        (sqliteDb as Record<string, unknown>).open === true
-      );
+      // Connected means the handle says open === true. The null and
+      // missing-property checks that used to precede this only restated it:
+      // optional chaining covers a missing handle, the strict comparison covers
+      // a missing or non-true property, and the catch covers a throwing getter.
+      return (connection as unknown as Record<string, unknown> | null | undefined)?.open === true;
     } catch {
       return false;
     }
@@ -85,6 +95,9 @@ export class SQLiteAdapter extends DatabaseAdapter {
   // Query Execution
   // ============================================================================
 
+  /**
+   *
+   */
   async executeQuery(
     connection: DatabaseConnection,
     query: string,
@@ -148,6 +161,11 @@ export class SQLiteAdapter extends DatabaseAdapter {
     });
   }
 
+  // Required by the base contract but not on any live path: executeQuery streams
+  // through buildStreamedResult, so this adapter never calls
+  // normalizeQueryResult, the only caller of the two extractors below. They are
+  // kept so the class satisfies DatabaseAdapter and so a future buffered path
+  // has them, which is also why they carry no tests.
   protected extractRawRows(result: unknown): unknown[] {
     const sqliteResult = result as { rows: unknown[] };
     return Array.isArray(sqliteResult.rows) ? sqliteResult.rows : [];
@@ -165,6 +183,9 @@ export class SQLiteAdapter extends DatabaseAdapter {
   // Transaction Management
   // ============================================================================
 
+  /**
+   *
+   */
   async beginTransaction(connection: DatabaseConnection): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const sqliteDb = connection as SQLiteDatabase;
@@ -178,6 +199,9 @@ export class SQLiteAdapter extends DatabaseAdapter {
     });
   }
 
+  /**
+   *
+   */
   async commitTransaction(connection: DatabaseConnection): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const sqliteDb = connection as SQLiteDatabase;
@@ -191,6 +215,9 @@ export class SQLiteAdapter extends DatabaseAdapter {
     });
   }
 
+  /**
+   *
+   */
   async rollbackTransaction(connection: DatabaseConnection): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       const sqliteDb = connection as SQLiteDatabase;
@@ -208,10 +235,16 @@ export class SQLiteAdapter extends DatabaseAdapter {
   // Performance Analysis
   // ============================================================================
 
+  /**
+   *
+   */
   buildExplainQuery(query: string): string {
     return `EXPLAIN QUERY PLAN ${query}`;
   }
 
+  /**
+   *
+   */
   override getPerformanceRecommendations(explainResult: QueryResult, _query: string): string[] {
     const recommendations: string[] = [];
     const planText = this.flattenExplainPlan(explainResult);
@@ -235,6 +268,9 @@ export class SQLiteAdapter extends DatabaseAdapter {
   // Schema Capture
   // ============================================================================
 
+  /**
+   *
+   */
   async captureSchema(connection: DatabaseConnection): Promise<DatabaseSchema> {
     try {
       const schema = this.createBaseSchema(this.config.file ?? '');

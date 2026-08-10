@@ -10,8 +10,6 @@ import type {
 } from 'mysql2/promise';
 import type { Database as SQLiteConnection } from 'sqlite3';
 import type { ConnectionPool as MSSQLConnection } from 'mssql';
-import type { Client as SSHClient } from 'ssh2';
-import type { Server as NetServer } from 'net';
 
 // ============================================================================
 // Database Types
@@ -102,17 +100,6 @@ export interface QueryResult {
   execution_time_ms: number;
 }
 
-export interface ExecutionResult {
-  success: boolean;
-  data?: QueryResult;
-  error?: string;
-  database: string;
-  query: string;
-  ssh_tunnel: boolean;
-  select_only_mode: boolean;
-  security_violation?: boolean;
-}
-
 // ============================================================================
 // Schema Types
 // ============================================================================
@@ -164,13 +151,6 @@ export interface SchemaInfo {
 // SSH Tunnel Types
 // ============================================================================
 
-export interface SSHTunnel {
-  server: NetServer;
-  connection: SSHClient;
-  localPort: number;
-  localHost: string;
-}
-
 // ============================================================================
 // Query and Batch Types
 // ============================================================================
@@ -199,24 +179,6 @@ export interface BatchResult {
   transactionUsed: boolean;
 }
 
-export interface BatchAnalysis {
-  allowed: boolean;
-  warnings: string[];
-  total_complexity: number;
-  query_count: number;
-  table_references: {
-    tables: string[];
-    conflicts: string[];
-    access_map: Record<string, string[]>;
-  };
-  estimated_resource_usage: {
-    cpu_intensity: number;
-    memory_usage: number;
-    io_operations: number;
-    overall_impact: number;
-  };
-}
-
 // ============================================================================
 // Configuration Types
 // ============================================================================
@@ -237,31 +199,9 @@ export interface ExtensionConfig {
   debug?: boolean;
 }
 
-export interface ServerConfig {
-  database?: Record<string, DatabaseConfig>;
-  security?: SecurityConfig;
-  extension?: ExtensionConfig;
-  [key: string]: unknown;
-}
-
 // ============================================================================
 // Error Types
 // ============================================================================
-
-export interface StandardErrorResponse {
-  success: false;
-  error: {
-    code: string;
-    message: string;
-    details?: Record<string, unknown>;
-    troubleshooting?: string[];
-  };
-  context: {
-    database?: string;
-    query?: string;
-    timestamp: string;
-  };
-}
 
 // Error classes are defined in ../utils/error-handler.ts and re-exported via types/index.ts
 

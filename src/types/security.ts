@@ -134,19 +134,6 @@ export interface SecurityManagerConfig {
 // Dangerous Pattern Detection Types
 // ============================================================================
 
-export interface DangerousPattern {
-  pattern: RegExp;
-  description: string;
-  severity: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
-}
-
-export type DangerousPatternCategory =
-  | 'FUNCTION'
-  | 'INJECTION'
-  | 'PRIVILEGE_ESCALATION'
-  | 'FILE_OPERATION'
-  | 'SYSTEM_COMMAND';
-
 // ============================================================================
 // Security Manager Interface
 // ============================================================================

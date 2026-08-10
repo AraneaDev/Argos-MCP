@@ -105,7 +105,7 @@ const BLOCKED_KEYWORDS = ['DROP', 'DELETE', 'UPDATE'];
 // Files: kebab-case for non-class files, PascalCase for classes
 security-manager.ts // Incorrect
 SecurityManager.ts // Correct (class file)
-query-formatter.ts // Correct (utility file)
+response-formatter.ts // Correct (utility file)
 error-handler.ts // Correct (utility file)
 
 // Directories: lowercase with hyphens

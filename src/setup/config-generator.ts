@@ -351,39 +351,4 @@ export class ConfigGenerator {
       return !!dbConfig.ssh_host;
     });
   }
-
-  /**
-   * Generate configuration with validation
-   */
-  static generateValidatedConfig(config: SetupConfig): GeneratedConfigFile {
-    // Basic validation
-    const databases = Object.keys(config).filter((key) => key.startsWith('database.'));
-    if (databases.length === 0) {
-      throw new Error('Configuration must contain at least one database');
-    }
-
-    // Validate each database config
-    for (const dbKey of databases) {
-      const dbConfig = config[dbKey] as DatabaseConfig;
-      if (!dbConfig.type) {
-        throw new Error(`Database ${dbKey} is missing type`);
-      }
-
-      if (dbConfig.type === DatabaseType.SQLITE) {
-        if (!dbConfig.file) {
-          throw new Error(`SQLite database ${dbKey} is missing file path`);
-        }
-      } else {
-        if (!dbConfig.host || !dbConfig.database || !dbConfig.username) {
-          throw new Error(`Database ${dbKey} is missing required connection parameters`);
-        }
-      }
-    }
-
-    return this.generateConfigFile(config, {
-      version: '2.0.0',
-      description: 'Validated Argos-MCP Configuration',
-      generated: new Date(),
-    });
-  }
 }

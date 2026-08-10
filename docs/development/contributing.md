@@ -178,11 +178,9 @@ src/
 |-- utils/ # Utility functions
 | |-- config.ts # Configuration parsing
 | |-- logger.ts # Logging utilities
-| |-- error-handler.ts # Error handling
-| \-- query-formatter.ts # Query formatting
+| \-- error-handler.ts # Error handling
 |-- setup/ # Interactive setup system
 | |-- wizard.ts # Setup wizard
-| |-- validators.ts # Configuration validation
 | \-- config-generator.ts # Configuration generation
 |-- index.ts # Server entry point
 \-- setup.ts # Setup script entry point

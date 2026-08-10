@@ -230,36 +230,30 @@ data:
 
 ## Environment Configuration
 
-### Development Environment
+Argos does not read `.env` files, and there is no environment variable that
+selects a configuration. It reads `config.ini` from the working directory it was
+started in, so one environment per directory (or per container image) is how the
+environments are kept apart:
 
 ```bash
-# .env.development
-NODE_ENV=development
-LOG_LEVEL=debug
-CONFIG_PATH=./config.dev.ini
-ENABLE_DEBUG_LOGGING=true
+# Staging and production differ by where the process is started, not by a flag
+cd /srv/argos-staging   && node dist/index.js
+cd /srv/argos-production && node dist/index.js
 ```
 
-### Staging Environment
+These are the only environment variables the server reads:
 
-```bash
-# .env.staging
-NODE_ENV=staging
-LOG_LEVEL=info
-CONFIG_PATH=./config.staging.ini
-ENABLE_MONITORING=true
-```
+| Variable | Effect |
+|----------|--------|
+| `SQL_MCP_SQLITE_BASE_DIR` | Confines SQLite paths supplied through MCP tools to this directory. Worth setting wherever the model can add databases. |
+| `SSH_DEBUG=true` | Adds the ssh2 handshake trace to `argos-mcp.log`. Verbose; off by default. |
+| `CLIENT_IP` | Recorded as the source address in security audit entries. Set it if a wrapper knows the real client. |
+| `DEBUG_SETUP=true` | Extra diagnostics from the setup wizard only. |
+| `NODE_ENV=development` | Extra detail from the setup wizard only. Has no effect on the server. |
 
-### Production Environment
-
-```bash
-# .env.production
-NODE_ENV=production
-LOG_LEVEL=warn
-CONFIG_PATH=./config.prod.ini
-ENABLE_MONITORING=true
-METRICS_ENDPOINT=http://prometheus:9090
-```
+Log verbosity, monitoring and metrics endpoints are not configurable: see
+[Monitoring and Logging](./security-hardening.md#monitoring-and-logging) for
+what is written and where.
 
 ## Security Configuration
 

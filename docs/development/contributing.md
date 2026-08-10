@@ -29,7 +29,7 @@ There are many ways to contribute to this project:
 1. **Clone the Repository**
  ```bash
  git clone <repository-url>
- cd sql-ts
+ cd Argos-MCP
  ```
 
 2. **Install Dependencies**

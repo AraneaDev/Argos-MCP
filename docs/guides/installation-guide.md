@@ -367,7 +367,9 @@ services:
  - ./logs:/app/logs
  environment:
  - NODE_ENV=production
- - SQL_LOG_LEVEL=info
+ # Confines model-supplied SQLite paths to this directory. Worth setting in a
+ # container, where the mount points are known.
+ - SQL_MCP_SQLITE_BASE_DIR=/app/data
  restart: unless-stopped
 ```
 

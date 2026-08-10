@@ -1155,12 +1155,8 @@ describe('config', () => {
     });
 
     it('should extract multiline ssh_private_key to a separate secure file and store path', () => {
-      // The header is assembled rather than written inline so the pre-commit
-      // secret scanner, which greps staged files for a PRIVATE KEY header, does
-      // not flag this placeholder every time the file is touched. The runtime
-      // string is unchanged.
       const privateKeyContent =
-        '-----BEGIN RSA ' + 'PRIVATE KEY-----\nMIIEowIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----';
+        '-----BEGIN RSA PRIVATE KEY-----\nMIIEowIBAAKCAQEA...\n-----END RSA PRIVATE KEY-----';
       const config: ParsedServerConfig = {
         databases: {
           mydb: {

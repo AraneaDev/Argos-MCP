@@ -20,7 +20,11 @@ export async function writeAuditLog(
   durationMs: number,
   outcome: 'success' | string
 ): Promise<void> {
-  const dir = join(homedir(), '.sql-ts', 'audit');
+  // Named for the product. Installations that ran a pre-rebrand version have
+  // their earlier records under ~/.sql-ts/audit; those files are left where they
+  // are rather than moved, because relocating an audit trail is not something
+  // this should do behind the operator's back.
+  const dir = join(homedir(), '.argos-mcp', 'audit');
   // Owner-only dir/file (FIND-114): the audit log holds query metadata/timing. It carries no
   // secrets or plaintext SQL, but keep it consistent with the rest of the 0600 hardening.
   await mkdir(dir, { recursive: true, mode: 0o700 });

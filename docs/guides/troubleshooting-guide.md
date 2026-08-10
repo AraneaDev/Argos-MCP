@@ -13,15 +13,19 @@ This comprehensive guide helps you diagnose and resolve common issues with the A
 
 ### Getting Log Information
 ```bash
-# Start server with debug logging
-SQL_DEBUG=true npm start
+# Start the server (it waits for JSON-RPC on stdin)
+npm start
 
-# View recent log entries (if using file logging)
-tail -f sql-ts.log
+# View recent log entries
+tail -f argos-mcp.log
 
 # Check for specific error patterns
-grep -i error sql-ts.log
+grep -i error argos-mcp.log
 ```
+
+The server never logs to the console: stdout carries the JSON-RPC stream, and
+anything written there breaks the protocol. `argos-mcp.log` in the repository
+root is the only place its own output goes.
 
 ## Server Startup Issues
 
@@ -356,7 +360,7 @@ Claude Code shows no SQL-related tools available
  "mcpServers": {
  "sql-database": {
  "command": "node",
- "args": ["/absolute/path/to/your/sql-ts/dist/index.js"],
+ "args": ["/absolute/path/to/your/Argos-MCP/dist/index.js"],
  "env": {}
  }
  }
@@ -366,7 +370,7 @@ Claude Code shows no SQL-related tools available
 2. **Verify absolute paths**:
  ```bash
  # Get absolute path to your installation
- pwd # From your sql-ts directory
+ pwd # From your Argos-MCP directory
  ls -la dist/index.js # Verify file exists
  ```
 
@@ -541,7 +545,7 @@ Server consuming excessive memory
 2. **Monitor query patterns**:
  ```bash
  # Check for queries returning large datasets
- grep "rows returned" sql-ts.log
+ grep "rows returned" argos-mcp.log
  ```
 
 ## Security Issues
@@ -605,13 +609,24 @@ Server consuming excessive memory
 ## Getting Additional Help
 
 ### Enable Debug Logging
-```bash
-# Start with debug logging
-SQL_DEBUG=true SQL_LOG_LEVEL=debug npm start
 
-# Save logs to file
-SQL_DEBUG=true npm start 2>&1 | tee debug.log
+There is no general verbosity switch: the server logs at INFO to
+`argos-mcp.log`, and that file is already the full picture of what it did.
+
+One extra trace is available, for the SSH handshake — algorithm negotiation,
+host-key exchange and authentication steps. It is off by default because it is
+verbose:
+
+```bash
+# Adds the ssh2 handshake trace to argos-mcp.log, prefixed [DEBUG]
+SSH_DEBUG=true npm start
+
+# Then read it back
+grep '\[DEBUG\]' argos-mcp.log
 ```
+
+Do not pipe the server's stdout to a file: that stream is the JSON-RPC channel,
+not the log. Redirecting or teeing it will break the connection to the client.
 
 ### Collect Diagnostic Information
 
@@ -640,9 +655,13 @@ When reporting issues, include:
 4. **Steps to reproduce** the issue
 
 ### Common Log Locations
-- **Current directory**: `./sql-ts.log`
-- **Debug output**: Console when running with `SQL_DEBUG=true`
-- **System logs**: `/var/log/` (Linux) or Console app (macOS)
+- **Server log**: `./argos-mcp.log` in the repository root, owner-readable only
+- **Previous run**: `./argos-mcp.log.1` — the log is rotated on every start, so
+  the run before the current one is still there
+- **Setup wizard**: `./setup.log`
+- **Audit records**: `~/.argos-mcp/audit/<database>.log`, one line per query with
+  a hash of the SQL rather than the SQL itself. Installations upgraded from a
+  pre-rebrand version will find their earlier records in `~/.sql-ts/audit`.
 
 ### Community Support
 - **GitHub Issues**: [Report bugs and issues](https://github.com/AraneaDev/Argos-MCP/issues)

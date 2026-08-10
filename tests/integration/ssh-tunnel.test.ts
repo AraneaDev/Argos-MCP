@@ -25,10 +25,7 @@ jest.mock('node:fs/promises', () => ({
 
 import { stat as mockStat } from 'node:fs/promises';
 
-// Assembled rather than written inline so the pre-commit secret scanner, which
-// greps staged files for a PRIVATE KEY header, does not flag these placeholders.
-// The runtime strings are unchanged.
-const PEM_HEADER = '-----BEGIN RSA ' + 'PRIVATE KEY-----';
+const PEM_HEADER = '-----BEGIN RSA PRIVATE KEY-----';
 
 describe('SSH tunnel', () => {
   let tunnelManager: EnhancedSSHTunnelManager;

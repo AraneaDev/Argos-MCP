@@ -304,16 +304,26 @@ bind-address = 10.0.2.100 # Database server private IP
 ### Security Event Monitoring
 
 #### 1. Application-Level Logging
-```bash
-# Enable comprehensive logging
-SQL_DEBUG=false
-SQL_LOG_LEVEL=INFO
-SQL_AUDIT_LOG=true
 
-# Log to secure location
-mkdir -p /var/log/claude-mcp
-chown app_user:app_group /var/log/claude-mcp
-chmod 750 /var/log/claude-mcp
+Logging needs no configuration, and there is nothing to switch on. The server
+writes to two places, both created owner-only:
+
+| What | Where | Mode |
+|------|-------|------|
+| Server log | `argos-mcp.log` in the install directory, previous run rotated to `argos-mcp.log.1` | `0600` |
+| Audit records | `~/.argos-mcp/audit/<database>.log` | `0600` in a `0700` directory |
+
+Each audit line carries a timestamp, the database, a hash of the statement, the
+duration and the outcome. The SQL itself is never written, so the file records
+what was run and when without becoming a second copy of the data.
+
+Console output is off by design: stdout carries the JSON-RPC stream, and writing
+anything else there breaks the protocol.
+
+```bash
+# Confirm the permissions are what they should be
+ls -l argos-mcp.log
+ls -ld ~/.argos-mcp/audit
 ```
 
 #### 2. Database Query Logging

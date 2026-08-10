@@ -411,12 +411,8 @@ describe('error-handler', () => {
     });
 
     it('should strip PEM private key blocks', () => {
-      // Header assembled from two pieces so the pre-commit secret scanner, which
-      // greps staged files for a PRIVATE KEY header, does not flag this
-      // placeholder. The runtime string is unchanged.
-      const header = '-----BEGIN RSA ' + 'PRIVATE KEY-----';
       const err = new Error(
-        `key error ${header}\nMIIabcSECRET\n-----END RSA PRIVATE KEY----- done`
+        'key error -----BEGIN RSA PRIVATE KEY-----\nMIIabcSECRET\n-----END RSA PRIVATE KEY----- done'
       );
       const sanitized = sanitizeError(err);
       expect(sanitized).not.toContain('MIIabcSECRET');

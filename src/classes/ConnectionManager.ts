@@ -1218,13 +1218,18 @@ export class ConnectionManager extends EventEmitter {
     // Query analysis recommendations
     const upperQuery = query.toUpperCase();
 
-    if (upperQuery.includes('SELECT *')) {
+    // These match keywords, not substrings. `includes('TOP')` fired on any
+    // identifier containing the letters - stop_id, laptop, topic - and silently
+    // suppressed the advice for perfectly ordinary queries; `includes('SELECT *')`
+    // missed the same query written with two spaces or a newline. The join
+    // analysis below already had this right.
+    if (/\bSELECT\s+\*/.test(upperQuery)) {
       recommendations.push(
         ' TIP: Use specific column names instead of SELECT * for better performance'
       );
     }
 
-    if (!upperQuery.includes('LIMIT') && !upperQuery.includes('TOP')) {
+    if (!/\bLIMIT\b/.test(upperQuery) && !/\bTOP\b/.test(upperQuery)) {
       recommendations.push(
         ' TIP: Consider adding LIMIT clause to prevent unexpected large results'
       );

@@ -859,6 +859,15 @@ describe('PostgreSQLAdapter', () => {
       );
     });
 
+    it('should not flag buffer usage without nested loops', () => {
+      const output = advise([
+        { 'QUERY PLAN': 'Index Scan using users_pkey on users' },
+        { 'QUERY PLAN': '  Buffers: shared hit=4' },
+      ]);
+
+      expect(output).not.toContain('Nested loops with buffer usage');
+    });
+
     it('should suggest full-text search for a wildcard LIKE', () => {
       const output = advise(
         [{ 'QUERY PLAN': 'Index Scan using users_pkey on users' }],
@@ -875,6 +884,30 @@ describe('PostgreSQLAdapter', () => {
       );
 
       expect(output).not.toContain('full-text search');
+    });
+
+    it('should not suggest full-text search for a wildcard outside a LIKE', () => {
+      const output = advise(
+        [{ 'QUERY PLAN': 'Index Scan using users_pkey on users' }],
+        'SELECT id FROM users WHERE id % 2 = 0'
+      );
+
+      expect(output).not.toContain('full-text search');
+    });
+
+    // The plan is flattened to one string before it is searched for multi-word
+    // phrases, so the separators are load-bearing: drop them and adjacent
+    // tokens fuse into words that no longer match.
+    it('should keep plan columns from running together', () => {
+      const output = advise([{ node: 'Seq', detail: 'Scan on users' }]);
+
+      expect(output).toContain('Sequential scan detected');
+    });
+
+    it('should keep plan rows from running together', () => {
+      const output = advise([{ 'QUERY PLAN': 'Seq' }, { 'QUERY PLAN': 'Scan on users' }]);
+
+      expect(output).toContain('Sequential scan detected');
     });
 
     it('should say nothing about a plan with no problems', () => {

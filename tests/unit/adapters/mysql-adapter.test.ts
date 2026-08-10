@@ -916,16 +916,22 @@ describe('MySQLAdapter - connection pooling', () => {
       expect(advise([{ type: 'ALL' }])).toContain('Full table scan detected');
     });
 
+    // Each branch asserts the advice it does NOT give as well. A guard that
+    // fired on the mere presence of an Extra column, rather than on what that
+    // column says, would otherwise pass every positive assertion here while
+    // recommending an index on ORDER BY for a query that never sorts.
     it('should flag a filesort in the Extra column', () => {
-      expect(advise([{ type: 'ref', Extra: 'Using where; Using filesort' }])).toContain(
-        'Filesort operation'
-      );
+      const output = advise([{ type: 'ref', Extra: 'Using where; Using filesort' }]);
+
+      expect(output).toContain('Filesort operation');
+      expect(output).not.toContain('Temporary table created');
     });
 
     it('should flag a temporary table in the Extra column', () => {
-      expect(advise([{ type: 'ref', Extra: 'Using temporary; Using filesort' }])).toContain(
-        'Temporary table created'
-      );
+      const output = advise([{ type: 'ref', Extra: 'Using temporary' }]);
+
+      expect(output).toContain('Temporary table created');
+      expect(output).not.toContain('Filesort operation');
     });
 
     it('should report each row of a multi-row plan', () => {
@@ -933,6 +939,83 @@ describe('MySQLAdapter - connection pooling', () => {
 
       expect(output).toContain('Full table scan detected');
       expect(output).toContain('Temporary table created');
+    });
+
+    // buildExplainQuery asks for EXPLAIN FORMAT=JSON, which returns a single
+    // column holding the whole plan rather than the tabular `type` / `Extra`
+    // columns. Advice that only reads those columns never fires in production.
+    describe('EXPLAIN FORMAT=JSON plans', () => {
+      // Pretty-printed, because that is how MySQL returns the plan: the value
+      // arrives indented, with a space after each colon.
+      const jsonPlan = (queryBlock: Record<string, unknown>): Record<string, unknown>[] => [
+        { EXPLAIN: JSON.stringify({ query_block: { select_id: 1, ...queryBlock } }, null, 2) },
+      ];
+
+      it('should flag a full table scan', () => {
+        const output = advise(
+          jsonPlan({
+            table: { table_name: 'users', access_type: 'ALL', rows_examined_per_scan: 425 },
+          })
+        );
+
+        expect(output).toContain('Full table scan detected');
+      });
+
+      it('should flag a filesort', () => {
+        const output = advise(
+          jsonPlan({
+            ordering_operation: {
+              using_filesort: true,
+              table: { table_name: 'users', access_type: 'ref' },
+            },
+          })
+        );
+
+        expect(output).toContain('Filesort operation');
+        expect(output).not.toContain('Temporary table created');
+      });
+
+      it('should flag a temporary table', () => {
+        const output = advise(
+          jsonPlan({
+            grouping_operation: {
+              using_temporary_table: true,
+              using_filesort: false,
+              table: { table_name: 'users', access_type: 'ref' },
+            },
+          })
+        );
+
+        expect(output).toContain('Temporary table created');
+        expect(output).not.toContain('Filesort operation');
+      });
+
+      it('should read a plan that is not pretty-printed', () => {
+        const compact = JSON.stringify({
+          query_block: {
+            select_id: 1,
+            grouping_operation: {
+              using_temporary_table: true,
+              using_filesort: true,
+              table: { table_name: 'users', access_type: 'ALL' },
+            },
+          },
+        });
+
+        const output = advise([{ EXPLAIN: compact }]);
+
+        expect(output).toContain('Full table scan detected');
+        expect(output).toContain('Filesort operation');
+        expect(output).toContain('Temporary table created');
+      });
+
+      it('should say nothing about a healthy plan', () => {
+        const output = advise(
+          jsonPlan({ table: { table_name: 'users', access_type: 'const', key: 'PRIMARY' } })
+        );
+
+        expect(output).toBe('');
+      });
     });
 
     it('should say nothing about a plan with no problems', () => {

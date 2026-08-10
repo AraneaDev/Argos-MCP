@@ -347,6 +347,84 @@ describe('MSSQLAdapter', () => {
       );
     });
 
+    // Parameters bind positionally as @param0..@paramN-1, so anything that
+    // wrongly consumes a placeholder slot misaligns every parameter after it.
+    describe('placeholder conversion', () => {
+      const convert = async (query: string): Promise<string> => {
+        mockRequestInstance.query.mockResolvedValueOnce({ recordset: [], recordsets: [[]] });
+        await adapter.executeQuery(connection, query, [1]);
+        const calls = mockRequestInstance.query.mock.calls;
+        return calls[calls.length - 1][0] as string;
+      };
+
+      it('should number placeholders in order', async () => {
+        expect(await convert('SELECT ? , ? , ?')).toBe('SELECT @param0 , @param1 , @param2');
+      });
+
+      it('should leave a question mark inside a string literal alone', async () => {
+        expect(await convert("SELECT '?' , ?")).toBe("SELECT '?' , @param0");
+      });
+
+      it('should treat a doubled quote as staying inside the string', async () => {
+        expect(await convert("SELECT 'it''s ?' , ?")).toBe("SELECT 'it''s ?' , @param0");
+      });
+
+      it('should leave a question mark inside a quoted identifier alone', async () => {
+        expect(await convert('SELECT "col?" , ?')).toBe('SELECT "col?" , @param0');
+      });
+
+      it('should leave a question mark inside a bracketed identifier alone', async () => {
+        expect(await convert('SELECT [col?] , ?')).toBe('SELECT [col?] , @param0');
+      });
+
+      it('should leave a question mark inside a line comment alone', async () => {
+        expect(await convert('SELECT 1 -- really?\nWHERE id = ?')).toBe(
+          'SELECT 1 -- really?\nWHERE id = @param0'
+        );
+      });
+
+      it('should leave a question mark inside a block comment alone', async () => {
+        expect(await convert('SELECT /* really? */ ?')).toBe('SELECT /* really? */ @param0');
+      });
+
+      it('should keep tracking nested block comments', async () => {
+        expect(await convert('SELECT /* a /* b? */ c? */ ?')).toBe(
+          'SELECT /* a /* b? */ c? */ @param0'
+        );
+      });
+
+      it('should not treat a dash inside a string as starting a comment', async () => {
+        expect(await convert("SELECT '-- ?' , ?")).toBe("SELECT '-- ?' , @param0");
+      });
+
+      it('should treat a doubled bracket as staying inside the identifier', async () => {
+        expect(await convert('SELECT [a]]?] , ?')).toBe('SELECT [a]]?] , @param0');
+      });
+
+      it('should treat a doubled double-quote as staying inside the identifier', async () => {
+        expect(await convert('SELECT "a""?" , ?')).toBe('SELECT "a""?" , @param0');
+      });
+
+      // A lone slash or star inside a comment is ordinary text; only the paired
+      // sequences open and close one.
+      it('should not let a lone slash inside a block comment open a nested one', async () => {
+        expect(await convert('SELECT /* a / b */ ?')).toBe('SELECT /* a / b */ @param0');
+      });
+
+      it('should not let a lone star inside a block comment close it', async () => {
+        expect(await convert('SELECT /* a * b? */ ?')).toBe('SELECT /* a * b? */ @param0');
+      });
+
+      // Arithmetic is not a comment opener.
+      it('should not treat subtraction as a line comment', async () => {
+        expect(await convert('SELECT 1 - 2 , ?')).toBe('SELECT 1 - 2 , @param0');
+      });
+
+      it('should not treat division as a block comment', async () => {
+        expect(await convert('SELECT 1 / 2 , ?')).toBe('SELECT 1 / 2 , @param0');
+      });
+    });
+
     it('should handle query execution errors', async () => {
       const queryError = new Error('Query execution failed');
       mockRequestInstance.query.mockRejectedValueOnce(queryError);

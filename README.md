@@ -1,34 +1,38 @@
 # Argos-MCP v3.0.0 <!-- x-release-please-version -->
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Test Coverage](https://img.shields.io/badge/Coverage-88%25-brightgreen)](https://github.com/AraneaDev/Argos-MCP)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Tests](https://img.shields.io/badge/Tests-1181%20passing-success)](https://github.com/AraneaDev/Argos-MCP)
+[![Release](https://img.shields.io/github/v/release/AraneaDev/Argos-MCP)](https://github.com/AraneaDev/Argos-MCP/releases)
+[![MCP Observatory risk grade](https://mcpobservatory.com/servers/github:AraneaDev/Argos-MCP/badge.svg)](https://mcpobservatory.com/servers/github:AraneaDev/Argos-MCP/security)
+[![CI](https://github.com/AraneaDev/Argos-MCP/actions/workflows/ci.yml/badge.svg)](https://github.com/AraneaDev/Argos-MCP/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
+[![coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](#development)
+[![status: in development](https://img.shields.io/badge/status-in%20development-orange.svg)](#)
+[![Strict TypeScript](https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript)](https://www.typescriptlang.org/)
 [![ESLint](https://img.shields.io/badge/ESLint-0%20warnings-brightgreen?logo=eslint)](https://eslint.org/)
 [![JSDoc](https://img.shields.io/badge/JSDoc-enforced-blue)](https://jsdoc.app/)
-[![Strict TypeScript](https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript)](https://www.typescriptlang.org/)
 
 > *Argos Panoptes — the hundred-eyed giant who never slept, set to watch over what mattered most.*
 
-**Argos-MCP** — a hundred eyes on your databases. Connect Claude Code to PostgreSQL, MySQL, SQLite, and SQL Server with bulletproof security, comprehensive monitoring, and seamless multi-database support.
+**Argos-MCP** — a hundred eyes on your databases. Connect Claude Code to PostgreSQL, MySQL, SQLite, and SQL Server with strong security defaults, per-query auditing, and multi-database support.
+
+> **Pre-release / in active development.** Argos-MCP is **not yet published to npm** — the publish step in the release workflow is deliberately dormant. The source is public on [GitHub](https://github.com/AraneaDev/Argos-MCP); install from source (see [Quick Start](#quick-start)). Any `npm install -g argos-mcp` command you find elsewhere will not resolve yet.
 
 ## Why Argos-MCP?
 
 ### **Security First**
 - **SELECT-Only Mode** - Production-safe read-only database access
-- **Query Validation** - Advanced SQL injection prevention and complexity analysis
+- **Query Validation** - Bound parameters, stacked statements refused, comment- and literal-aware parsing, complexity limits
 - **SSH Tunneling** - Secure encrypted connections through bastion hosts
-- **Audit Logging** - Comprehensive security event tracking
+- **Audit Logging** - One record per query: database, statement hash, duration, outcome — never the values
 
 ### **High Performance**
 - **Connection Pooling** - Efficient database connection management
-- **Schema Caching** - Lightning-fast metadata access
+- **Schema Caching** - Captured once per database, reused for the session
 - **Query Optimization** - Built-in performance analysis and recommendations
 - **Batch Operations** - Execute multiple queries with transaction support
 
 ### **Universal Database Support**
 - **PostgreSQL** - Full support including advanced features
-- **MySQL/MariaDB** - Complete compatibility with all versions
+- **MySQL/MariaDB** - Via mysql2, including Azure Database for MySQL/MariaDB
 - **SQLite** - Perfect for development and small applications
 - **SQL Server** - Enterprise-grade Microsoft SQL Server support
 
@@ -36,7 +40,7 @@
 - **One-command install** - Registers with Claude Code via the native `claude mcp add`
 - **TypeScript Native** - Full type safety and IntelliSense support
 - **Comprehensive Docs** - Detailed guides, tutorials, and API reference
-- **Extensive Testing** - Unit, integration, and end-to-end test coverage
+- **Extensive Testing** - Unit and integration suites, plus mutation testing on the security-critical paths
 
 ## Quick Start
 
@@ -166,6 +170,10 @@ ssh_host=bastion.company.com
 ssh_port=22
 ssh_username=tunnel_user
 ssh_private_key=/secure/path/ssh_key
+# Required: without a pinned fingerprint the tunnel refuses to connect, rather
+# than trusting whatever host key it is offered. Get it from the bastion with
+#   ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub
+ssh_host_fingerprint=SHA256:47DEQpj8HBSa+/TImW+5JCeuQeRkm5NMpJWZG3hSuFU
 
 [security]
 max_joins=5
@@ -237,7 +245,7 @@ redaction_log_access=true
 | Type | Example Input | Example Output |
 |------|--------------|----------------|
 | `partial_mask` | `john.doe@example.com` | `j******.e@*****.com` |
-| `full_mask` | `555-123-4567` | `************` |
+| `full_mask` | `555-123-4567` | `**********` (capped at 10) |
 | `replace` | `123-45-6789` | `[PROTECTED]` |
 | `custom` | Regex-based | Custom pattern |
 
@@ -245,11 +253,18 @@ redaction_log_access=true
 
 **[Full Redaction Guide](docs/features/field-redaction.md)**
 
-### Enterprise Security Compliance
-- **SOC 2 Type II** compatible logging and monitoring
-- **GDPR/CCPA** compliant data access controls
-- **HIPAA** suitable with proper configuration
-- **PCI DSS** compatible for payment data environments
+### What this gives you towards compliance
+
+Argos is not certified against any standard, and no library can be — compliance
+is a property of your deployment. What it provides is the controls and the
+evidence that such a regime asks for:
+
+- Read-only enforcement that cannot be relaxed from a session
+- Field redaction, so protected columns never reach the model
+- An audit record per query: timestamp, database, statement hash, duration,
+  outcome, with no values and no SQL
+- Secrets scrubbed from logs and error messages
+- Owner-only file modes on the log, the audit records and the configuration
 
 ## Dynamic Database Management
 
@@ -270,17 +285,14 @@ Argos-MCP supports runtime database management through dedicated MCP tools. This
 - Set `mcp_configurable=true` in your database config to allow MCP-driven updates and removal.
 - The `sql_set_mcp_configurable` tool is a one-way lock: once set to `false`, the database can no longer be modified or removed via MCP. Unlocking requires a manual edit to the configuration file.
 - The `sql_get_config` tool always redacts passwords and other sensitive fields before returning configuration data.
-- Databases added at runtime via `sql_add_database` have `mcp_configurable=true` by default.
+- Databases added at runtime via `sql_add_database` have `mcp_configurable=true` by default, and are **always** `select_only=true`. Granting write access requires editing `config.ini` by hand — the model cannot grant it to itself.
 
 ## Performance
 
-### Benchmarks
-| Operation | PostgreSQL | MySQL | SQLite | SQL Server |
-|-----------|------------|-------|--------|------------|
-| Simple SELECT | ~5ms | ~4ms | ~1ms | ~6ms |
-| Complex JOIN | ~45ms | ~40ms | ~8ms | ~50ms |
-| Schema Capture | ~150ms | ~120ms | ~30ms | ~180ms |
-| Connection Setup | ~80ms | ~60ms | ~5ms | ~100ms |
+Query time is your database's, not Argos's — it adds validation and formatting
+around a normal client connection. `sql_get_metrics` reports the latency it
+actually observed (min, max, avg, p95), and `sql_analyze_performance` returns the
+execution plan with dialect-specific advice when something is slow.
 
 ### Performance Features
 - **Connection Pooling** - Reuse database connections efficiently
@@ -340,12 +352,9 @@ deliberately do not gate on the diagnostic count.
 
 ## License
 
-This project is licensed under the **MIT License**.
-
-### Open Source Commitment
-- **Always free** for individual developers and small teams
-- **No vendor lock-in** - use with any Claude deployment
-- **Transparent** development process and roadmap
+Released under the [MIT License](./LICENSE) — free for any use, commercial
+included, with no warranty. It speaks any MCP client, not just Claude Code, and
+connects to databases you already run.
 
 ## Acknowledgments
 

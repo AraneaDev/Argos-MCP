@@ -302,6 +302,32 @@ export class MySQLAdapter extends DatabaseAdapter {
     return `EXPLAIN FORMAT=JSON ${query}`;
   }
 
+  override getPerformanceRecommendations(explainResult: QueryResult, _query: string): string[] {
+    const recommendations: string[] = [];
+
+    for (const row of explainResult.rows) {
+      const rowData = row as Record<string, unknown>;
+
+      if (rowData.type === 'ALL') {
+        recommendations.push(' MYSQL: Full table scan detected - add appropriate indexes');
+      }
+
+      if (rowData.Extra && String(rowData.Extra).includes('Using filesort')) {
+        recommendations.push(
+          ' MYSQL: Filesort operation - consider adding index on ORDER BY columns'
+        );
+      }
+
+      if (rowData.Extra && String(rowData.Extra).includes('Using temporary')) {
+        recommendations.push(
+          ' MYSQL: Temporary table created - optimize GROUP BY or DISTINCT operations'
+        );
+      }
+    }
+
+    return recommendations;
+  }
+
   // ============================================================================
   // Schema Capture
   // ============================================================================

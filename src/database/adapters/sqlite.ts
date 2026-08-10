@@ -212,6 +212,25 @@ export class SQLiteAdapter extends DatabaseAdapter {
     return `EXPLAIN QUERY PLAN ${query}`;
   }
 
+  override getPerformanceRecommendations(explainResult: QueryResult, _query: string): string[] {
+    const recommendations: string[] = [];
+    const planText = this.flattenExplainPlan(explainResult);
+
+    if (planText.includes('scan table')) {
+      recommendations.push(' SQLITE: Table scan detected - consider adding indexes');
+    }
+
+    if (planText.includes('temp b-tree')) {
+      recommendations.push(' SQLITE: Temporary B-tree created - optimize sorting operations');
+    }
+
+    recommendations.push(
+      '[INFO] SQLITE: Run ANALYZE command periodically to update query planner statistics'
+    );
+
+    return recommendations;
+  }
+
   // ============================================================================
   // Schema Capture
   // ============================================================================

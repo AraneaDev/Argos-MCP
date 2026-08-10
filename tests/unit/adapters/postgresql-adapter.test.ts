@@ -821,4 +821,69 @@ describe('PostgreSQLAdapter', () => {
       expect(mockClientInner.end).not.toHaveBeenCalled();
     });
   });
+
+  // ============================================================================
+  // Performance Recommendations
+  // ============================================================================
+
+  describe('getPerformanceRecommendations', () => {
+    const explain = (rows: Record<string, unknown>[]): QueryResult => ({
+      rows,
+      rowCount: rows.length,
+      fields: rows.length > 0 ? Object.keys(rows[0]!) : [],
+      truncated: false,
+      execution_time_ms: 1,
+    });
+
+    const advise = (rows: Record<string, unknown>[], query = 'SELECT id FROM users'): string =>
+      adapter.getPerformanceRecommendations(explain(rows), query).join('\n');
+
+    it('should flag a sequential scan', () => {
+      expect(advise([{ 'QUERY PLAN': 'Seq Scan on users  (cost=0.00..1.00 rows=1)' }])).toContain(
+        'Sequential scan detected'
+      );
+    });
+
+    it('should flag nested loops that report buffer usage', () => {
+      const output = advise([
+        { 'QUERY PLAN': 'Nested Loop  (cost=0.00..8.00 rows=1)' },
+        { 'QUERY PLAN': '  Buffers: shared hit=4' },
+      ]);
+
+      expect(output).toContain('Nested loops with buffer usage');
+    });
+
+    it('should not flag nested loops without buffer usage', () => {
+      expect(advise([{ 'QUERY PLAN': 'Nested Loop  (cost=0.00..8.00 rows=1)' }])).not.toContain(
+        'Nested loops with buffer usage'
+      );
+    });
+
+    it('should suggest full-text search for a wildcard LIKE', () => {
+      const output = advise(
+        [{ 'QUERY PLAN': 'Index Scan using users_pkey on users' }],
+        "SELECT id FROM users WHERE name LIKE '%ab%'"
+      );
+
+      expect(output).toContain('full-text search');
+    });
+
+    it('should not suggest full-text search for a LIKE without wildcards', () => {
+      const output = advise(
+        [{ 'QUERY PLAN': 'Index Scan using users_pkey on users' }],
+        "SELECT id FROM users WHERE name LIKE 'ab'"
+      );
+
+      expect(output).not.toContain('full-text search');
+    });
+
+    it('should say nothing about a plan with no problems', () => {
+      const result = adapter.getPerformanceRecommendations(
+        explain([{ 'QUERY PLAN': 'Index Scan using users_pkey on users' }]),
+        'SELECT id FROM users'
+      );
+
+      expect(result).toEqual([]);
+    });
+  });
 });

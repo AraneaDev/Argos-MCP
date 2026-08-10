@@ -173,6 +173,27 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     return `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${query}`;
   }
 
+  override getPerformanceRecommendations(explainResult: QueryResult, query: string): string[] {
+    const recommendations: string[] = [];
+    const planText = this.flattenExplainPlan(explainResult);
+
+    if (planText.includes('seq scan')) {
+      recommendations.push(' POSTGRESQL: Sequential scan detected - consider adding indexes');
+    }
+
+    if (planText.includes('nested loop') && planText.includes('buffers')) {
+      recommendations.push(' POSTGRESQL: Nested loops with buffer usage - check join conditions');
+    }
+
+    if (query.toUpperCase().includes('LIKE') && query.includes('%')) {
+      recommendations.push(
+        ' POSTGRESQL: LIKE with wildcards - consider full-text search (GIN indexes)'
+      );
+    }
+
+    return recommendations;
+  }
+
   // ============================================================================
   // Schema Capture
   // ============================================================================

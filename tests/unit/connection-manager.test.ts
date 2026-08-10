@@ -925,6 +925,57 @@ describe('ConnectionManager', () => {
   });
 
   // ============================================================================
+  // Performance Recommendations
+  // ============================================================================
+
+  describe('generatePerformanceRecommendations', () => {
+    const emptyResult = {
+      rows: [],
+      rowCount: 0,
+      fields: [],
+      truncated: false,
+      execution_time_ms: 0,
+    };
+
+    const generate = (adapter: unknown, query = 'SELECT id FROM users'): string =>
+      (connectionManager as any).generatePerformanceRecommendations({
+        query,
+        result: emptyResult,
+        explainResult: { ...emptyResult, rows: [{ step: 'SCAN users' }] },
+        executionTime: 10,
+        adapter,
+      });
+
+    test('should include the dialect advice the adapter reports', () => {
+      const adapter = {
+        getPerformanceRecommendations: jest.fn().mockReturnValue(['DIALECT: add an index']),
+      };
+
+      expect(generate(adapter)).toContain('DIALECT: add an index');
+    });
+
+    test('should ask the adapter about the explain result and the original query', () => {
+      const adapter = { getPerformanceRecommendations: jest.fn().mockReturnValue([]) };
+
+      generate(adapter, 'SELECT name FROM widget');
+
+      expect(adapter.getPerformanceRecommendations).toHaveBeenCalledWith(
+        expect.objectContaining({ rows: [{ step: 'SCAN users' }] }),
+        'SELECT name FROM widget'
+      );
+    });
+
+    test('should still report the generic advice when the adapter has none', () => {
+      const adapter = { getPerformanceRecommendations: jest.fn().mockReturnValue([]) };
+
+      const output = generate(adapter, 'SELECT * FROM users');
+
+      expect(output).toContain('Performance Analysis Results:');
+      expect(output).toContain('Use specific column names instead of SELECT *');
+    });
+  });
+
+  // ============================================================================
   // Batch Execution
   // ============================================================================
 

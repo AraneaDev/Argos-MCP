@@ -985,4 +985,25 @@ describe('MSSQLAdapter', () => {
       );
     });
   });
+
+  // ============================================================================
+  // Performance Recommendations
+  // ============================================================================
+
+  describe('getPerformanceRecommendations', () => {
+    it('should return no dialect-specific advice', () => {
+      // MSSQL has no SHOWPLAN-specific analysis yet; it inherits the empty base default.
+      const explainResult: QueryResult = {
+        rows: [{ StmtText: 'SELECT * FROM users', EstimateRows: 1000 }],
+        rowCount: 1,
+        fields: ['StmtText', 'EstimateRows'],
+        truncated: false,
+        execution_time_ms: 1,
+      };
+
+      expect(adapter.getPerformanceRecommendations(explainResult, 'SELECT * FROM users')).toEqual(
+        []
+      );
+    });
+  });
 });

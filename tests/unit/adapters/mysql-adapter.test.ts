@@ -880,4 +880,69 @@ describe('MySQLAdapter - connection pooling', () => {
     expect(mockRelease).toHaveBeenCalled();
     expect(mockConn.end).not.toHaveBeenCalled();
   });
+
+  // ============================================================================
+  // Performance Recommendations
+  // ============================================================================
+
+  describe('getPerformanceRecommendations', () => {
+    let adapter: MySQLAdapter;
+
+    beforeEach(() => {
+      adapter = new MySQLAdapter({
+        type: 'mysql',
+        host: 'localhost',
+        port: 3306,
+        database: 'test',
+        username: 'root',
+        password: 'test',
+        select_only: true,
+        mcp_configurable: false,
+      });
+    });
+
+    const explain = (rows: Record<string, unknown>[]): QueryResult => ({
+      rows,
+      rowCount: rows.length,
+      fields: rows.length > 0 ? Object.keys(rows[0]!) : [],
+      truncated: false,
+      execution_time_ms: 1,
+    });
+
+    const advise = (rows: Record<string, unknown>[], query = 'SELECT id FROM users'): string =>
+      adapter.getPerformanceRecommendations(explain(rows), query).join('\n');
+
+    it('should flag a full table scan', () => {
+      expect(advise([{ type: 'ALL' }])).toContain('Full table scan detected');
+    });
+
+    it('should flag a filesort in the Extra column', () => {
+      expect(advise([{ type: 'ref', Extra: 'Using where; Using filesort' }])).toContain(
+        'Filesort operation'
+      );
+    });
+
+    it('should flag a temporary table in the Extra column', () => {
+      expect(advise([{ type: 'ref', Extra: 'Using temporary; Using filesort' }])).toContain(
+        'Temporary table created'
+      );
+    });
+
+    it('should report each row of a multi-row plan', () => {
+      const output = advise([{ type: 'ALL' }, { type: 'ref', Extra: 'Using temporary' }]);
+
+      expect(output).toContain('Full table scan detected');
+      expect(output).toContain('Temporary table created');
+    });
+
+    it('should say nothing about a plan with no problems', () => {
+      expect(
+        adapter.getPerformanceRecommendations(explain([{ type: 'const' }]), 'SELECT 1')
+      ).toEqual([]);
+    });
+
+    it('should say nothing about an empty plan', () => {
+      expect(adapter.getPerformanceRecommendations(explain([]), 'SELECT 1')).toEqual([]);
+    });
+  });
 });

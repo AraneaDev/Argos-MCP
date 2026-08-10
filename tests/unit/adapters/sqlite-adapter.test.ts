@@ -855,4 +855,43 @@ describe('SQLiteAdapter', () => {
       );
     });
   });
+
+  // ============================================================================
+  // Performance Recommendations
+  // ============================================================================
+
+  describe('getPerformanceRecommendations', () => {
+    const explain = (rows: Record<string, unknown>[]): QueryResult => ({
+      rows,
+      rowCount: rows.length,
+      fields: rows.length > 0 ? Object.keys(rows[0]!) : [],
+      truncated: false,
+      execution_time_ms: 1,
+    });
+
+    const advise = (rows: Record<string, unknown>[], query = 'SELECT id FROM users'): string =>
+      adapter.getPerformanceRecommendations(explain(rows), query).join('\n');
+
+    it('should flag a table scan', () => {
+      expect(advise([{ detail: 'SCAN TABLE users' }])).toContain('Table scan detected');
+    });
+
+    it('should flag a temporary b-tree', () => {
+      expect(advise([{ detail: 'USE TEMP B-TREE FOR ORDER BY' }])).toContain(
+        'Temporary B-tree created'
+      );
+    });
+
+    it('should always advise running ANALYZE', () => {
+      expect(advise([{ detail: 'SEARCH TABLE users USING INDEX users_name' }])).toContain(
+        'Run ANALYZE command periodically'
+      );
+    });
+
+    it('should advise running ANALYZE even for an empty plan', () => {
+      expect(adapter.getPerformanceRecommendations(explain([]), 'SELECT 1')).toEqual([
+        expect.stringContaining('Run ANALYZE command periodically'),
+      ]);
+    });
+  });
 });

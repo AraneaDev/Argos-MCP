@@ -90,6 +90,32 @@ export abstract class DatabaseAdapter {
   abstract buildExplainQuery(_query: string): string;
 
   // ============================================================================
+  // Performance Analysis
+  // ============================================================================
+
+  /**
+   * Produce dialect-specific advice about the plan that buildExplainQuery() asked for.
+   * The adapter owns this because only it knows the shape of its own EXPLAIN output.
+   * Adapters with nothing dialect-specific to say inherit this empty default.
+   * @param _explainResult - the result of running buildExplainQuery()
+   * @param _query - the original query the plan was produced for
+   * @returns zero or more recommendation lines
+   */
+  public getPerformanceRecommendations(_explainResult: QueryResult, _query: string): string[] {
+    return [];
+  }
+
+  /**
+   * Flatten an execution plan into a single lowercase string for keyword matching.
+   */
+  protected flattenExplainPlan(explainResult: QueryResult): string {
+    return explainResult.rows
+      .map((row) => Object.values(row).join(' '))
+      .join(' ')
+      .toLowerCase();
+  }
+
+  // ============================================================================
   // Common Implementation Methods
   // ============================================================================
 

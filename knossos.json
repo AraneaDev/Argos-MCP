@@ -1,5 +1,6 @@
 {
   "version": 1,
+  "ignores": [".knossos-src/", ".knossos-ci/", "artifacts/"],
   "boundaries": [
     { "name": "types", "path_prefix": "src/types" },
     { "name": "utils", "path_prefix": "src/utils" },

@@ -100,6 +100,32 @@
         "reason": "equivalent: settled=false makes the guard on the previous line never fire, which is the same observable behaviour as removing it - see the entry on line 215",
         "fingerprint": "156654eed4a1"
       }
+    ],
+    "src/database/adapters/base.ts": [
+      {
+        "line": 192,
+        "mutator": "ConditionalExpression",
+        "addedAt": 1786380254890,
+        "change": "typeof value === 'boolean' → false",
+        "reason": "equivalent: the fallthrough agrees with the early return for both boolean inputs - String(true) is 'true' so the comparison yields true, and String(false) is 'false' so it yields false. No boolean input distinguishes the two paths.",
+        "fingerprint": "83c015ab8cd2"
+      },
+      {
+        "line": 192,
+        "mutator": "StringLiteral",
+        "addedAt": 1786380254890,
+        "change": "'boolean' → \"\"",
+        "reason": "equivalent: 'boolean' -> \"\" makes typeof value === \"\" always false, which is the same fallthrough as the ConditionalExpression mutant on this line",
+        "fingerprint": "83c015ab8cd2"
+      },
+      {
+        "line": 268,
+        "mutator": "StringLiteral",
+        "addedAt": 1786380254890,
+        "change": "'' → \"Stryker was here!\"",
+        "reason": "equivalent: the '' fallback is only reached when raw is null or undefined, and any non-numeric replacement parseInt cannot read yields NaN just as '' does, so the result is 30000 either way",
+        "fingerprint": "618085852af1"
+      }
     ]
   }
 }

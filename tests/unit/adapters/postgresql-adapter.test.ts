@@ -221,7 +221,81 @@ describe('PostgreSQLAdapter', () => {
     });
   });
 
+  // ============================================================================
+  // Pool Configuration
+  // ============================================================================
+
+  describe('pool configuration', () => {
+    const poolConfigAfterConnect = async (
+      overrides: Partial<DatabaseConfig>
+    ): Promise<Record<string, unknown>> => {
+      await new PostgreSQLAdapter({ ...config, ...overrides } as DatabaseConfig).connect();
+      const calls = (pg.Pool as unknown as jest.Mock).mock.calls;
+      return calls[calls.length - 1][0] as Record<string, unknown>;
+    };
+
+    // PostgreSQL cancels the statement itself, so this value is the only thing
+    // stopping a runaway query from holding the connection open.
+    it('should apply the configured query timeout to the server', async () => {
+      const poolConfig = await poolConfigAfterConnect({ query_timeout: 4000 });
+
+      expect(poolConfig.statement_timeout).toBe(4000);
+      expect(poolConfig.query_timeout).toBe(4000);
+    });
+
+    it('should fall back to the connection timeout', async () => {
+      const poolConfig = await poolConfigAfterConnect({
+        query_timeout: undefined,
+        timeout: 9000,
+      });
+
+      expect(poolConfig.statement_timeout).toBe(9000);
+    });
+
+    it('should leave SSL unset when it is not configured', async () => {
+      const { ssl: _ssl, ...withoutSsl } = config;
+      await new PostgreSQLAdapter(withoutSsl as DatabaseConfig).connect();
+      const calls = (pg.Pool as unknown as jest.Mock).mock.calls;
+
+      expect(calls[calls.length - 1][0]).not.toHaveProperty('ssl');
+    });
+
+    it('should disable SSL explicitly when it is configured off', async () => {
+      const poolConfig = await poolConfigAfterConnect({ ssl: false });
+
+      expect(poolConfig.ssl).toBe(false);
+    });
+
+    it('should treat a null SSL setting as off rather than on', async () => {
+      const poolConfig = await poolConfigAfterConnect({ ssl: null as never });
+
+      expect(poolConfig.ssl).toBe(false);
+    });
+  });
+
+  describe('destroyPool', () => {
+    it('should end the pool so the next connect builds a fresh one', async () => {
+      await adapter.connect();
+
+      await adapter.destroyPool();
+
+      expect(mockPoolEnd).toHaveBeenCalled();
+      await adapter.connect();
+      expect(pg.Pool as unknown as jest.Mock).toHaveBeenCalledTimes(2);
+    });
+
+    it('should do nothing when no pool was ever created', async () => {
+      await adapter.destroyPool();
+
+      expect(mockPoolEnd).not.toHaveBeenCalled();
+    });
+  });
+
   describe('isConnected', () => {
+    it('should return false when the client has no stream', async () => {
+      expect(adapter.isConnected({ connection: {} } as never)).toBe(false);
+    });
+
     it('should return true for connected client', async () => {
       const connection = await adapter.connect();
       mockStream.destroyed = false;
@@ -536,6 +610,12 @@ describe('PostgreSQLAdapter', () => {
       expect(schema.tables.users.columns[1].name).toBe('name');
       expect(schema.tables.users.columns[1].max_length).toBe(100);
 
+      // Nullability is read off the 'YES'/'NO' text, so both spellings need an
+      // assertion or a mapping that always answers the same way looks correct.
+      expect(schema.views.user_stats.columns[0].nullable).toBe(true);
+      expect(schema.tables.users.columns[0].comment).toBe('Primary key');
+      expect(schema.tables.posts.columns[0].comment).toBe('');
+
       // Check views
       expect(Object.keys(schema.views)).toHaveLength(1);
       expect(schema.views.user_stats).toBeDefined();
@@ -629,6 +709,12 @@ describe('PostgreSQLAdapter', () => {
           ['testdb']
         );
         expect(size).toBe('42 MB');
+      });
+
+      it('should report an unknown size when the query returns nothing', async () => {
+        mockQuery.mockResolvedValueOnce({ rows: [] });
+
+        expect(await adapter.getDatabaseSize(connection)).toBe('Unknown');
       });
 
       it('should handle database size query errors', async () => {

@@ -243,16 +243,13 @@ export abstract class DatabaseAdapter {
    * parser, into a silently disabled certificate check.
    */
   protected verifyServerCertificate(): boolean {
-    const configured = this.config.ssl_verify;
-
-    if (configured === undefined || configured === null) {
-      return true;
-    }
-    if (typeof configured === 'boolean') {
-      return configured;
-    }
-
-    return !['false', '0', 'no', 'off'].includes(String(configured).trim().toLowerCase());
+    // One expression covers every input, because stringifying lands each on the
+    // right side of the list: false -> 'false' (off), true -> 'true' (on), and
+    // an absent, null or misspelled value stringifies to something the list does
+    // not contain, so it stays on.
+    return !['false', '0', 'no', 'off'].includes(
+      String(this.config.ssl_verify).trim().toLowerCase()
+    );
   }
 
   /**
@@ -291,7 +288,9 @@ export abstract class DatabaseAdapter {
     startTime: number,
     query?: string
   ): QueryResult {
-    const fields = rows.length > 0 ? Object.keys(rows[0] ?? {}) : [];
+    // No length check: Object.keys of the ?? {} fallback is already [] for an
+    // empty result, so guarding on rows.length only restated it.
+    const fields = Object.keys(rows[0] ?? {});
     const baseResult: QueryResult = {
       rows,
       rowCount: observedRowCount,

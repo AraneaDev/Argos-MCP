@@ -34,8 +34,11 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
       const username = this.config.username as string;
       const password = this.config.password as string;
 
-      const statementTimeout =
-        typeof this.config.query_timeout === 'number' ? this.config.query_timeout : 30000;
+      // Same resolution as every other adapter: query_timeout, else the
+      // connection timeout, else 30s. This used to read query_timeout directly
+      // and ignore both a numeric string and the timeout fallback, so the same
+      // configuration could mean one thing here and another on MySQL.
+      const statementTimeout = this.getStatementTimeoutMs();
 
       const poolConfig: pg.PoolConfig = {
         host,

@@ -16,6 +16,9 @@ import { RedactionManager } from '../../classes/RedactionManager.js';
 // Abstract Database Adapter
 // ============================================================================
 
+/**
+ *
+ */
 export abstract class DatabaseAdapter {
   protected config: DatabaseConfig;
   protected connectionTimeout: number;
@@ -229,6 +232,28 @@ export abstract class DatabaseAdapter {
    * Extract field names from query results (implementation varies by adapter)
    */
   protected abstract extractFieldNames(_result: unknown): string[];
+
+  /**
+   * Whether the server's TLS certificate must be verified.
+   *
+   * Fails secure. Verification is switched off only when the configuration says
+   * so in a form this recognises; an unrecognised value leaves it on. The plain
+   * boolean coercion used elsewhere treats every string but 'true' as false,
+   * which would turn a typo, or a 'yes' that never went through the config-file
+   * parser, into a silently disabled certificate check.
+   */
+  protected verifyServerCertificate(): boolean {
+    const configured = this.config.ssl_verify;
+
+    if (configured === undefined || configured === null) {
+      return true;
+    }
+    if (typeof configured === 'boolean') {
+      return configured;
+    }
+
+    return !['false', '0', 'no', 'off'].includes(String(configured).trim().toLowerCase());
+  }
 
   /**
    * Resolve the effective maximum row count from configuration (default 1000).

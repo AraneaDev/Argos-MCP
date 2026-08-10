@@ -3,6 +3,7 @@
  * Tests the MySQL-specific database adapter implementation
  */
 
+import { EventEmitter } from 'events';
 import { MySQLAdapter } from '../../../src/database/adapters/mysql.js';
 import type {
   DatabaseConnection,
@@ -153,6 +154,48 @@ describe('MySQLAdapter', () => {
         expect.objectContaining({
           ssl: { rejectUnauthorized: false },
         })
+      );
+    });
+
+    // A security control must not be switched off by a value nobody recognises.
+    // ssl_verify reaches the adapter as a boolean when it came through the
+    // config-file parser, but nothing guarantees that for every caller.
+    it('should keep verifying when ssl_verify holds an unrecognised value', async () => {
+      const sslAdapter = new MySQLAdapter({ ...config, ssl: true, ssl_verify: 'yes' as never });
+
+      await sslAdapter.connect();
+
+      expect(mysql.createPool).toHaveBeenCalledWith(
+        expect.objectContaining({ ssl: { rejectUnauthorized: true } })
+      );
+    });
+
+    it('should stop verifying for a recognised false spelling', async () => {
+      const sslAdapter = new MySQLAdapter({ ...config, ssl: true, ssl_verify: 'false' as never });
+
+      await sslAdapter.connect();
+
+      expect(mysql.createPool).toHaveBeenCalledWith(
+        expect.objectContaining({ ssl: { rejectUnauthorized: false } })
+      );
+    });
+
+    it('should not configure SSL when it is not asked for', async () => {
+      const { ssl: _ssl, ...withoutSsl } = config;
+      const plainAdapter = new MySQLAdapter(withoutSsl as DatabaseConfig);
+
+      await plainAdapter.connect();
+
+      expect(mysql.createPool).toHaveBeenCalledWith(
+        expect.not.objectContaining({ ssl: expect.anything() })
+      );
+    });
+
+    it('should queue callers rather than fail when the pool is exhausted', async () => {
+      await adapter.connect();
+
+      expect(mysql.createPool).toHaveBeenCalledWith(
+        expect.objectContaining({ waitForConnections: true, connectionLimit: 10 })
       );
     });
 
@@ -853,6 +896,200 @@ describe('MySQLAdapter', () => {
         execute: jest.fn(),
       };
       expect(adapter.isConnected(mockConn as any)).toBe(true);
+    });
+
+    it('should return false for a missing connection', () => {
+      expect(adapter.isConnected(null as any)).toBe(false);
+      expect(adapter.isConnected(undefined as any)).toBe(false);
+    });
+  });
+
+  // ============================================================================
+  // Server-side Statement Timeout
+  // ============================================================================
+
+  // A runaway query has to be cancelled by the server, not just abandoned by the
+  // client, or the connection stays busy. MySQL spells this max_execution_time
+  // (milliseconds); MariaDB spells it max_statement_time (seconds).
+  describe('applyStatementTimeout', () => {
+    const connectWith = async (
+      query: jest.Mock,
+      overrides: Partial<DatabaseConfig> = {}
+    ): Promise<void> => {
+      mockGetConnection.mockResolvedValueOnce({ ...mockConnection, query });
+      const timeoutAdapter = new MySQLAdapter({ ...config, ...overrides });
+      await timeoutAdapter.connect();
+    };
+
+    it('should set the MySQL statement timeout in milliseconds', async () => {
+      const query = jest.fn().mockResolvedValue(undefined);
+
+      await connectWith(query);
+
+      expect(query).toHaveBeenCalledWith('SET SESSION max_execution_time = ?', [30000]);
+    });
+
+    it('should fall back to the MariaDB variable in seconds', async () => {
+      const query = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Unknown system variable'))
+        .mockResolvedValueOnce(undefined);
+
+      await connectWith(query);
+
+      expect(query).toHaveBeenNthCalledWith(2, 'SET SESSION max_statement_time = ?', [30]);
+    });
+
+    it('should round the MariaDB timeout up to a whole second', async () => {
+      const query = jest
+        .fn()
+        .mockRejectedValueOnce(new Error('Unknown system variable'))
+        .mockResolvedValueOnce(undefined);
+
+      await connectWith(query, { query_timeout: 500 });
+
+      expect(query).toHaveBeenNthCalledWith(2, 'SET SESSION max_statement_time = ?', [1]);
+    });
+
+    it('should still connect when the server supports neither variable', async () => {
+      const query = jest.fn().mockRejectedValue(new Error('Unknown system variable'));
+
+      await expect(connectWith(query)).resolves.toBeUndefined();
+      expect(query).toHaveBeenCalledTimes(2);
+    });
+
+    it('should not set a timeout when it is disabled', async () => {
+      const query = jest.fn().mockResolvedValue(undefined);
+
+      await connectWith(query, { query_timeout: 0 });
+
+      expect(query).not.toHaveBeenCalled();
+    });
+  });
+
+  // ============================================================================
+  // Pool Teardown
+  // ============================================================================
+
+  describe('destroyPool', () => {
+    it('should end the pool so the next connect builds a fresh one', async () => {
+      await adapter.connect();
+
+      await adapter.destroyPool();
+
+      expect(mockPoolEnd).toHaveBeenCalled();
+      await adapter.connect();
+      expect(mysql.createPool).toHaveBeenCalledTimes(2);
+    });
+
+    it('should do nothing when no pool was ever created', async () => {
+      await adapter.destroyPool();
+
+      expect(mockPoolEnd).not.toHaveBeenCalled();
+    });
+  });
+
+  // ============================================================================
+  // Row Streaming
+  // ============================================================================
+
+  // executeQuery streams rows rather than buffering them, so a huge result set
+  // never fully materializes in the heap. Only the connections that expose the
+  // core .connection take this path; the others fall back to buffered execute.
+  describe('row streaming', () => {
+    const streamingConnection = (
+      rows: Record<string, unknown>[],
+      opts: { error?: Error; throwOnQuery?: Error; trailing?: () => void } = {}
+    ): Record<string, unknown> => {
+      const stream = new EventEmitter();
+      const core = {
+        query: jest.fn(() => {
+          if (opts.throwOnQuery) throw opts.throwOnQuery;
+          return { stream: () => stream };
+        }),
+      };
+
+      // Emit once the adapter has attached its listeners.
+      process.nextTick(() => {
+        for (const row of rows) stream.emit('data', row);
+        if (opts.error) stream.emit('error', opts.error);
+        else stream.emit('end');
+        opts.trailing?.();
+      });
+
+      return { ...mockConnection, connection: core };
+    };
+
+    const streamAdapter = (overrides: Partial<DatabaseConfig> = {}): MySQLAdapter =>
+      new MySQLAdapter({ ...config, ...overrides });
+
+    it('should fall back to buffered execute when the core cannot stream', async () => {
+      // A connection object that has .connection but no usable query on it.
+      const conn = { ...mockConnection, connection: { notQuery: true } };
+
+      const result = await streamAdapter().executeQuery(conn as any, 'SELECT id FROM users');
+
+      expect(mockExecute).toHaveBeenCalled();
+      expect(result.rows).toEqual([{ id: 1, name: 'test' }]);
+    });
+
+    it('should return the streamed rows', async () => {
+      const conn = streamingConnection([{ id: 1 }, { id: 2 }]);
+
+      const result = await streamAdapter().executeQuery(conn as any, 'SELECT id FROM users');
+
+      expect(result.rows).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(result.rowCount).toBe(2);
+      expect(result.fields).toEqual(['id']);
+      expect(result.truncated).toBe(false);
+    });
+
+    it('should retain only max_rows and report the full observed count', async () => {
+      const conn = streamingConnection([{ id: 1 }, { id: 2 }, { id: 3 }]);
+
+      const result = await streamAdapter({ max_rows: 2 }).executeQuery(conn as any, 'SELECT 1');
+
+      expect(result.rows).toEqual([{ id: 1 }, { id: 2 }]);
+      expect(result.rowCount).toBe(3);
+      expect(result.truncated).toBe(true);
+    });
+
+    it('should not mark a result truncated at exactly max_rows', async () => {
+      const conn = streamingConnection([{ id: 1 }, { id: 2 }]);
+
+      const result = await streamAdapter({ max_rows: 2 }).executeQuery(conn as any, 'SELECT 1');
+
+      expect(result.rows).toHaveLength(2);
+      expect(result.truncated).toBe(false);
+    });
+
+    it('should reject when the stream errors', async () => {
+      const conn = streamingConnection([{ id: 1 }], { error: new Error('connection lost') });
+
+      await expect(streamAdapter().executeQuery(conn as any, 'SELECT 1')).rejects.toThrow(
+        'mysql adapter error: Failed to execute MySQL query - connection lost'
+      );
+    });
+
+    it('should reject when the stream cannot be created', async () => {
+      const conn = streamingConnection([], { throwOnQuery: new Error('bad SQL') });
+
+      await expect(streamAdapter().executeQuery(conn as any, 'SELECT 1')).rejects.toThrow(
+        'mysql adapter error: Failed to execute MySQL query - bad SQL'
+      );
+    });
+
+    it('should ignore an error that arrives after the stream ended', async () => {
+      const conn = streamingConnection([{ id: 1 }]);
+      const stream = ((conn.connection as any).query() as { stream: () => EventEmitter }).stream();
+
+      const result = streamAdapter().executeQuery(conn as any, 'SELECT 1');
+      process.nextTick(() => {
+        stream.emit('end');
+        stream.emit('error', new Error('too late'));
+      });
+
+      await expect(result).resolves.toMatchObject({ rowCount: 1 });
     });
   });
 });

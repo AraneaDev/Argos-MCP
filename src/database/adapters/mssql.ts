@@ -52,11 +52,7 @@ export class MSSQLAdapter extends DatabaseAdapter {
       requestTimeout: this.connectionTimeout,
       options: {
         encrypt: this.parseConfigValue(this.config.encrypt ?? true, 'boolean', true),
-        trustServerCertificate: !this.parseConfigValue(
-          this.config.ssl_verify ?? true,
-          'boolean',
-          true
-        ),
+        trustServerCertificate: !this.verifyServerCertificate(),
         enableArithAbort: true,
       },
       pool: {

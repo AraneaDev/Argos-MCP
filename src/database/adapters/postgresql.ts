@@ -17,6 +17,9 @@ import type {
 // PostgreSQL Adapter Implementation
 // ============================================================================
 
+/**
+ *
+ */
 export class PostgreSQLAdapter extends DatabaseAdapter {
   private _pool?: pg.Pool;
 
@@ -52,7 +55,7 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
       if (this.config.ssl !== undefined) {
         const sslEnabled = this.parseConfigValue(this.config.ssl, 'boolean', false);
         if (sslEnabled) {
-          const sslVerify = this.parseConfigValue(this.config.ssl_verify ?? true, 'boolean', true);
+          const sslVerify = this.verifyServerCertificate();
           poolConfig.ssl = { rejectUnauthorized: sslVerify };
         } else {
           poolConfig.ssl = false; // explicitly disable
@@ -64,6 +67,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     return this._pool;
   }
 
+  /**
+   *
+   */
   async connect(): Promise<DatabaseConnection> {
     this.validateConfig(['host', 'database', 'username', 'password']);
     try {
@@ -74,6 +80,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   async disconnect(connection: DatabaseConnection): Promise<void> {
     try {
       const poolClient = connection as PoolClient;
@@ -83,6 +92,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   async destroyPool(): Promise<void> {
     if (this._pool) {
       await this._pool.end();
@@ -90,6 +102,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   isConnected(connection: DatabaseConnection): boolean {
     try {
       const pgClient = connection as PgClient & {
@@ -106,6 +121,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
   // Query Execution
   // ============================================================================
 
+  /**
+   *
+   */
   async executeQuery(
     connection: DatabaseConnection,
     query: string,
@@ -137,6 +155,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
   // Transaction Management
   // ============================================================================
 
+  /**
+   *
+   */
   async beginTransaction(connection: DatabaseConnection): Promise<void> {
     try {
       const pgClient = connection as PgClient;
@@ -146,6 +167,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   async commitTransaction(connection: DatabaseConnection): Promise<void> {
     try {
       const pgClient = connection as PgClient;
@@ -155,6 +179,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
     }
   }
 
+  /**
+   *
+   */
   async rollbackTransaction(connection: DatabaseConnection): Promise<void> {
     try {
       const pgClient = connection as PgClient;
@@ -168,11 +195,17 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
   // Performance Analysis
   // ============================================================================
 
+  /**
+   *
+   */
   buildExplainQuery(query: string): string {
     // Use JSON format for better parsing and analysis
     return `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) ${query}`;
   }
 
+  /**
+   *
+   */
   override getPerformanceRecommendations(explainResult: QueryResult, query: string): string[] {
     const recommendations: string[] = [];
     const planText = this.flattenExplainPlan(explainResult);
@@ -198,6 +231,9 @@ export class PostgreSQLAdapter extends DatabaseAdapter {
   // Schema Capture
   // ============================================================================
 
+  /**
+   *
+   */
   async captureSchema(connection: DatabaseConnection): Promise<DatabaseSchema> {
     try {
       const schema = this.createBaseSchema(this.config.database ?? '');

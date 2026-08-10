@@ -57,13 +57,12 @@ export class MySQLAdapter extends DatabaseAdapter {
         connectTimeout: this.connectionTimeout,
       };
 
-      // Handle SSL configuration
-      if (this.config.ssl !== undefined) {
-        const sslEnabled = this.parseConfigValue(this.config.ssl ?? false, 'boolean', false);
-        if (sslEnabled) {
-          const sslVerify = this.parseConfigValue(this.config.ssl_verify ?? true, 'boolean', true);
-          poolConfig.ssl = { rejectUnauthorized: sslVerify };
-        }
+      // Handle SSL configuration. No presence check is needed: parseConfigValue
+      // already maps an absent or null value to the default, so guarding on
+      // `!== undefined` only restated what the next line does.
+      const sslEnabled = this.parseConfigValue(this.config.ssl, 'boolean', false);
+      if (sslEnabled) {
+        poolConfig.ssl = { rejectUnauthorized: this.verifyServerCertificate() };
       }
 
       // Azure MariaDB/MySQL: force SSL and rewrite username to user@server
@@ -71,7 +70,7 @@ export class MySQLAdapter extends DatabaseAdapter {
         host.includes('.mariadb.database.azure.com') ||
         host.includes('.mysql.database.azure.com')
       ) {
-        const sslVerify = this.parseConfigValue(this.config.ssl_verify ?? true, 'boolean', true);
+        const sslVerify = this.verifyServerCertificate();
         poolConfig.ssl = { rejectUnauthorized: sslVerify };
         if (!username.includes('@')) {
           const serverName = host.split('.')[0];

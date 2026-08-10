@@ -66,6 +66,40 @@
         "reason": "equivalent: validateDatabaseConfig returns { valid: errors.length === 0 }, so reaching this line (valid === false) guarantees errors.length > 0 and errors[0] is never undefined. The ?? branch is therefore unreachable and ?. behaves identically to . here. The LogicalOperator mutant on the same line IS killable and is tested, because ?? yields the field name while && yields 'config'.",
         "fingerprint": "38e427d70abb"
       }
+    ],
+    "src/database/adapters/mysql.ts": [
+      {
+        "line": 151,
+        "mutator": "ConditionalExpression",
+        "addedAt": 1786379194256,
+        "change": "!connection → false",
+        "reason": "equivalent: with the guard skipped, a null/undefined connection makes the next line throw on .connection and the surrounding try/catch returns false; a falsy non-null value falls through to `typeof execute === 'function'`, also false. Same result for every falsy input. The guard is kept because relying on a thrown TypeError for control flow is worse to read.",
+        "fingerprint": "215559e64f6b"
+      },
+      {
+        "line": 151,
+        "mutator": "BlockStatement",
+        "addedAt": 1786379194256,
+        "change": "{ return false; } → {}",
+        "reason": "equivalent: emptying the block has the same effect as skipping the guard - see the ConditionalExpression entry on this line",
+        "fingerprint": "215559e64f6b"
+      },
+      {
+        "line": 215,
+        "mutator": "ConditionalExpression",
+        "addedAt": 1786379194256,
+        "change": "settled → false",
+        "reason": "equivalent through the returned promise: resolve/reject after settlement are no-ops per spec, so a second finish() cannot change the outcome. The guard still earns its place by stopping finish's body from running twice when a stream emits both 'error' and 'end', which would repeat the redaction pass inside buildStreamedResult.",
+        "fingerprint": "02ed967d30c2"
+      },
+      {
+        "line": 216,
+        "mutator": "BooleanLiteral",
+        "addedAt": 1786379194256,
+        "change": "true → false",
+        "reason": "equivalent: settled=false makes the guard on the previous line never fire, which is the same observable behaviour as removing it - see the entry on line 215",
+        "fingerprint": "156654eed4a1"
+      }
     ]
   }
 }

@@ -103,6 +103,68 @@ describe('RedactionManager', () => {
     redactionManager = new RedactionManager(config);
   });
 
+  // Each of these settings is off unless the configuration turns it on. The
+  // case-sensitivity one matters most: flipped, a '*email*' rule would stop
+  // matching a column named 'Email' and the value would come back in the clear.
+  describe('settings default to off', () => {
+    const summary = (
+      config: Partial<DatabaseRedactionConfig>
+    ): { log_access: boolean; audit_queries: boolean; case_sensitive: boolean } =>
+      new RedactionManager({
+        enabled: true,
+        rules: [],
+        ...config,
+      } as DatabaseRedactionConfig).getConfigurationSummary().settings;
+
+    it('should leave all three off when the configuration is silent', () => {
+      expect(summary({})).toEqual({
+        log_access: false,
+        audit_queries: false,
+        case_sensitive: false,
+      });
+    });
+
+    it('should honour each one when the configuration turns it on', () => {
+      expect(
+        summary({
+          log_redacted_access: true,
+          audit_redacted_queries: true,
+          case_sensitive_matching: true,
+        })
+      ).toEqual({ log_access: true, audit_queries: true, case_sensitive: true });
+    });
+
+    it('should keep matching case-insensitively by default', () => {
+      const manager = new RedactionManager({
+        enabled: true,
+        rules: [
+          { field_pattern: '*email*', pattern_type: 'wildcard', redaction_type: 'full_mask' },
+        ] as FieldRedactionRule[],
+      } as DatabaseRedactionConfig);
+
+      expect(manager.shouldRedactField('Email')).toBeTruthy();
+      expect(manager.shouldRedactField('USER_EMAIL')).toBeTruthy();
+    });
+
+    it('should apply the same defaults when the rules are replaced', () => {
+      const manager = new RedactionManager({
+        enabled: true,
+        rules: [],
+        log_redacted_access: true,
+        audit_redacted_queries: true,
+        case_sensitive_matching: true,
+      } as DatabaseRedactionConfig);
+
+      manager.updateRules({ enabled: true, rules: [] } as DatabaseRedactionConfig);
+
+      expect(manager.getConfigurationSummary().settings).toEqual({
+        log_access: false,
+        audit_queries: false,
+        case_sensitive: false,
+      });
+    });
+  });
+
   describe('shouldRedactField', () => {
     it('should match exact field names', () => {
       const rule = redactionManager.shouldRedactField('email');
@@ -121,6 +183,37 @@ describe('RedactionManager', () => {
       expect(rule1?.redaction_type).toBe('full_mask');
     });
 
+    // Only '*' is a wildcard. Every other regex metacharacter has to be matched
+    // literally, or a rule containing one either matches the wrong fields or,
+    // worse, throws while building its regex and silently protects nothing.
+    it.each([
+      ['?', '?ssn'],
+      ['.', 'a.b'],
+      ['+', 'a+b'],
+      ['(', 'a(b'],
+      ['[', 'a[b'],
+    ])('should treat %s in a pattern as a literal character', (_label, field) => {
+      const manager = new RedactionManager({
+        enabled: true,
+        rules: [
+          { field_pattern: field, pattern_type: 'wildcard', redaction_type: 'full_mask' },
+        ] as FieldRedactionRule[],
+      } as DatabaseRedactionConfig);
+
+      expect(manager.shouldRedactField(field)).toBeTruthy();
+    });
+
+    it('should not let a literal metacharacter match a different field', () => {
+      const manager = new RedactionManager({
+        enabled: true,
+        rules: [
+          { field_pattern: 'a.b', pattern_type: 'wildcard', redaction_type: 'full_mask' },
+        ] as FieldRedactionRule[],
+      } as DatabaseRedactionConfig);
+
+      expect(manager.shouldRedactField('axb')).toBeNull();
+    });
+
     it('should not match non-matching fields', () => {
       const rule = redactionManager.shouldRedactField('username');
       expect(rule).toBeNull();
@@ -133,6 +226,107 @@ describe('RedactionManager', () => {
   });
 
   describe('redactResults', () => {
+    // The whole point of redaction is that the raw value never reaches the
+    // caller. If redacting one throws, returning it untouched would leak exactly
+    // what the rule exists to hide, so the field is replaced with a placeholder
+    // instead. Nothing exercised that path before.
+    describe('when redacting a value throws', () => {
+      const hostileValue = (): unknown => ({
+        toString(): string {
+          throw new Error('value could not be decoded');
+        },
+      });
+
+      const redactHostile = (): QueryResult => {
+        const value = hostileValue();
+        return redactionManager.redactResults({
+          rows: [{ id: 1, email: value, name: 'John Doe' }],
+          rowCount: 1,
+          fields: ['id', 'email', 'name'],
+          truncated: false,
+          execution_time_ms: 1,
+        });
+      };
+
+      it('should replace the value with a placeholder rather than pass it through', () => {
+        const result = redactHostile();
+
+        expect(result.rows[0].email).toBe('[REDACTION_ERROR]');
+        expect(typeof result.rows[0].email).toBe('string');
+      });
+
+      it('should still count and name the field as redacted', () => {
+        const result = redactHostile() as QueryResult & {
+          redaction?: { redaction_count: number; fields_redacted: string[]; warnings?: string[] };
+        };
+
+        expect(result.redaction?.redaction_count).toBe(1);
+        expect(result.redaction?.fields_redacted).toContain('email');
+      });
+
+      it('should report the failure as a warning naming the field', () => {
+        const result = redactHostile() as QueryResult & {
+          redaction?: { warnings?: string[] };
+        };
+
+        expect(result.redaction?.warnings?.join(' ')).toContain('email');
+      });
+
+      it('should leave the other fields of the row alone', () => {
+        const result = redactHostile();
+
+        expect(result.rows[0].id).toBe(1);
+        expect(result.rows[0].name).toBe('John Doe');
+      });
+    });
+
+    // FIND-104: a protected column renamed by the query must stay protected, or
+    // wrapping it in an expression is enough to read it in the clear. The AS form
+    // is covered below; these cover the form with no AS keyword.
+    describe('when a protected column is aliased without AS', () => {
+      const redactWithQuery = (query: string, row: Record<string, unknown>): QueryResult =>
+        redactionManager.redactResults(
+          {
+            rows: [row],
+            rowCount: 1,
+            fields: Object.keys(row),
+            truncated: false,
+            execution_time_ms: 1,
+          },
+          query
+        );
+
+      it('should follow the alias through a function call', () => {
+        const result = redactWithQuery('SELECT lower(email) e FROM users', {
+          e: 'john.doe@example.com',
+        });
+
+        expect(result.rows[0].e).not.toBe('john.doe@example.com');
+      });
+
+      it('should follow the alias through a qualified column', () => {
+        const result = redactWithQuery('SELECT users.email addr FROM users', {
+          addr: 'john.doe@example.com',
+        });
+
+        expect(result.rows[0].addr).not.toBe('john.doe@example.com');
+      });
+
+      it('should follow the alias through a concatenation', () => {
+        const result = redactWithQuery("SELECT (email + '') contact FROM users", {
+          contact: 'john.doe@example.com',
+        });
+
+        expect(result.rows[0].contact).not.toBe('john.doe@example.com');
+      });
+
+      it('should leave an unrelated expression alias alone', () => {
+        const result = redactWithQuery('SELECT upper(name) n FROM users', { n: 'JOHN DOE' });
+
+        expect(result.rows[0].n).toBe('JOHN DOE');
+      });
+    });
+
     it('should redact matching fields in query results', () => {
       const queryResult: QueryResult = {
         rows: [

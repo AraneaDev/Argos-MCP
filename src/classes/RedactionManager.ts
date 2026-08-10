@@ -450,18 +450,20 @@ export class RedactionManager {
    * Check if a field name matches a wildcard pattern
    */
   private matchesWildcard(fieldName: string, pattern: string): boolean {
-    // Convert wildcard pattern to regex
+    // '*' is the only wildcard; every other regex metacharacter is escaped so it
+    // matches itself. '?' used to be left unescaped, which made a pattern like
+    // '?ssn' an invalid regex. That threw, was swallowed, and the rule then
+    // matched nothing at all - a field the operator had asked to protect was
+    // returned in the clear, with only a log line to say so.
+    //
+    // With every metacharacter escaped the expression cannot fail to compile, so
+    // there is nothing left to catch. Were that ever to change, the throw should
+    // reach the caller and fail the query rather than quietly drop a rule.
     const regexPattern = pattern
-      .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except *
+      .replace(/[.+?^${}()|[\]\\]/g, '\\$&') // Escape regex special chars except *
       .replace(/\*/g, '.*'); // Convert * to .*
 
-    try {
-      const regex = new RegExp(`^${regexPattern}$`);
-      return regex.test(fieldName);
-    } catch (error) {
-      this.logger.warning('Invalid wildcard pattern', { pattern, error });
-      return false;
-    }
+    return new RegExp(`^${regexPattern}$`).test(fieldName);
   }
 
   /**

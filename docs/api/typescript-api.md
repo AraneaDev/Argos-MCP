@@ -1,38 +1,22 @@
 # TypeScript API Reference
 
-# TypeScript API Reference
-
 This document provides comprehensive TypeScript API documentation for the Argos-MCP. It covers all interfaces, types, classes, and functions available for developers working with or extending the server.
 
-## Implementation Status Guide
+## What this covers
 
-This documentation reflects the **actual implementation** as of v3.0.0 <!-- x-release-please-version -->. Status indicators show the current state:
+Describes the source as of v3.0.0 <!-- x-release-please-version -->. These are
+the internal types and classes of the server, for anyone reading or extending
+it. They are not a supported import surface: the package
+publishes `dist/` but declares no `types` entry and no `exports` map, so names
+here can change without a major version.
 
-- **Fully Implemented** - Complete and ready for use (90%+ test coverage)
-- **Partially Implemented** - Basic functionality available, advanced features planned
-- **Planned** - Interface defined, implementation in future versions
-- **Not Available** - Documented but not implemented
+For the interface that *is* stable, see the
+[MCP Tools Reference](./mcp-tools-reference.md): the tools, their arguments and
+their responses are what a client depends on.
 
-## Test Coverage Status
-
-**Overall Test Coverage:** 92% (180+ test scenarios)
-
-| Component Category | Coverage | Test Files | Status |
-|-------------------|----------|------------|--------|
-| **Core Classes** | 96% | 6 files | Enterprise Grade |
-| **Database Adapters** | 94% | 5 files | Enterprise Grade |
-| **Security Components** | 98% | 1 file | Enterprise Grade |
-| **Type Definitions** | 100% | - | Fully Validated |
-
-**Test Standards:** All components marked with have comprehensive test coverage including:
-- Unit tests for all public methods
-- Integration tests for component interactions
-- Performance tests for database operations
-- Error handling and edge case validation
-- Mock implementations for external dependencies
-
-**Last Updated:** 2025-01-13 
-**Implementation Review:** All method signatures and types have been verified against actual codebase
+Coverage figures are deliberately not quoted here, because a number written into
+a document is wrong the week after. Run `npm run test:coverage` for the current
+state.
 
 ## Table of Contents
 
@@ -81,7 +65,7 @@ Manages database connections and connection pooling.
 
 ```typescript
 export class ConnectionManager extends EventEmitter {
- constructor(sshTunnelManager: SSHTunnelManager);
+ constructor(sshTunnelManager: EnhancedSSHTunnelManager, metrics?: MetricsManager, queryCache?: QueryCache);
  
  // Connection management
  initialize(databases: Record<string, DatabaseConfig>): void;
@@ -153,7 +137,7 @@ Manages database schema caching and retrieval.
 
 ```typescript
 export class SchemaManager extends EventEmitter {
- constructor(connectionManager: ConnectionManager);
+ constructor(connectionManager: ConnectionManager, schemaPath?: string);
  
  // Initialization
  initialize(): Promise<void>;
@@ -171,29 +155,34 @@ export class SchemaManager extends EventEmitter {
 }
 ```
 
-### SSHTunnelManager 
+### EnhancedSSHTunnelManager
 Manages SSH tunnels for secure database connections.
 
 ```typescript
-export class SSHTunnelManager extends EventEmitter {
+export class EnhancedSSHTunnelManager extends EventEmitter {
  constructor();
- 
+
  // Initialization
- initialize(): void;
- 
+ initialize(): Promise<void>;
+
  // Tunnel management
- createTunnel(database: string, options: SSHTunnelCreateOptions): Promise<SSHTunnelInfo>;
- hasTunnel(database: string): boolean;
- getTunnel(database: string): SSHTunnelInfo | null;
- closeTunnel(database: string): Promise<void>;
+ createTunnel(dbName: string, options: SSHTunnelCreateOptions): Promise<SSHTunnelInfo>;
+ createEnhancedTunnel(dbName: string, options: EnhancedTunnelOptions): Promise<EnhancedTunnelInfo>;
+ hasTunnel(dbName: string): boolean;
+ getTunnel(dbName: string): SSHTunnelInfo | undefined;
+ getEnhancedTunnel(dbName: string): EnhancedTunnelInfo | undefined;
+ closeTunnel(dbName: string): Promise<void>;
  closeAllTunnels(): Promise<void>;
- 
- // Events emitted
- on(event: 'tunnel-connected', listener: (database: string) => void): this;
- on(event: 'tunnel-disconnected', listener: (database: string) => void): this;
- on(event: 'tunnel-error', listener: (error: Error, database?: string) => void): this;
+
+ // Status
+ isConnected(dbName: string): boolean;
+ getTunnelStatus(dbName: string): SSHTunnelStatusInfo | undefined;
+ getActiveTunnels(): string[];
 }
 ```
+
+The class is named `EnhancedSSHTunnelManager`; there is no `SSHTunnelManager`.
+The getters return `undefined` rather than `null` for an unknown database.
 
 ---
 
@@ -260,44 +249,52 @@ Complete schema information for a database.
 
 ```typescript
 export interface DatabaseSchema {
+ database: string;
+ type: DatabaseTypeString;
+ captured_at: string;
  tables: Record<string, TableInfo>;
- views: Record<string, ViewInfo>;
- summary: SchemaInfo;
+ views: Record<string, TableInfo>;
+ summary: {
+ table_count: number;
+ view_count: number;
+ total_columns: number;
+ };
 }
 
 export interface TableInfo {
- columns: Record<string, ColumnInfo>;
- primaryKey?: string[];
- foreignKeys: ForeignKeyInfo[];
- indexes: IndexInfo[];
+ name: string;
+ type: string;
+ comment?: string;
+ columns: ColumnInfo[];
 }
 
 export interface ColumnInfo {
+ name: string;
  type: string;
  nullable: boolean;
- default?: any;
- maxLength?: number;
- precision?: number;
- scale?: number;
- autoIncrement?: boolean;
- unique?: boolean;
-}
-
-export interface ForeignKeyInfo {
- column: string;
- referencedTable: string;
- referencedColumn: string;
- onDelete?: string;
- onUpdate?: string;
-}
-
-export interface IndexInfo {
- name: string;
- columns: string[];
- unique: boolean;
- type?: string;
+ default: unknown;
+ max_length?: number | null;
+ precision?: number | null;
+ scale?: number | null;
+ comment?: string;
+ key?: string;
+ extra?: string;
 }
 ```
+
+Two things to note about what schema capture returns, because both are easy to
+assume otherwise:
+
+- **Columns are an array, not a map.** `TableInfo.columns` is ordered as the
+  database returned it, and each entry carries its own `name`.
+- **Relationships and indexes are not captured.** There is no foreign-key or
+  index metadata in the schema, on any adapter. `ColumnInfo.key` carries
+  whatever the driver reports for the column (MySQL's `COLUMN_KEY`, for
+  instance), which is the closest thing available. To reason about
+  relationships, query the database's own catalogue.
+
+Views are described with the same `TableInfo` shape as tables and are
+distinguished by the `type` field.
 
 ### BatchResult
 Result of batch query execution.
@@ -365,31 +362,29 @@ export interface MCPError {
 }
 ```
 
-### MCPTool
-Tool definition for MCP tools/list.
+### Tool definitions
+The tool list served for `tools/list`.
 
 ```typescript
-export interface MCPTool {
+export function getToolDefinitions(): Array<{
  name: string;
  description: string;
- inputSchema: MCPToolInputSchema;
-}
-
-export interface MCPToolInputSchema {
- type: 'object';
- properties: Record<string, MCPToolParameter>;
- required: string[];
- additionalProperties: boolean;
-}
+ inputSchema: { type: 'object'; properties: Record<string, unknown>; required?: string[] };
+}>;
 
 export interface MCPToolParameter {
  type: string;
  description?: string;
  enum?: string[];
  items?: MCPToolParameter;
- default?: any;
+ default?: unknown;
 }
 ```
+
+The definitions are plain object literals in `src/tools/tool-definitions.ts` and
+their type is inferred rather than declared, so there is no `MCPTool` interface
+to import. `MCPToolParameter` describes the shape of one property inside an
+`inputSchema` and is the only part of this declared as a named type.
 
 ### Tool Input Types
 Specific input argument types for each tool.
@@ -425,58 +420,16 @@ export interface SQLRefreshSchemaArgs {
  database: string;
 }
 
-export interface SQLListDatabasesArgs {
- // No parameters required
-}
-
-export interface SQLAddDatabaseArgs {
- name: string;
- type: string;
- host?: string;
- port?: number;
- database?: string;
- username?: string;
- password?: string;
- file?: string;
- ssl?: boolean;
- select_only?: boolean;
- ssh_host?: string;
- ssh_port?: number;
- ssh_username?: string;
- ssh_password?: string;
- ssh_private_key?: string;
-}
-
-export interface SQLUpdateDatabaseArgs {
- database: string;
- host?: string;
- port?: number;
- database_name?: string;
- username?: string;
- password?: string;
- file?: string;
- ssl?: boolean;
- select_only?: boolean;
- ssh_host?: string;
- ssh_port?: number;
- ssh_username?: string;
- ssh_password?: string;
- ssh_private_key?: string;
-}
-
-export interface SQLRemoveDatabaseArgs {
- database: string;
-}
-
-export interface SQLGetConfigArgs {
- database: string;
-}
-
-export interface SQLSetMcpConfigurableArgs {
- database: string;
- enabled: boolean;
-}
 ```
+
+The config-management tools (`sql_add_database`, `sql_update_database`,
+`sql_remove_database`, `sql_get_config`, `sql_set_mcp_configurable`) and
+`sql_list_databases` have no declared argument interfaces. Their handlers take
+`Record<string, unknown>` and read the fields they need, so the authoritative
+description of what each accepts is the `inputSchema` in
+`src/tools/tool-definitions.ts` and the
+[MCP Tools Reference](./mcp-tools-reference.md).
+
 
 ### MCPToolResponse
 Tool response structure.
@@ -807,7 +760,8 @@ export const SSH_TUNNEL_STATUSES = ['connecting', 'connected', 'error', 'disconn
 
 ### Creating and Using SQLMCPServer
 ```typescript
-import { SQLMCPServer, DatabaseConfig } from 'argos';
+import { SQLMCPServer } from '../../src/classes/SQLMCPServer.js';
+import type { DatabaseConfig } from '../../src/types/index.js';
 
 const server = new SQLMCPServer();
 
@@ -835,29 +789,32 @@ startServer();
 
 ### Custom Security Validation
 ```typescript
-import { SecurityManager, SecurityValidation } from 'argos';
+import { SecurityManager } from '../../src/classes/SecurityManager.js';
+import type { SecurityValidation } from '../../src/types/index.js';
 
 class CustomSecurityManager extends SecurityManager {
  validateCustomRule(query: string): SecurityValidation {
- // Custom validation logic
- const hasCustomPattern = /CUSTOM_FORBIDDEN_PATTERN/.test(query);
- 
- if (hasCustomPattern) {
+ if (/CUSTOM_FORBIDDEN_PATTERN/.test(query)) {
  return {
  allowed: false,
  reason: 'Custom forbidden pattern detected',
- blockedOperation: 'CUSTOM_PATTERN'
+ blockedCommand: 'CUSTOM_PATTERN',
+ confidence: 1.0,
  };
  }
- 
- return { allowed: true };
+
+ return { allowed: true, confidence: 1.0 };
  }
 }
 ```
 
+`confidence` is required on a `SecurityValidation`, and the field naming the
+offending statement is `blockedCommand`.
+
 ### Type-Safe Configuration
 ```typescript
-import { DatabaseConfig, isDatabaseType, validateRequiredFields } from 'argos';
+import { isDatabaseType, validateRequiredFields } from '../../src/types/index.js';
+import type { DatabaseConfig } from '../../src/types/index.js';
 
 function createDatabaseConfig(rawConfig: any): DatabaseConfig {
  // Validate database type
@@ -886,50 +843,49 @@ function createDatabaseConfig(rawConfig: any): DatabaseConfig {
 ```
 
 ### Custom Database Adapter
-```typescript
-import { DatabaseConnection, QueryResult } from 'argos';
 
-class CustomDatabaseAdapter implements DatabaseConnection {
- async connect(config: DatabaseConfig): Promise<void> {
- // Custom connection logic
- }
- 
- async disconnect(): Promise<void> {
- // Custom disconnection logic
- }
- 
- async executeQuery(query: string, params?: any[]): Promise<QueryResult> {
- // Custom query execution
- return {
- rows: [],
- fields: [],
- rowCount: 0
- };
- }
- 
- async getSchema(): Promise<DatabaseSchema> {
- // Custom schema introspection
- return {
- tables: {},
- views: {},
- summary: {
- table_count: 0,
- view_count: 0,
- total_columns: 0
- }
- };
- }
+A new database is added by extending the abstract `DatabaseAdapter`, not by
+implementing `DatabaseConnection` — that type is the driver's connection handle,
+not the adapter contract. The subclass must supply every abstract member:
+
+```typescript
+import { DatabaseAdapter } from '../../src/database/adapters/base.js';
+import type { DatabaseConnection, QueryResult, DatabaseSchema } from '../../src/types/index.js';
+
+class CustomAdapter extends DatabaseAdapter {
+ async connect(): Promise<DatabaseConnection> { /* ... */ }
+ async executeQuery(connection: DatabaseConnection, query: string, params?: unknown[]): Promise<QueryResult> { /* ... */ }
+ async disconnect(connection: DatabaseConnection): Promise<void> { /* ... */ }
+ async captureSchema(connection: DatabaseConnection): Promise<DatabaseSchema> { /* ... */ }
+ isConnected(connection: DatabaseConnection): boolean { /* ... */ }
+ async beginTransaction(connection: DatabaseConnection): Promise<void> { /* ... */ }
+ async commitTransaction(connection: DatabaseConnection): Promise<void> { /* ... */ }
+ async rollbackTransaction(connection: DatabaseConnection): Promise<void> { /* ... */ }
+ buildExplainQuery(query: string): string { /* ... */ }
+
+ protected extractRawRows(result: unknown): unknown[] { /* ... */ }
+ protected extractFieldNames(result: unknown): string[] { /* ... */ }
 }
 ```
 
+`examples/custom-adapters/adapter-template.ts` is a complete version of the
+above with each method commented, and is a better starting point than this
+outline. Register the finished class in
+`src/database/adapters/AdapterFactory.ts`.
+
+Optionally override `getPerformanceRecommendations(explainResult, query)` to
+turn the output of your `buildExplainQuery` into advice; the base implementation
+returns nothing.
+
+
 ### Error Handling with Type Safety
 ```typescript
-import { 
- SQLMCPError, 
- SecurityViolationError, 
+import {
+ SQLMCPError,
+ SecurityViolationError,
  ConnectionError,
- isSecurityViolationError 
-} from 'argos';
+} from '../../src/utils/error-handler.js';
+import { isSecurityViolationError } from '../../src/types/index.js';
 
 async function handleDatabaseOperation() {
  try {

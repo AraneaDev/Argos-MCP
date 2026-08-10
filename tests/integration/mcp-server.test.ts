@@ -1,4 +1,4 @@
-import { SQLMCPServer } from '../../src/classes/SQLMCPServer.js';
+import { SQLMCPServer, resolveConfigPathFromArgv } from '../../src/classes/SQLMCPServer.js';
 import { TestConfigFixtures } from '../fixtures/test-configs.js';
 import { SampleQueries } from '../fixtures/sample-queries.js';
 import type { MCPRequest } from '../../src/types/mcp.js';
@@ -776,6 +776,42 @@ ssh_private_key=/tmp/fake_key
       (server as any).sshTunnelManager = mockSSHTunnelManager;
 
       await expect(server.cleanup()).rejects.toThrow('Cleanup failed');
+    });
+  });
+
+  // The documented registration command passes --config, and an MCP client
+  // starts the server from whatever working directory it happens to be in. If
+  // the flag is ignored, the search falls back to ./config.ini and the server
+  // reports no configuration while the operator is looking at the file they
+  // pointed it at.
+  describe('resolveConfigPathFromArgv', () => {
+    const argv = (...args: string[]): string[] => ['node', '/path/dist/index.js', ...args];
+
+    it('reads the path from a separate argument', () => {
+      expect(resolveConfigPathFromArgv(argv('--config', '/etc/argos/config.ini'))).toBe(
+        '/etc/argos/config.ini'
+      );
+    });
+
+    it('reads the path from an = form', () => {
+      expect(resolveConfigPathFromArgv(argv('--config=/etc/argos/config.ini'))).toBe(
+        '/etc/argos/config.ini'
+      );
+    });
+
+    it('ignores arguments it does not own', () => {
+      expect(resolveConfigPathFromArgv(argv('--verbose', '--config', '/a/b.ini', '--other'))).toBe(
+        '/a/b.ini'
+      );
+    });
+
+    it('returns nothing when the flag is absent, leaving the existing search alone', () => {
+      expect(resolveConfigPathFromArgv(argv())).toBeUndefined();
+      expect(resolveConfigPathFromArgv(argv('--verbose'))).toBeUndefined();
+    });
+
+    it('returns nothing when the flag has no value', () => {
+      expect(resolveConfigPathFromArgv(argv('--config'))).toBeUndefined();
     });
   });
 });

@@ -60,6 +60,41 @@ function safeToolArgs(args: unknown): unknown {
 /**
  * Main Argos-MCP class that coordinates all operations
  */
+/**
+ * Read the configuration path from the command line.
+ *
+ * The registration command in the README passes `--config`, and the setup wizard
+ * writes to `~/.config/argos/config.ini` rather than to the working directory.
+ * An MCP client starts this process from wherever it happens to be, so without
+ * reading the flag the search fell through to `./config.ini` and the server
+ * reported no configuration while the operator was looking at the file they had
+ * pointed it at.
+ *
+ * Returning undefined leaves loadConfig's existing search (working directory,
+ * then the directory the server was installed in) exactly as it was.
+ * @param argv - process arguments, including the node and script entries
+ */
+export function resolveConfigPathFromArgv(
+  argv: readonly string[] = process.argv
+): string | undefined {
+  const args = argv.slice(2);
+
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i]!;
+    if (arg === '--config') {
+      return args[i + 1];
+    }
+    if (arg.startsWith('--config=')) {
+      return arg.slice('--config='.length) || undefined;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ *
+ */
 export class SQLMCPServer extends EventEmitter {
   private metricsManager!: MetricsManager;
   private queryCache!: QueryCache;
@@ -180,7 +215,7 @@ export class SQLMCPServer extends EventEmitter {
    */
   public async run(): Promise<void> {
     try {
-      await this.initialize();
+      await this.initialize(resolveConfigPathFromArgv());
       const transport = new StdioServerTransport();
       await this.mcpServer.connect(transport);
       this.logger.info('Argos-MCP running on stdio (MCP SDK transport)');

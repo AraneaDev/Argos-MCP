@@ -43,13 +43,18 @@ jobs:
       # Retained snapshots live in .knossos-ci. Restoring them is what makes a
       # baseline comparison possible at all; without a hit, the boundary check
       # still runs and only the budget step is skipped.
+      #
+      # The v2 in the key retires the history written before knossos.json
+      # ignored .knossos-src. Those snapshots hold the analyzer's own source
+      # alongside this repository's, which is not a baseline anything should be
+      # measured against.
       - name: Restore architecture history
         uses: actions/cache/restore@v4
         with:
           path: .knossos-ci
-          key: knossos-${{ runner.os }}-${{ env.KNOSSOS_VERSION }}-main
+          key: knossos-v2-${{ runner.os }}-${{ env.KNOSSOS_VERSION }}-main
           restore-keys: |
-            knossos-${{ runner.os }}-${{ env.KNOSSOS_VERSION }}-
+            knossos-v2-${{ runner.os }}-${{ env.KNOSSOS_VERSION }}-
 
       - name: Build the pinned analyzer image
         working-directory: .knossos-src
@@ -62,7 +67,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p .knossos-ci artifacts
-          chmod 0777 .knossos-ci
+          # The runtime image runs as www-data (uid 33), but actions/cache
+          # extracts the restored snapshot database as the runner user with its
+          # archived 0644 mode. The container then cannot write the file it owns
+          # the contents of, and SQLite reports "attempt to write a readonly
+          # database" - so every run after the first cache hit fails. Widen the
+          # whole tree, not just the directory: the -wal and -shm files a killed
+          # run leaves behind are cached too.
+          chmod -R a+rwX .knossos-ci
           jq -e '.policies' knossos.json > artifacts/policies.json
           jq -e '.quality_budgets' knossos.json > artifacts/budgets.json
 
@@ -130,4 +142,4 @@ jobs:
         uses: actions/cache/save@v4
         with:
           path: .knossos-ci
-          key: knossos-${{ runner.os }}-${{ env.KNOSSOS_VERSION }}-main-${{ github.run_id }}
+          key: knossos-v2-${{ runner.os }}-${{ env.KNOSSOS_VERSION }}-main-${{ github.run_id }}

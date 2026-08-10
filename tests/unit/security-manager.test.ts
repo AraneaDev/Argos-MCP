@@ -616,11 +616,174 @@ describe('SecurityManager', () => {
       ['# hides stacked COPY..PROGRAM (pg)', "SELECT 1 # 0; COPY (SELECT 1) TO PROGRAM 'id'"],
       // FIND-107: standalone ANALYZE is a write/maintenance statement, not a read.
       ['standalone ANALYZE (pg)', 'ANALYZE users'],
+      // Comment stripping used to run as a plain regex over the whole query, with
+      // no idea what was inside a string literal. A '--' in a string therefore
+      // swallowed the rest of the line, taking the ';' and the statement after it
+      // out of the validator's view while pg's simple query protocol still ran
+      // both. The same trick works through a dollar-quoted string.
+      ['-- inside a string hides stacked DROP', "SELECT '--' ; DROP TABLE users"],
+      ['-- inside a string hides stacked DELETE', "SELECT note = '--' ; DELETE FROM users"],
+      ['-- inside a quoted identifier hides stacked DROP', 'SELECT "a--b" ; DROP TABLE users'],
+      ['-- inside a dollar-quoted string hides stacked DROP', 'SELECT $$--$$ ; DROP TABLE users'],
+      ['-- inside a tagged dollar quote hides stacked DROP', 'SELECT $q$--$q$ ; DROP TABLE users'],
     ];
 
     test.each(cases)('blocks %s', (_label, query) => {
       const result = securityManager.validateSelectOnlyQuery(query, 'postgresql');
       expect(result.allowed).toBe(false);
+    });
+
+    test.each([
+      ['-- inside a string', "SELECT '--' ; DROP TABLE users"],
+      ['# inside a string', "SELECT '#' ; DROP TABLE users"],
+      ['-- inside a backtick identifier', 'SELECT `a--b` ; DROP TABLE users'],
+      ['# inside a backtick identifier', 'SELECT `a#b` ; DROP TABLE users'],
+    ])('blocks %s on mysql, where # is a real comment', (_label, query) => {
+      expect(securityManager.validateSelectOnlyQuery(query, 'mysql').allowed).toBe(false);
+    });
+
+    test('blocks # hiding a stacked statement on mariadb too', () => {
+      const result = securityManager.validateSelectOnlyQuery(
+        "SELECT '#' ; DROP TABLE users",
+        'mariadb'
+      );
+
+      expect(result.allowed).toBe(false);
+    });
+
+    // A nested block comment is a comment all the way to the outer close on
+    // PostgreSQL and T-SQL, but MySQL and SQLite stop at the first '*/' and run
+    // whatever follows. The validator closes at the first '*/' on every engine so
+    // that tail stays visible; rejecting a nested comment beats missing a DROP.
+    test('blocks a stacked statement wrapped in a nested-looking comment', () => {
+      const query = 'SELECT 1 /* a /* b */ ; DROP TABLE users */';
+
+      expect(securityManager.validateSelectOnlyQuery(query, 'mysql').allowed).toBe(false);
+      expect(securityManager.validateSelectOnlyQuery(query, 'postgresql').allowed).toBe(false);
+    });
+
+    // Unterminated literals must not swallow the rest of the statement. The text
+    // is left in place, so the tokenizer still sees the ';' and the command.
+    test.each([
+      ['an unterminated string', "SELECT ' ; DROP TABLE users"],
+      ['an unterminated dollar quote', 'SELECT $$ ; DROP TABLE users'],
+    ])('blocks a stacked statement after %s', (_label, query) => {
+      expect(securityManager.validateSelectOnlyQuery(query, 'postgresql').allowed).toBe(false);
+    });
+
+    test('treats text after an unterminated block comment as commented out', () => {
+      // No engine executes what follows an unterminated '/*': it is either inside
+      // the comment or the statement is a syntax error. So there is nothing to
+      // block here, and the leading SELECT stands on its own.
+      const result = securityManager.validateSelectOnlyQuery(
+        'SELECT 1 /* ; DROP TABLE users',
+        'postgresql'
+      );
+
+      expect(result.allowed).toBe(true);
+    });
+
+    // Comments outside a literal must still be removed, and a literal that merely
+    // looks like a comment must survive, or the fix trades a bypass for a
+    // validator that rejects ordinary queries.
+    test.each([
+      ['a trailing line comment', 'SELECT id FROM users -- fetch the id'],
+      ['a block comment between tokens', 'SELECT id /* the pk */ FROM users'],
+      ['a string that looks like a line comment', "SELECT '-- not a comment' AS note"],
+      ['a string that looks like a block comment', "SELECT '/* not a comment */' AS note"],
+      ['a quoted identifier containing dashes', 'SELECT "a--b" FROM users'],
+      ['a dollar-quoted string containing dashes', 'SELECT $$-- literal$$ AS note'],
+    ])('still allows %s', (_label, query) => {
+      const result = securityManager.validateSelectOnlyQuery(query, 'postgresql');
+      expect(result.allowed).toBe(true);
+    });
+
+    test('still allows a backtick identifier containing dashes on mysql', () => {
+      const result = securityManager.validateSelectOnlyQuery('SELECT `a--b` FROM users', 'mysql');
+      expect(result.allowed).toBe(true);
+    });
+
+    test('should not weld tokens together when removing a comment', () => {
+      // A comment separates tokens, so it has to leave a gap behind. Replacing it
+      // with nothing turned SEL/**/ECT into a valid-looking SELECT.
+      const result = securityManager.validateSelectOnlyQuery('SEL/**/ECT 1', 'postgresql');
+
+      expect(result.allowed).toBe(false);
+    });
+
+    // The verdict tests above prove the bypasses are closed; these pin the lexer
+    // itself, because an off-by-one in it would not always change a verdict.
+    describe('comment stripping', () => {
+      const strip = (query: string, dbType = 'postgresql'): string =>
+        (
+          securityManager as unknown as {
+            stripComments(q: string, d: string): string;
+          }
+        ).stripComments(query, dbType);
+
+      test('should leave a literal that looks like a comment untouched', () => {
+        expect(strip("SELECT '--' ; DROP")).toBe("SELECT '--' ; DROP");
+      });
+
+      test('should treat a doubled quote as staying inside the literal', () => {
+        expect(strip("SELECT 'it''s -- x' ; A")).toBe("SELECT 'it''s -- x' ; A");
+        expect(strip('SELECT "a""b--c" ; A')).toBe('SELECT "a""b--c" ; A');
+      });
+
+      test('should end a line comment at the newline and keep it', () => {
+        expect(strip('SELECT 1 -- c\nFROM t')).toBe('SELECT 1  \nFROM t');
+        expect(strip('SELECT 1 -- c\rFROM t')).toBe('SELECT 1  \rFROM t');
+      });
+
+      test('should treat # as a comment only on mysql and mariadb', () => {
+        expect(strip('SELECT 1 # c\nFROM t', 'mariadb')).toBe('SELECT 1  \nFROM t');
+        expect(strip('SELECT 1 # c\nFROM t', 'mysql')).toBe('SELECT 1  \nFROM t');
+        expect(strip('SELECT 1 # c\nFROM t', 'postgresql')).toBe('SELECT 1 # c\nFROM t');
+      });
+
+      test('should leave a space where a block comment was', () => {
+        expect(strip('SELECT/*x*/1')).toBe('SELECT 1');
+      });
+
+      test('should end a block comment at the first close, exposing the tail', () => {
+        expect(strip('SELECT 1 /* a /* b */ ; DROP */')).toBe('SELECT 1   ; DROP */');
+      });
+
+      test('should leave dollar-quoted text untouched, tagged or not', () => {
+        expect(strip('SELECT $$--$$ ; A')).toBe('SELECT $$--$$ ; A');
+        expect(strip('SELECT $q$--$q$ ; A')).toBe('SELECT $q$--$q$ ; A');
+      });
+
+      test('should treat a lone dollar as ordinary text', () => {
+        expect(strip('SELECT a$b -- c')).toBe('SELECT a$b  ');
+      });
+
+      test('should not swallow anything after an unterminated literal', () => {
+        expect(strip("SELECT ' ; DROP")).toBe("SELECT ' ; DROP");
+        expect(strip('SELECT $$ ; DROP')).toBe('SELECT $$ ; DROP');
+      });
+
+      // A literal has to end where it ends: if the scanner misses the closing
+      // quote it stays inside for the rest of the statement and stops noticing
+      // comments, which these catch.
+      test('should resume scanning after a literal closes', () => {
+        expect(strip("SELECT 'x' -- c")).toBe("SELECT 'x'  ");
+        expect(strip("SELECT 'it''s' -- c")).toBe("SELECT 'it''s'  ");
+        expect(strip('SELECT $$x$$ -- c')).toBe('SELECT $$x$$  ');
+        expect(strip('SELECT `x` -- c', 'mysql')).toBe('SELECT `x`  ');
+      });
+
+      test('should not treat subtraction as a comment', () => {
+        expect(strip('SELECT 1 - 2 FROM t')).toBe('SELECT 1 - 2 FROM t');
+      });
+
+      test('should handle an empty string literal', () => {
+        // The escape check looks at the character AFTER the quote. Looking at the
+        // one before instead reads the opening quote as its own escape and
+        // duplicates it, which only shows up on an empty literal.
+        expect(strip("SELECT '' AS blank")).toBe("SELECT '' AS blank");
+        expect(strip("SELECT '' -- c")).toBe("SELECT ''  ");
+      });
     });
 
     test('still allows a legitimate SELECT with keyword-like identifiers', () => {

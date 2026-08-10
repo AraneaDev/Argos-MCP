@@ -152,6 +152,48 @@
         "reason": "equivalent: clearTimeout(undefined) is a documented no-op, so calling it unconditionally behaves exactly as the guarded call when no timer was armed",
         "fingerprint": "f3b0efe69729"
       }
+    ],
+    "src/classes/SecurityManager.ts": [
+      {
+        "line": 1115,
+        "mutator": "ConditionalExpression",
+        "addedAt": 1786389853103,
+        "change": "query[i + 1] === ch → false",
+        "reason": "equivalent: the quote character is itself an opener, so treating a doubled quote as escape-and-continue consumes exactly what close-then-reopen consumes, and the literal is copied through verbatim either way. Verified by differential run over every string up to length 5 from the significant alphabet, both # modes - 354312 inputs, no difference. The i+1 -> i-1 mutant on the same line IS killable and is tested via an empty literal.",
+        "fingerprint": "7367688a269e"
+      },
+      {
+        "line": 1115,
+        "mutator": "BlockStatement",
+        "addedAt": 1786389853103,
+        "change": "{ out += ch + ch; i += 2; continue; } → {}",
+        "reason": "equivalent: emptying the escape branch falls through to close-and-reopen, which is the same consumption - see the ConditionalExpression entry on this line. Same 354312-input differential run, no difference.",
+        "fingerprint": "7367688a269e"
+      },
+      {
+        "line": 1131,
+        "mutator": "ConditionalExpression",
+        "addedAt": 1786389853103,
+        "change": "ch === '$' → true",
+        "reason": "equivalent: the dollar-quote opener regex is anchored and only matches when the character is '$', so testing it first is an optimisation, not a decision. No difference over 354312 inputs.",
+        "fingerprint": "19e5491de23f"
+      },
+      {
+        "line": 1144,
+        "mutator": "EqualityOperator",
+        "addedAt": 1786389853103,
+        "change": "i < query.length → i <= query.length",
+        "reason": "equivalent: at end of input query[i] is undefined, which is neither newline, so the extra iteration only advances i past the end before the outer loop exits. No difference over 354312 inputs.",
+        "fingerprint": "d07b33cf51d8"
+      },
+      {
+        "line": 1158,
+        "mutator": "EqualityOperator",
+        "addedAt": 1786389853103,
+        "change": "i < query.length → i <= query.length",
+        "reason": "equivalent: same end-of-input reasoning as the line-comment scan, and the outer loop bound stops the overshoot. No difference over 354312 inputs.",
+        "fingerprint": "4659c4d3009a"
+      }
     ]
   }
 }

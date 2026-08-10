@@ -46,6 +46,9 @@ function validatePathNoTraversal(filePath: string, fieldName: string): void {
   }
 }
 
+/**
+ *
+ */
 export async function handleAddDatabase(
   ctx: ToolHandlerContext,
   args: Record<string, unknown>
@@ -107,14 +110,19 @@ export async function handleAddDatabase(
     if (args.ssl_verify !== undefined) {
       // Fail secure: the model must not be able to DISABLE TLS certificate verification
       // (that would enable MITM). Disabling requires a manual config.ini edit.
-      if (args.ssl_verify === false) {
+      // Only a literal boolean true passes. Tool arguments are not validated
+      // against the declared schema, and the adapters coerce with
+      // String(value) === 'true', so 'false', 0 and 'no' would each disable the
+      // check just as effectively as the boolean false did.
+      if (args.ssl_verify !== true) {
         throw new ValidationError(
-          'ssl_verify cannot be set to false via MCP tools (it would disable TLS certificate ' +
-            'verification and enable MITM). To disable verification, edit config.ini manually.',
+          'ssl_verify can only be set to true via MCP tools (any other value would disable TLS ' +
+            'certificate verification and enable MITM). To disable verification, edit config.ini ' +
+            'manually.',
           'ssl_verify'
         );
       }
-      dbConfig.ssl_verify = args.ssl_verify as boolean;
+      dbConfig.ssl_verify = true;
     }
     dbConfig.timeout = 30000;
   }
@@ -156,6 +164,9 @@ export async function handleAddDatabase(
   );
 }
 
+/**
+ *
+ */
 export async function handleUpdateDatabase(
   ctx: ToolHandlerContext,
   args: Record<string, unknown>
@@ -185,11 +196,13 @@ export async function handleUpdateDatabase(
   if (args.ssh_private_key !== undefined) {
     validatePathNoTraversal(args.ssh_private_key as string, 'ssh_private_key');
   }
-  // Fail secure: ssl_verify=false is rejected before mutation.
-  if (args.ssl_verify !== undefined && args.ssl_verify === false) {
+  // Fail secure: anything but a literal boolean true is rejected before mutation.
+  // See handleAddDatabase for why `!== false` is not enough.
+  if (args.ssl_verify !== undefined && args.ssl_verify !== true) {
     throw new ValidationError(
-      'ssl_verify cannot be set to false via MCP tools (it would disable TLS certificate ' +
-        'verification and enable MITM). To disable verification, edit config.ini manually.',
+      'ssl_verify can only be set to true via MCP tools (any other value would disable TLS ' +
+        'certificate verification and enable MITM). To disable verification, edit config.ini ' +
+        'manually.',
       'ssl_verify'
     );
   }
@@ -294,6 +307,9 @@ export async function handleUpdateDatabase(
   );
 }
 
+/**
+ *
+ */
 export async function handleRemoveDatabase(
   ctx: ToolHandlerContext,
   database: string
@@ -324,6 +340,9 @@ export async function handleRemoveDatabase(
   );
 }
 
+/**
+ *
+ */
 export async function handleGetConfig(
   ctx: ToolHandlerContext,
   database: string
@@ -359,6 +378,9 @@ export async function handleGetConfig(
   return createToolResponse(responseText);
 }
 
+/**
+ *
+ */
 export async function handleSetMcpConfigurable(
   ctx: ToolHandlerContext,
   database: string,

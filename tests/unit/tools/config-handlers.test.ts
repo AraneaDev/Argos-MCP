@@ -132,6 +132,141 @@ describe('config-handlers', () => {
       );
     });
 
+    // Disabling TLS certificate verification must require a human editing
+    // config.ini. Nothing validates tool arguments against the declared schema,
+    // so the guard has to reject anything that is not literally `true` — the
+    // adapters coerce with String(value) === 'true', which turns 'false', 0 and
+    // 'no' into a disabled check just as effectively as the boolean false.
+    describe.each([
+      ['the boolean false', false],
+      ['the string "false"', 'false'],
+      ['the number 0', 0],
+      ['an unrecognised string', 'no'],
+    ])('rejects ssl_verify given %s', (_label, value) => {
+      it('on add', async () => {
+        const ctx = createMockContext();
+
+        await expect(
+          handleAddDatabase(ctx, {
+            name: 'newdb',
+            type: 'mysql',
+            host: 'localhost',
+            database: 'mydb',
+            username: 'root',
+            password: 'secret',
+            ssl: true,
+            ssl_verify: value,
+          })
+        ).rejects.toThrow(/ssl_verify can only be set to true via MCP tools/);
+
+        expect(ctx.config.databases['newdb']).toBeUndefined();
+      });
+
+      it('on update', async () => {
+        const ctx = createMockContext({
+          mydb: { type: 'mysql', select_only: true, mcp_configurable: true } as DatabaseConfig,
+        });
+
+        await expect(
+          handleUpdateDatabase(ctx, { database: 'mydb', ssl_verify: value })
+        ).rejects.toThrow(/ssl_verify can only be set to true via MCP tools/);
+
+        expect(ctx.config.databases['mydb'].ssl_verify).toBeUndefined();
+      });
+    });
+
+    // The traversal check on `file` is guarded by the database being SQLite, so
+    // a non-SQLite database must not be able to smuggle a path through it.
+    it('should not run the SQLite file check against a non-SQLite database', async () => {
+      const ctx = createMockContext({
+        mydb: {
+          type: 'mysql',
+          host: 'localhost',
+          port: 3306,
+          username: 'root',
+          password: 'secret',
+          database: 'mydb',
+          select_only: true,
+          mcp_configurable: true,
+        } as DatabaseConfig,
+      });
+
+      await handleUpdateDatabase(ctx, { database: 'mydb', file: '../../etc/shadow' });
+
+      expect(ctx.config.databases['mydb'].type).toBe('mysql');
+    });
+
+    it('should update a SQLite database that does not touch its file', async () => {
+      const ctx = createMockContext({
+        litedb: {
+          type: 'sqlite',
+          file: '/data/app.sqlite',
+          select_only: true,
+          mcp_configurable: true,
+        } as DatabaseConfig,
+      });
+
+      await handleUpdateDatabase(ctx, { database: 'litedb', timeout: 5000 });
+
+      expect(ctx.config.databases['litedb'].file).toBe('/data/app.sqlite');
+    });
+
+    it('should accept ssl_verify=true and store it', async () => {
+      const ctx = createMockContext();
+
+      await handleAddDatabase(ctx, {
+        name: 'newdb',
+        type: 'mysql',
+        host: 'localhost',
+        database: 'mydb',
+        username: 'root',
+        password: 'secret',
+        ssl: true,
+        ssl_verify: true,
+      });
+
+      expect(ctx.config.databases['newdb'].ssl_verify).toBe(true);
+      expect(ctx.config.databases['newdb'].ssl).toBe(true);
+    });
+
+    it('should default ssl to false and leave SSH unconfigured when not asked for', async () => {
+      const ctx = createMockContext();
+
+      await handleAddDatabase(ctx, {
+        name: 'newdb',
+        type: 'mysql',
+        host: 'localhost',
+        database: 'mydb',
+        username: 'root',
+        password: 'secret',
+      });
+
+      const dbConfig = ctx.config.databases['newdb'];
+      expect(dbConfig.ssl).toBe(false);
+      expect(dbConfig.ssh_host).toBeUndefined();
+      expect(dbConfig.ssh_port).toBeUndefined();
+    });
+
+    it('should reject an ssh_private_key that escapes its directory', async () => {
+      const ctx = createMockContext();
+
+      await expect(
+        handleAddDatabase(ctx, {
+          name: 'newdb',
+          type: 'mysql',
+          host: 'localhost',
+          database: 'mydb',
+          username: 'root',
+          password: 'secret',
+          ssh_host: 'bastion.example.com',
+          ssh_username: 'sshuser',
+          ssh_private_key: '/home/user/../../etc/shadow',
+        })
+      ).rejects.toThrow(ValidationError);
+
+      expect(ctx.config.databases['newdb']).toBeUndefined();
+    });
+
     it('should throw ValidationError when SQLite is missing file parameter', async () => {
       const ctx = createMockContext();
 
@@ -146,6 +281,17 @@ describe('config-handlers', () => {
       await expect(
         handleAddDatabase(ctx, { name: 'newdb', type: 'mysql', username: 'root' })
       ).rejects.toThrow(ValidationError);
+    });
+
+    // The error names the first field that failed, not a generic placeholder,
+    // so a caller can point at what to fix.
+    it('should report the first failing field on an invalid configuration', async () => {
+      const ctx = createMockContext();
+
+      await expect(
+        handleAddDatabase(ctx, { name: 'newdb', type: 'mysql', host: 'localhost', username: 'r' })
+        // port is not among them: the handler defaults it to 3306.
+      ).rejects.toMatchObject({ field: 'password' });
     });
 
     it('should throw ValidationError when non-SQLite is missing username', async () => {

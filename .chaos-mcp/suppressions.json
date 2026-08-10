@@ -56,6 +56,16 @@
         "reason": "equivalent: '\"' -> \"\" makes next === \"\" always false, which is the same close-then-reopen path as the ConditionalExpression mutant on this line",
         "fingerprint": "cc9394157d23"
       }
+    ],
+    "src/tools/handlers/config-handlers.ts": [
+      {
+        "line": 144,
+        "mutator": "OptionalChaining",
+        "addedAt": 1786376970134,
+        "change": "validationResult.errors[0]?.field → validationResult.errors[0].field",
+        "reason": "equivalent: validateDatabaseConfig returns { valid: errors.length === 0 }, so reaching this line (valid === false) guarantees errors.length > 0 and errors[0] is never undefined. The ?? branch is therefore unreachable and ?. behaves identically to . here. The LogicalOperator mutant on the same line IS killable and is tested, because ?? yields the field name while && yields 'config'.",
+        "fingerprint": "38e427d70abb"
+      }
     ]
   }
 }

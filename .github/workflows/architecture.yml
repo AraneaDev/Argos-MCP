@@ -28,7 +28,7 @@ jobs:
       # Pin the analyzer so a graph change is always a change in this repository,
       # never a silent change in the tool. Override with the KNOSSOS_VERSION
       # repository variable to roll forward.
-      KNOSSOS_VERSION: ${{ vars.KNOSSOS_VERSION || 'v0.10.4' }}
+      KNOSSOS_VERSION: ${{ vars.KNOSSOS_VERSION || 'v0.10.5' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -44,10 +44,11 @@ jobs:
       # baseline comparison possible at all; without a hit, the boundary check
       # still runs and only the budget step is skipped.
       #
-      # The v2 in the key retires the history written before knossos.json
-      # ignored .knossos-src. Those snapshots hold the analyzer's own source
+      # The v2 in the key retires the history written before .knossos-src was
+      # excluded from the scan. Those snapshots hold the analyzer's own source
       # alongside this repository's, which is not a baseline anything should be
-      # measured against.
+      # measured against. The analyzer version is part of the key too, so rolling
+      # it forward starts clean history of its own.
       - name: Restore architecture history
         uses: actions/cache/restore@v4
         with:

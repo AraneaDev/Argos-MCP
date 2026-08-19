@@ -1,20 +1,33 @@
-# Argos-MCP v4.0.0 <!-- x-release-please-version -->
+<div align="center">
+
+# Argos-MCP <!-- x-release-please-version -->
+
+**A hundred eyes on your databases, and none of them blink.**
 
 [![Release](https://img.shields.io/github/v/release/AraneaDev/Argos-MCP)](https://github.com/AraneaDev/Argos-MCP/releases)
-[![MCP Observatory risk grade](https://mcpobservatory.com/servers/github:AraneaDev/Argos-MCP/badge.svg)](https://mcpobservatory.com/servers/github:AraneaDev/Argos-MCP/security)
 [![CI](https://github.com/AraneaDev/Argos-MCP/actions/workflows/ci.yml/badge.svg)](https://github.com/AraneaDev/Argos-MCP/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/codecov/c/github/AraneaDev/Argos-MCP)](https://codecov.io/gh/AraneaDev/Argos-MCP)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![coverage](https://img.shields.io/badge/coverage-93%25-brightgreen.svg)](#development)
-[![status: in development](https://img.shields.io/badge/status-in%20development-orange.svg)](#)
-[![Strict TypeScript](https://img.shields.io/badge/TypeScript-strict-blue?logo=typescript)](https://www.typescriptlang.org/)
-[![ESLint](https://img.shields.io/badge/ESLint-0%20warnings-brightgreen?logo=eslint)](https://eslint.org/)
-[![JSDoc](https://img.shields.io/badge/JSDoc-enforced-blue)](https://jsdoc.app/)
+[![MCP Observatory risk grade](https://mcpobservatory.com/servers/github:AraneaDev/Argos-MCP/badge.svg)](https://mcpobservatory.com/servers/github:AraneaDev/Argos-MCP/security)
+[![status: in development](https://img.shields.io/badge/status-in%20development-orange.svg)](#quick-start)
 
-> *Argos Panoptes — the hundred-eyed giant who never slept, set to watch over what mattered most.*
+</div>
 
-**Argos-MCP** — a hundred eyes on your databases. Connect Claude Code to PostgreSQL, MySQL, SQLite, and SQL Server with strong security defaults, per-query auditing, and multi-database support.
+> **Argos Panoptes** (Ἄργος Πανόπτης) is the giant of Greek myth with a hundred eyes, set by
+> Hera to guard Io. Only some of his eyes slept at a time, so he was never fully asleep and
+> nothing passed him unseen. *Panoptes* means "all-seeing".
 
-> **Pre-release / in active development.** Argos-MCP is **not yet published to npm** — the publish step in the release workflow is deliberately dormant. The source is public on [GitHub](https://github.com/AraneaDev/Argos-MCP); install from source (see [Quick Start](#quick-start)). Any `npm install -g argos-mcp` command you find elsewhere will not resolve yet.
+Argos-MCP connects Claude Code to PostgreSQL, MySQL, SQLite, and SQL Server with strong
+security defaults, per-query auditing, and multi-database support. Every query is watched, and
+nothing reaches your data unlogged.
+
+> **Status:** pre-release. Argos-MCP is **not yet published to npm**, and the publish step in
+> the release workflow is deliberately dormant. The source is public on
+> [GitHub](https://github.com/AraneaDev/Argos-MCP), so install from source (see
+> [Quick start](#quick-start)). Any `npm install -g argos-mcp` command you find elsewhere will
+> not resolve yet.
+
+---
 
 ## Why Argos-MCP?
 
@@ -22,7 +35,7 @@
 - **SELECT-Only Mode** - Production-safe read-only database access
 - **Query Validation** - Bound parameters, stacked statements refused, comment- and literal-aware parsing, complexity limits
 - **SSH Tunneling** - Secure encrypted connections through bastion hosts
-- **Audit Logging** - One record per query: database, statement hash, duration, outcome — never the values
+- **Audit Logging** - One record per query: database, statement hash, duration, outcome, never the values
 
 ### **High Performance**
 - **Connection Pooling** - Efficient database connection management
@@ -42,7 +55,7 @@
 - **Comprehensive Docs** - Detailed guides, tutorials, and API reference
 - **Extensive Testing** - Unit and integration suites, plus mutation testing on the security-critical paths
 
-## Quick Start
+## Quick start
 
 **Requirements:** Node.js >= 22 and the [Claude Code CLI](https://docs.claude.com/en/docs/claude-code).
 
@@ -58,7 +71,7 @@ npm run build
 ```bash
 npm run setup
 ```
-Interactive wizard for adding database connections, security settings, and SSH tunnels. It writes a `config.ini` — by convention at `~/.config/argos/config.ini`, though any path works. You can also add databases at runtime with the `sql_add_database` tool.
+Interactive wizard for adding database connections, security settings, and SSH tunnels. It writes a `config.ini`, by convention at `~/.config/argos/config.ini`, though any path works. You can also add databases at runtime with the `sql_add_database` tool.
 
 ### 3. Register with Claude Code
 ```bash
@@ -85,7 +98,7 @@ You should see `argos` listed as connected. Its tools appear in Claude Code as `
 claude mcp remove argos --scope user
 ```
 
-## Use Cases
+## Use cases
 
 ### **Data Analytics & Business Intelligence**
 > "Show me the top 10 customers by revenue this quarter, including their growth rate compared to last quarter"
@@ -124,7 +137,7 @@ graph TB
 - **MCP Protocol** - Standard protocol for AI tool integration
 - **Industry-standard drivers** - Proven database connectivity libraries
 
-## Documentation Hub
+## Documentation hub
 
 ### **Getting Started**
 - **[5-Minute Quick Start](docs/guides/quick-start.md)** - Get running fast
@@ -150,7 +163,7 @@ graph TB
 
 **[Browse All Documentation](docs/README.md)**
 
-## Configuration Examples
+## Configuration examples
 
 ### Production PostgreSQL with SSH
 ```ini
@@ -211,7 +224,7 @@ max_rows=1000
 query_timeout=30000
 ```
 
-## Security Features
+## Security features
 
 ### Multi-Layer Security Model
 1. **Query Validation** - SQL injection prevention and syntax analysis
@@ -255,7 +268,7 @@ redaction_log_access=true
 
 ### What this gives you towards compliance
 
-Argos is not certified against any standard, and no library can be — compliance
+Argos is not certified against any standard, and no library can be. Compliance
 is a property of your deployment. What it provides is the controls and the
 evidence that such a regime asks for:
 
@@ -266,7 +279,7 @@ evidence that such a regime asks for:
 - Secrets scrubbed from logs and error messages
 - Owner-only file modes on the log, the audit records and the configuration
 
-## Dynamic Database Management
+## Dynamic database management
 
 Argos-MCP supports runtime database management through dedicated MCP tools. This allows you to add, update, and remove database connections without restarting the server.
 
@@ -285,11 +298,11 @@ Argos-MCP supports runtime database management through dedicated MCP tools. This
 - Set `mcp_configurable=true` in your database config to allow MCP-driven updates and removal.
 - The `sql_set_mcp_configurable` tool is a one-way lock: once set to `false`, the database can no longer be modified or removed via MCP. Unlocking requires a manual edit to the configuration file.
 - The `sql_get_config` tool always redacts passwords and other sensitive fields before returning configuration data.
-- Databases added at runtime via `sql_add_database` have `mcp_configurable=true` by default, and are **always** `select_only=true`. Granting write access requires editing `config.ini` by hand — the model cannot grant it to itself.
+- Databases added at runtime via `sql_add_database` have `mcp_configurable=true` by default, and are **always** `select_only=true`. Granting write access requires editing `config.ini` by hand, so the model cannot grant it to itself.
 
 ## Performance
 
-Query time is your database's, not Argos's — it adds validation and formatting
+Query time is your database's, not Argos's. It adds validation and formatting
 around a normal client connection. `sql_get_metrics` reports the latency it
 actually observed (min, max, avg, p95), and `sql_analyze_performance` returns the
 execution plan with dialect-specific advice when something is slow.
@@ -301,14 +314,14 @@ execution plan with dialect-specific advice when something is slow.
 - **Result Streaming** - Handle large datasets efficiently
 - **Batch Operations** - Execute multiple queries optimally
 
-## CLI Commands
+## CLI commands
 
 | Command | Description |
 |---------|-------------|
 | `argos-mcp` | Start the Argos MCP server on stdio (this is what Claude Code invokes) |
 | `argos-setup` | Run the interactive configuration wizard |
 
-Both are exposed as `bin` entries, so `npm link` (or a global install) makes them available on your `PATH`. Registration with Claude Code is handled by `claude mcp add` — see [Quick Start](#quick-start).
+Both are exposed as `bin` entries, so `npm link` (or a global install) makes them available on your `PATH`. Registration with Claude Code is handled by `claude mcp add`, see [Quick start](#quick-start).
 
 ## Development
 
@@ -352,7 +365,7 @@ deliberately do not gate on the diagnostic count.
 
 ## License
 
-Released under the [MIT License](./LICENSE) — free for any use, commercial
+Released under the [MIT License](./LICENSE), free for any use, commercial
 included, with no warranty. It speaks any MCP client, not just Claude Code, and
 connects to databases you already run.
 

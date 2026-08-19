@@ -12,10 +12,6 @@
         },
         {
           "type": "generic",
-          "path": "README.md"
-        },
-        {
-          "type": "generic",
           "path": "docs/api/typescript-api.md"
         },
         {

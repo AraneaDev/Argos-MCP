@@ -1,6 +1,6 @@
 <div align="center">
 
-# Argos-MCP <!-- x-release-please-version -->
+# Argos-MCP v4.0.0 <!-- x-release-please-version -->
 
 **A hundred eyes on your databases, and none of them blink.**
 

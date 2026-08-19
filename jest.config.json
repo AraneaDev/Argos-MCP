@@ -1,6 +1,8 @@
 {
   "testEnvironment": "node",
-  "roots": ["<rootDir>/tests"],
+  "roots": [
+    "<rootDir>/tests"
+  ],
   "testMatch": [
     "**/tests/**/*.test.ts"
   ],
@@ -17,7 +19,8 @@
     "text",
     "text-summary",
     "lcov",
-    "html"
+    "html",
+    "json-summary"
   ],
   "coverageThreshold": {
     "global": {

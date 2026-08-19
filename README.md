@@ -4,12 +4,15 @@
 
 **A hundred eyes on your databases, and none of them blink.**
 
-[![Release](https://img.shields.io/github/v/release/AraneaDev/Argos-MCP)](https://github.com/AraneaDev/Argos-MCP/releases)
-[![CI](https://github.com/AraneaDev/Argos-MCP/actions/workflows/ci.yml/badge.svg)](https://github.com/AraneaDev/Argos-MCP/actions/workflows/ci.yml)
-[![Coverage](https://img.shields.io/codecov/c/github/AraneaDev/Argos-MCP)](https://codecov.io/gh/AraneaDev/Argos-MCP)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
-[![MCP Observatory risk grade](https://mcpobservatory.com/servers/github:AraneaDev/Argos-MCP/badge.svg)](https://mcpobservatory.com/servers/github:AraneaDev/Argos-MCP/security)
-[![status: in development](https://img.shields.io/badge/status-in%20development-orange.svg)](#quick-start)
+[![Release](https://img.shields.io/github/v/release/AraneaDev/Argos-MCP?label=release)](https://github.com/AraneaDev/Argos-MCP/releases)
+[![CI](https://img.shields.io/github/actions/workflow/status/AraneaDev/Argos-MCP/ci.yml?label=CI)](https://github.com/AraneaDev/Argos-MCP/actions/workflows/ci.yml)
+[![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FAraneaDev%2FArgos-MCP%2Fgh-pages%2Fcoverage.json)](https://github.com/AraneaDev/Argos-MCP/actions/workflows/ci.yml)
+[![License](https://img.shields.io/github/license/AraneaDev/Argos-MCP?label=license&color=yellow)](./LICENSE)
+[![Language](https://img.shields.io/github/languages/top/AraneaDev/Argos-MCP)](https://github.com/AraneaDev/Argos-MCP)
+[![Last commit](https://img.shields.io/github/last-commit/AraneaDev/Argos-MCP?label=last%20commit)](https://github.com/AraneaDev/Argos-MCP/commits/main)
+[![Conventional Commits](https://img.shields.io/badge/commits-conventional-fe5196?logo=conventionalcommits&logoColor=white)](https://www.conventionalcommits.org/)
+[![MCP Observatory](https://mcpobservatory.com/servers/github:AraneaDev/Argos-MCP/badge.svg)](https://mcpobservatory.com/servers/github:AraneaDev/Argos-MCP/security)
+[![Status](https://img.shields.io/badge/status-in%20development-orange)](#quick-start)
 
 </div>
 

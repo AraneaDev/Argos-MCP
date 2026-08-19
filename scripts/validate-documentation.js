@@ -79,10 +79,12 @@ async function checkVersionConsistency(results) {
     
     console.log(`  [PKG] Package version: ${expectedVersion}`);
 
-    // Check files that should contain version references
+    // Check files that should contain version references.
+    // The README deliberately is not one of them: its title carries no version, matching the
+    // sibling MCP repos, and the live Release badge reports the released version instead of a
+    // hand-maintained string that can drift.
     const filesToCheck = [
       { file: 'src/types/index.ts', pattern: /SERVER_VERSION = '([^']+)'/g, name: 'SERVER_VERSION' },
-      { file: 'README.md', pattern: /Argos-MCP v([0-9.]+)/g, name: 'README title' },
       { file: 'docs/api/typescript-api.md', pattern: /as of v([0-9]+\.[0-9]+\.[0-9]+)\.?\s/g, name: 'TypeScript API docs' },
       { file: 'docs/tutorials/01-installation.md', pattern: /Argos-MCP v([0-9.]+)/g, name: 'Installation tutorial' }
     ];

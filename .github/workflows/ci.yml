@@ -62,7 +62,17 @@ jobs:
       - name: Test with coverage
         run: npm run test:coverage
 
-      - name: Upload coverage
+      # Both uploads are gated to one matrix entry: the numbers do not differ by Node
+      # version, and a second Codecov upload would only race the first for the same commit.
+      - name: Upload coverage to Codecov
+        if: matrix.node-version == '22.x'
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          fail_ci_if_error: false
+
+      - name: Upload coverage artifact
         if: matrix.node-version == '22.x'
         uses: actions/upload-artifact@v4
         with:

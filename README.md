@@ -5,7 +5,7 @@
 **A hundred eyes on your databases, and none of them blink.**
 
 [![Release](https://img.shields.io/github/v/release/AraneaDev/Argos-MCP?label=release)](https://github.com/AraneaDev/Argos-MCP/releases)
-[![Project page](https://img.shields.io/badge/project%20page-aranea--development.nl-0b7285)](https://aranea-development.nl/en/projects/argos-mcp)
+[![Tool page](https://img.shields.io/badge/tool%20page-aranea--development.nl-0b7285)](https://aranea-development.nl/en/tools/argos-mcp)
 [![CI](https://img.shields.io/github/actions/workflow/status/AraneaDev/Argos-MCP/ci.yml?label=CI)](https://github.com/AraneaDev/Argos-MCP/actions/workflows/ci.yml)
 [![Coverage](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FAraneaDev%2FArgos-MCP%2Fgh-pages%2Fcoverage.json)](https://github.com/AraneaDev/Argos-MCP/actions/workflows/ci.yml)
 [![License](https://img.shields.io/github/license/AraneaDev/Argos-MCP?label=license&color=yellow)](./LICENSE)

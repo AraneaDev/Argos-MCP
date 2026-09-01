@@ -396,3 +396,7 @@ connects to databases you already run.
 *Transform your database interactions with AI-powered SQL intelligence*
 
 </div>
+
+---
+
+Built by [Aranea Development](https://aranea-development.nl).

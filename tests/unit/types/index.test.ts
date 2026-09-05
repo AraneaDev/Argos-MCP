@@ -176,7 +176,7 @@ describe('database type guards', () => {
 
   describe('isSecurityViolationError', () => {
     it('should return true for SecurityViolationError instances', () => {
-      const err = new SecurityViolationError('test', 'DANGEROUS_PATTERN');
+      const err = new SecurityViolationError('test', { pattern: 'DANGEROUS_PATTERN' });
       expect(isSecurityViolationError(err)).toBe(true);
     });
 

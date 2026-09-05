@@ -1,9 +1,16 @@
 // tests/unit/query-cache.test.ts
 import { QueryCache } from '../../src/classes/QueryCache.js';
+import type { QueryResult } from '../../src/types/index.js';
 
 describe('QueryCache', () => {
   let cache: QueryCache;
-  const fakeResult = { rows: [{ id: 1 }], rowCount: 1, fields: [] };
+  const fakeResult: QueryResult = {
+    rows: [{ id: 1 }],
+    rowCount: 1,
+    fields: [],
+    truncated: false,
+    execution_time_ms: 0,
+  };
 
   beforeEach(() => {
     jest.useFakeTimers();

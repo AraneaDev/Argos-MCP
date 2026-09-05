@@ -52,6 +52,9 @@ function createMockContext(
       hasTunnel: jest.fn().mockReturnValue(false),
       closeTunnel: jest.fn(),
     } as any,
+    metricsManager: {
+      getSnapshot: jest.fn().mockReturnValue({}),
+    } as any,
     config: {
       databases,
       ...(extensionConfig ? { extension: extensionConfig } : {}),
@@ -107,13 +110,13 @@ describe('query-handlers', () => {
       await handleSqlQuery(ctx, {
         database: 'testdb',
         query: 'SELECT * FROM users WHERE id = ?',
-        params: [42],
+        params: ['42'],
       });
 
       expect(ctx.connectionManager.executeQuery).toHaveBeenCalledWith(
         'testdb',
         'SELECT * FROM users WHERE id = ?',
-        [42]
+        ['42']
       );
     });
 

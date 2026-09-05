@@ -188,8 +188,8 @@ describe('SchemaManager', () => {
       mockFs.readdirSync.mockReturnValue(['testdb.json', 'otherdb.json', 'invalid.txt'] as any);
       // After M4, loadCachedSchemas keys by schema.database, not the filename.
       // Return a schema whose `database` field matches the file being read.
-      mockFs.readFileSync.mockImplementation((filePath: string) => {
-        const dbName = filePath.replace(/.*\//, '').replace('.json', '');
+      mockFs.readFileSync.mockImplementation((filePath) => {
+        const dbName = String(filePath).replace(/.*\//, '').replace('.json', '');
         return JSON.stringify({ ...mockSchema, database: dbName });
       });
 

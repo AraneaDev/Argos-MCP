@@ -39,6 +39,13 @@ jobs:
         if: always()
         run: npm run type-check
 
+      # The root tsconfig excludes tests so `tsc` emits only src into dist, which
+      # left the suite checked by nothing: @swc/jest strips types without
+      # checking them, and `eslint src/**/*.ts` does not reach tests either.
+      - name: Typecheck tests
+        if: always()
+        run: npm run type-check:tests
+
   test:
     name: Test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest

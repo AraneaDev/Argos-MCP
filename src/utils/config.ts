@@ -43,6 +43,18 @@ export interface ValidationResult {
   errors: ConfigFieldError[];
 }
 
+/**
+ * What the parser actually produces. `security` and `extension` are optional on
+ * ParsedServerConfig because a config object can be assembled by hand, but
+ * parseSecurityConfig and parseExtensionConfig both fall back to defaults, so
+ * anything that came out of parseConfiguration has them. Saying so here means
+ * callers of the parser do not need a guard that can never be false.
+ */
+export type FullyParsedConfig = ParsedServerConfig & {
+  security: ParsedSecurityConfig;
+  extension: ParsedExtensionConfig;
+};
+
 const SHELL_METACHAR_RE = /[;&|$()><]/;
 const EMBEDDED_CREDENTIALS_RE = /[^@]+:[^@]+@/;
 
@@ -102,7 +114,7 @@ export function validateDatabaseConfig(config: DatabaseConfig): ValidationResult
 /**
  * Load configuration from config.ini file
  */
-export function loadConfiguration(configPath?: string): ParsedServerConfig {
+export function loadConfiguration(configPath?: string): FullyParsedConfig {
   const path = configPath || join(process.cwd(), 'config.ini');
 
   if (!existsSync(path)) {
@@ -139,7 +151,7 @@ export function loadConfiguration(configPath?: string): ParsedServerConfig {
 /**
  * Parse raw INI configuration into typed configuration
  */
-export function parseConfiguration(rawConfig: Record<string, unknown>): ParsedServerConfig {
+export function parseConfiguration(rawConfig: Record<string, unknown>): FullyParsedConfig {
   const databases: Record<string, DatabaseConfig> = {};
 
   // Handle nested database configurations (database.name.property)

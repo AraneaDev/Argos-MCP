@@ -44,7 +44,6 @@ export type {
   MCPToolCallRequest,
   MCPToolContent,
   MCPToolResponse,
-  MCPToolParameter,
   SQLQueryArgs,
   SQLBatchQueryArgs,
   SQLAnalyzePerformanceArgs,
@@ -96,7 +95,6 @@ export type {
 } from './config.js';
 
 // Performance types
-export type { ExecutionStage } from './performance.js';
 
 // Enhanced Schema types
 
@@ -135,8 +133,6 @@ export {
   isSQLGetSchemaArgs,
   isSQLTestConnectionArgs,
 } from './mcp.js';
-
-export { isComplexityRiskLevel, isTokenType, isLogSeverity } from './security.js';
 
 export { validateSSHConfig } from './ssh.js';
 

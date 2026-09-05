@@ -172,7 +172,12 @@ export abstract class DatabaseAdapter {
    * Parse string values to appropriate types
    */
   protected parseConfigValue<T>(
-    value: string | number | boolean | T,
+    // undefined and null are accepted explicitly because the first branch below
+    // returns the default for them. Without it, T widens to include undefined
+    // whenever an optional config field is passed, so a caller who wants a
+    // plain number back has to cast around a function that already guarantees
+    // one.
+    value: string | number | boolean | T | undefined | null,
     type: 'string' | 'number' | 'boolean',
     defaultValue: T
   ): T {

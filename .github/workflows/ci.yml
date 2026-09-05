@@ -46,6 +46,13 @@ jobs:
         if: always()
         run: npm run type-check:tests
 
+      # examples/ was covered by no tsconfig either, which is how the adapter
+      # template the docs tell contributors to copy came to have imports that
+      # did not resolve.
+      - name: Typecheck examples
+        if: always()
+        run: npm run type-check:examples
+
   test:
     name: Test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest

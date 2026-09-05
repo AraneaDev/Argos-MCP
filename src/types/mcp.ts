@@ -47,17 +47,6 @@ export interface MCPNotification extends MCPMessage {
 // MCP Tool Types
 // ============================================================================
 
-export interface MCPToolParameter {
-  type: string;
-  description?: string;
-  items?: MCPToolParameter;
-  properties?: Record<string, MCPToolParameter>;
-  required?: string[];
-  enum?: string[];
-  default?: unknown;
-  additionalProperties?: boolean;
-}
-
 export interface MCPToolCallParams {
   name: string;
   arguments: Record<string, unknown>;

@@ -1747,9 +1747,11 @@ describe('checkPortAvailability - error logging', () => {
     const logger = internals.logger as { debug: jest.Mock };
     const debugSpy = jest.spyOn(logger, 'debug');
 
-    const pm = internals.portManager as Record<string, jest.Mock>;
-    pm.isPortAvailable = jest.fn().mockResolvedValue({ isAvailable: false, reason: 'in use' });
-    pm.findAvailablePort = jest.fn().mockRejectedValue(new Error('no ports'));
+    const pm = internals.portManager as Record<string, jest.Mock<any>>;
+    pm.isPortAvailable = jest.fn(async () => ({ isAvailable: false, reason: 'in use' }));
+    pm.findAvailablePort = jest.fn(async () => {
+      throw new Error('no ports');
+    });
 
     await manager.checkPortAvailability(12345);
 

@@ -79,6 +79,9 @@ function createMockContext(): ToolHandlerContext {
     securityManager: {} as any,
     schemaManager: {} as any,
     sshTunnelManager: {} as any,
+    metricsManager: {
+      getSnapshot: jest.fn().mockReturnValue({}),
+    } as any,
     config: { databases: {} } as ParsedServerConfig,
     configPath: '/tmp/test-config.ini',
     logger: {

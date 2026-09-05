@@ -1,0 +1,17 @@
+{
+  // The root tsconfig excludes tests so `tsc` emits only src into dist. That left
+  // the suite type-checked by nothing: @swc/jest strips types without checking
+  // them, and `eslint src/**/*.ts` never looks here either. This config exists to
+  // type-check the tests without emitting anything.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "rootDir": "..",
+    "types": ["node", "jest"]
+  },
+  "include": ["**/*.ts", "../src/**/*.ts"],
+  "exclude": []
+}

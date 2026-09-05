@@ -57,6 +57,9 @@ function createMockContext(databases: Record<string, DatabaseConfig> = {}): Tool
       hasTunnel: jest.fn().mockReturnValue(false),
       closeTunnel: jest.fn(),
     } as any,
+    metricsManager: {
+      getSnapshot: jest.fn().mockReturnValue({}),
+    } as any,
     config: {
       databases,
     } as ParsedServerConfig,

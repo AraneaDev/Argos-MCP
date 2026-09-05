@@ -1,10 +1,21 @@
 import { SecurityManager } from '../../src/classes/SecurityManager.js';
 import { SampleQueries } from '../fixtures/sample-queries.js';
 import type { SecurityConfig } from '../../src/types/security.js';
+import type { ParsedSecurityConfig } from '../../src/types/config.js';
 
 describe('SecurityManager', () => {
   let securityManager: SecurityManager;
   let defaultConfig: SecurityConfig;
+  // initialize() takes ParsedServerConfig, whose security is the post-parse
+  // shape: every field present and already a number.
+  const parsedConfig: ParsedSecurityConfig = {
+    max_joins: 10,
+    max_subqueries: 5,
+    max_unions: 3,
+    max_group_bys: 5,
+    max_complexity_score: 100,
+    max_query_length: 10000,
+  };
 
   beforeEach(() => {
     defaultConfig = {
@@ -1038,7 +1049,7 @@ describe('SecurityManager', () => {
       const handler = jest.fn();
       securityManager.on('initialized', handler);
 
-      securityManager.initialize({ databases: {}, security: defaultConfig });
+      securityManager.initialize({ databases: {}, security: parsedConfig });
       expect(handler).toHaveBeenCalledWith(expect.objectContaining({ databases: {} }));
     });
   });

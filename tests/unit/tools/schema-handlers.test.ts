@@ -50,6 +50,9 @@ function createMockContext(
       hasTunnel: jest.fn().mockReturnValue(false),
       closeTunnel: jest.fn(),
     } as any,
+    metricsManager: {
+      getSnapshot: jest.fn().mockReturnValue({}),
+    } as any,
     config: {
       databases,
       ...(security ? { security } : {}),

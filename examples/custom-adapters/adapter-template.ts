@@ -7,7 +7,7 @@
  * Example: TemplateAdapter -> OracleAdapter, RedisAdapter, etc.
  */
 
-import { DatabaseAdapter } from '../base.js';
+import { DatabaseAdapter } from '../../src/database/adapters/base.js';
 import type { 
  DatabaseConnection, 
  QueryResult, 
@@ -15,7 +15,7 @@ import type {
  ColumnInfo,
  TableInfo,
  DatabaseConfig
-} from '../../../types/index.js';
+} from '../../src/types/index.js';
 
 // Import your database driver here
 // Example: import * as driverName from 'database-driver';
@@ -48,10 +48,19 @@ export class TemplateAdapter extends DatabaseAdapter {
  // Validate required configuration fields
  this.validateConfig(['host', 'database', 'username', 'password']);
 
- // Build connection configuration
- const connectionConfig = {
+ // Build connection configuration. Declare every key the object may carry:
+ // assigning a new one afterwards does not widen an inferred object type.
+ const connectionConfig: {
+ host: string;
+ port: number;
+ database: string;
+ username: string;
+ password: string;
+ timeout: number;
+ ssl?: boolean;
+ } = {
  host: this.config.host!,
- port: this.parseConfigValue(this.config.port, 'number', 1234), // Default port
+ port: this.parseConfigValue<number>(this.config.port, 'number', 1234), // Default port
  database: this.config.database!,
  username: this.config.username!,
  password: this.config.password!,

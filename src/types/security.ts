@@ -158,24 +158,3 @@ export interface ISecurityManager {
 // ============================================================================
 // Type Guards
 // ============================================================================
-
-/**
- *
- */
-export function isComplexityRiskLevel(value: string): value is ComplexityRiskLevel {
-  return ['LOW', 'MEDIUM', 'HIGH', 'CRITICAL'].includes(value);
-}
-
-/**
- *
- */
-export function isTokenType(value: string): value is TokenType {
-  return ['KEYWORD', 'IDENTIFIER', 'STRING', 'OPERATOR', 'UNKNOWN'].includes(value);
-}
-
-/**
- *
- */
-export function isLogSeverity(value: string): value is LogSeverity {
-  return ['INFO', 'WARNING', 'ERROR', 'CRITICAL'].includes(value);
-}

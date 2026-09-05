@@ -1,0 +1,16 @@
+{
+  // examples/ was covered by no tsconfig, so the adapter template the docs tell
+  // contributors to copy sat with broken imports and 26 unresolved inherited
+  // members for as long as nobody tried to compile it. This config exists to
+  // type-check the examples without emitting anything.
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "sourceMap": false,
+    "rootDir": ".."
+  },
+  "include": ["**/*.ts", "../src/**/*.ts"],
+  "exclude": []
+}

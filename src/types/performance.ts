@@ -14,18 +14,6 @@
 // Execution Plan Types
 // ============================================================================
 
-export interface ExecutionStage {
-  operation: string;
-  cost: number;
-  rows: number;
-  width: number;
-  time?: number;
-  loops?: number;
-  indexName?: string;
-  condition?: string;
-  children?: ExecutionStage[];
-}
-
 // ============================================================================
 // Resource Usage Types
 // ============================================================================

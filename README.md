@@ -340,32 +340,25 @@ npm test
 
 **[Full Development Guide](docs/development/development-setup.md)**
 
-### Architecture gate
+### Layers
 
-`knossos.json` declares the layers of this codebase and the dependency rules
-between them, and the `Architecture` workflow enforces those rules on every pull
-request. The layers run from `types` at the bottom, through `utils`, `adapters`
-and `domain`, up to `mcp-tools`, with `setup-cli` off to the side; a lower layer
-may never depend on a higher one. Adding an import that breaks a rule fails CI
-with the offending file and line.
+The source is layered, and a lower layer may never depend on a higher one:
 
-The workflow also runs a budget check that compares each commit against a
-reviewed baseline and fails on regressions such as a new dependency cycle. That
-half stays dormant until you adopt a baseline:
+| layer | directory | may depend on |
+|---|---|---|
+| `types` | `src/types` | nothing in `src` |
+| `utils` | `src/utils` | `types` |
+| `adapters` | `src/database` | `types`, `utils` |
+| `domain` | `src/classes` | `types`, `utils`, `adapters` |
+| `mcp-tools` | `src/tools` | everything below |
+| `setup-cli` | `src/setup` | everything below, and nothing depends on it |
 
-1. Open the latest `Architecture` run on `main` and download the
-   `knossos-architecture` artifact.
-2. Read `scan.json` and take its `snapshot_id`.
-3. Save it as the `KNOSSOS_BASELINE_SNAPSHOT` repository variable.
+Nothing in `src` imports from `tests` or `examples`.
 
-Re-adopt a newer snapshot when a deliberate architectural change makes the old
-baseline meaningless. Never move it just to make a red pull request go green.
-
-The scan reports several thousand error diagnostics for the `tests` tree. That
-is a side effect of `tsconfig.json` excluding `tests`, which leaves the analyzer
-type-checking those files without the Jest globals. `npm run type-check` is the
-authority on whether this repository compiles, and the architecture budgets
-deliberately do not gate on the diagnostic count.
+These rules are not enforced by CI. They are a design constraint, checked by
+hand or by whatever analysis tool you point at the checkout, so read the table
+before adding an import that reaches upward. A cycle between layers is the
+signal that something belongs in a lower one.
 
 ## License
 

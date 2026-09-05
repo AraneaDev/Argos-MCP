@@ -5,6 +5,44 @@ All notable changes to the Argos-MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.0](https://github.com/AraneaDev/Argos-MCP/compare/v4.0.0...v4.1.0) (2026-09-05)
+
+
+### Features
+
+* **mssql:** authenticate with the signed-in Azure CLI identity ([#17](https://github.com/AraneaDev/Argos-MCP/issues/17)) ([00a4f80](https://github.com/AraneaDev/Argos-MCP/commit/00a4f806de2b22e501c14cb66a5490adeb4026a3))
+* **mssql:** choose the tenant for Azure CLI authentication ([#24](https://github.com/AraneaDev/Argos-MCP/issues/24)) ([509c3c4](https://github.com/AraneaDev/Argos-MCP/commit/509c3c4650fb0da4d7a3959cb2645d89e4bfc3b8))
+
+
+### Fixes
+
+* **examples:** repair the adapter template and check it in CI ([#22](https://github.com/AraneaDev/Argos-MCP/issues/22)) ([eacf83b](https://github.com/AraneaDev/Argos-MCP/commit/eacf83b87da89342c4cb2e65094782b0331afc3c))
+
+
+### Documentation
+
+* adopt the house README style, upload coverage to Codecov ([a856626](https://github.com/AraneaDev/Argos-MCP/commit/a85662642d29811c3412c86e3cced75ec9b89f1c))
+* adopt the house README style, upload coverage to Codecov ([6c23020](https://github.com/AraneaDev/Argos-MCP/commit/6c2302071e6a121a48b89759436bda62917a797f))
+* link the project site from the readme ([#16](https://github.com/AraneaDev/Argos-MCP/issues/16)) ([a816bd6](https://github.com/AraneaDev/Argos-MCP/commit/a816bd67f0c31dca0f8ce2055a3990413e7e66a0))
+* link the README to the project page ([27cae43](https://github.com/AraneaDev/Argos-MCP/commit/27cae4381b68a372aeb35c8051c73cb63f954568))
+* normalise the badge row, self-host the coverage badge ([f9b605c](https://github.com/AraneaDev/Argos-MCP/commit/f9b605c682f556079eb2a129a48cafb664ce2e4e))
+* normalise the badge row, self-host the coverage badge ([acf89b9](https://github.com/AraneaDev/Argos-MCP/commit/acf89b97d7cfbf6039059fe06bf16f9060d0abe2))
+* point the badge at the renamed /tools section ([684c06b](https://github.com/AraneaDev/Argos-MCP/commit/684c06b46532c12eb8bfa75c0124645de1da659b))
+
+
+### Tests
+
+* close the mutation gaps in the new auth validation ([#23](https://github.com/AraneaDev/Argos-MCP/issues/23)) ([86989c1](https://github.com/AraneaDev/Argos-MCP/commit/86989c1ee8710e14b3158ee319cefc0c4245392e))
+* type-check the test suite, which nothing was checking ([#19](https://github.com/AraneaDev/Argos-MCP/issues/19)) ([b5d88e6](https://github.com/AraneaDev/Argos-MCP/commit/b5d88e68d1d67c8463c48632b081c339238231ce))
+
+
+### Continuous integration
+
+* keep the Release PR runnable and widen the changelog ([#18](https://github.com/AraneaDev/Argos-MCP/issues/18)) ([6a0f760](https://github.com/AraneaDev/Argos-MCP/commit/6a0f7608a5a7287e3b7300d710c54d2b906cbc97))
+* move off the actions still running on Node 20 ([#15](https://github.com/AraneaDev/Argos-MCP/issues/15)) ([0d4b6fc](https://github.com/AraneaDev/Argos-MCP/commit/0d4b6fc9249e6c8eb18e345b5c2217c288d32ab0))
+* roll the architecture gate forward to Knossos v0.10.5 ([#10](https://github.com/AraneaDev/Argos-MCP/issues/10)) ([85da547](https://github.com/AraneaDev/Argos-MCP/commit/85da547a99900f00408c5b338a933ec62c3cd983))
+* scan only this repository, and keep the restored cache writable ([#9](https://github.com/AraneaDev/Argos-MCP/issues/9)) ([b16ed3e](https://github.com/AraneaDev/Argos-MCP/commit/b16ed3e09ce4f2d3a08e833c6ca2eee0ac312c86))
+
 ## [4.0.0](https://github.com/AraneaDev/Argos-MCP/compare/v3.0.1...v4.0.0) (2026-08-10)
 
 

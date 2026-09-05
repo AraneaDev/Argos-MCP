@@ -264,6 +264,66 @@ describe('config', () => {
       }
     });
 
+    describe('azure-cli authentication', () => {
+      it('should accept azure-cli authentication for mssql without a username', () => {
+        const config = parseDatabaseConfig('db', {
+          type: 'mssql',
+          host: 'myserver.database.windows.net',
+          database: 'db',
+          authentication: 'azure-cli',
+        });
+        expect(config.authentication).toBe('azure-cli');
+        expect(config.username).toBeUndefined();
+      });
+
+      it('should still require a username for mssql using sql authentication', () => {
+        expect(() =>
+          parseDatabaseConfig('db', { type: 'mssql', host: 'localhost', database: 'db' })
+        ).toThrow("missing required 'username'");
+      });
+
+      it('should reject azure-cli authentication for a non-mssql database', () => {
+        expect(() =>
+          parseDatabaseConfig('db', {
+            type: 'mysql',
+            host: 'localhost',
+            username: 'root',
+            authentication: 'azure-cli',
+          })
+        ).toThrow('authentication');
+      });
+
+      it('should reject an unknown authentication value', () => {
+        expect(() =>
+          parseDatabaseConfig('db', {
+            type: 'mssql',
+            host: 'localhost',
+            username: 'u',
+            authentication: 'kerberos',
+          })
+        ).toThrow('kerberos');
+      });
+
+      it('should accept an explicit sql authentication value', () => {
+        const config = parseDatabaseConfig('db', {
+          type: 'mssql',
+          host: 'localhost',
+          username: 'u',
+          authentication: 'sql',
+        });
+        expect(config.authentication).toBe('sql');
+      });
+
+      it('should leave authentication undefined when the key is absent', () => {
+        const config = parseDatabaseConfig('db', {
+          type: 'mssql',
+          host: 'localhost',
+          username: 'u',
+        });
+        expect(config.authentication).toBeUndefined();
+      });
+    });
+
     it('should normalize type to lowercase', () => {
       const config = parseDatabaseConfig('db', {
         type: 'MySQL',
@@ -838,6 +898,22 @@ describe('config', () => {
           extension: {} as any,
         })
       ).toThrow('missing username');
+    });
+
+    it('should not require a username for mssql using azure-cli authentication', () => {
+      expect(() =>
+        validateConfiguration({
+          databases: {
+            db: {
+              type: 'mssql',
+              host: 'myserver.database.windows.net',
+              authentication: 'azure-cli',
+            } as any,
+          },
+          security: {} as any,
+          extension: {} as any,
+        })
+      ).not.toThrow();
     });
 
     it('should validate sqlite db missing file', () => {

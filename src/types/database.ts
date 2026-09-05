@@ -38,6 +38,13 @@ export type DatabaseTypeString =
   | 'mssql'
   | 'sqlserver';
 
+/**
+ * Authentication modes supported by the SQL Server adapter.
+ */
+export const MSSQL_AUTHENTICATION_MODES = ['sql', 'azure-cli'] as const;
+
+export type MSSQLAuthenticationMode = (typeof MSSQL_AUTHENTICATION_MODES)[number];
+
 export interface DatabaseConfig {
   type: DatabaseTypeString;
   host?: string;
@@ -51,6 +58,11 @@ export interface DatabaseConfig {
   timeout?: number;
   file?: string; // For SQLite
   encrypt?: boolean; // For MSSQL
+
+  // Authentication mode. Only meaningful for MSSQL; omitted means SQL
+  // authentication with username/password. 'azure-cli' delegates to the
+  // signed-in Azure CLI, so no credentials live in config.ini.
+  authentication?: MSSQLAuthenticationMode;
 
   // SSH Tunnel Configuration
   ssh_host?: string;

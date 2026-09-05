@@ -7,6 +7,7 @@ export type {
   DatabaseType,
   DatabaseTypeString,
   DatabaseConfig,
+  MSSQLAuthenticationMode,
   DatabaseConnection,
   ConnectionInfo,
   QueryResult,
@@ -29,6 +30,8 @@ export type {
   QueryResultWithRedaction,
   RedactionAuditEntry,
 } from './database.js';
+
+export { MSSQL_AUTHENTICATION_MODES } from './database.js';
 
 // MCP protocol types
 export type {

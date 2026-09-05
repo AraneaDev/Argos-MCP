@@ -16,7 +16,11 @@ import type {
   DatabaseRedactionConfig,
   FieldRedactionRule,
 } from '../types/index.js';
-import { isValidRedactionType, DEFAULT_DATABASE_PORTS } from '../types/index.js';
+import {
+  isValidRedactionType,
+  DEFAULT_DATABASE_PORTS,
+  MSSQL_AUTHENTICATION_MODES,
+} from '../types/index.js';
 import { getErrorMessage } from './error-handler.js';
 
 /**
@@ -59,6 +63,16 @@ const SHELL_METACHAR_RE = /[;&|$()><]/;
 const EMBEDDED_CREDENTIALS_RE = /[^@]+:[^@]+@/;
 
 /**
+ * Azure CLI authentication takes its identity from the signed-in `az` session,
+ * so a username and password are not merely optional but absent by design.
+ * Every credential check has to agree on that, or a config valid at parse time
+ * fails at connect time (or the reverse).
+ */
+export function usesAzureCliAuth(config: Pick<DatabaseConfig, 'type' | 'authentication'>): boolean {
+  return config.type === 'mssql' && config.authentication === 'azure-cli';
+}
+
+/**
  *
  */
 export function validateDatabaseConfig(config: DatabaseConfig): ValidationResult {
@@ -68,9 +82,11 @@ export function validateDatabaseConfig(config: DatabaseConfig): ValidationResult
   if (t === 'mysql' || t === 'postgresql' || t === 'mssql') {
     if (!config.host) errors.push({ field: 'host', message: 'host is required' });
     if (!config.port) errors.push({ field: 'port', message: 'port is required' });
-    if (!(config as unknown as Record<string, unknown>).user && !config.username)
-      errors.push({ field: 'user', message: 'user is required' });
-    if (!config.password) errors.push({ field: 'password', message: 'password is required' });
+    if (!usesAzureCliAuth(config)) {
+      if (!(config as unknown as Record<string, unknown>).user && !config.username)
+        errors.push({ field: 'user', message: 'user is required' });
+      if (!config.password) errors.push({ field: 'password', message: 'password is required' });
+    }
     if (!config.database) errors.push({ field: 'database', message: 'database is required' });
   }
   if (t === 'sqlite') {
@@ -254,6 +270,43 @@ export function parseDatabaseConfig(name: string, config: Record<string, string>
 }
 
 /**
+ * Parse and validate the optional 'authentication' key.
+ *
+ * Only the SQL Server adapter can act on it, so accepting it elsewhere would
+ * mean silently ignoring a key the user believed changed how they authenticate.
+ */
+function parseAuthentication(
+  name: string,
+  config: Record<string, string>,
+  dbConfig: DatabaseConfig
+): void {
+  if (config.authentication === undefined) {
+    return;
+  }
+
+  const mode = config.authentication.trim().toLowerCase();
+
+  if (dbConfig.type !== 'mssql') {
+    throw new ConfigValidationError(
+      `Database '${name}' sets 'authentication' but that is only supported for type 'mssql'`,
+      'authentication',
+      name
+    );
+  }
+
+  if (!(MSSQL_AUTHENTICATION_MODES as readonly string[]).includes(mode)) {
+    throw new ConfigValidationError(
+      `Database '${name}' has invalid authentication '${config.authentication}'. ` +
+        `Valid values: ${MSSQL_AUTHENTICATION_MODES.join(', ')}`,
+      'authentication',
+      name
+    );
+  }
+
+  dbConfig.authentication = mode as DatabaseConfig['authentication'];
+}
+
+/**
  * Validate networked database configuration (non-SQLite)
  */
 function validateNetworkedDatabase(
@@ -269,7 +322,9 @@ function validateNetworkedDatabase(
       name
     );
   }
-  if (!config.username) {
+  parseAuthentication(name, config, dbConfig);
+
+  if (!config.username && !usesAzureCliAuth(dbConfig)) {
     throw new ConfigValidationError(
       `Database '${name}' missing required 'username' field`,
       'username',
@@ -603,7 +658,7 @@ function validateDatabaseConfiguration(name: string, config: DatabaseConfig): vo
     if (!config.host) {
       throw new ConfigValidationError(`Database '${name}' missing host`, 'host', name);
     }
-    if (!config.username) {
+    if (!config.username && !usesAzureCliAuth(config)) {
       throw new ConfigValidationError(`Database '${name}' missing username`, 'username', name);
     }
   } else {

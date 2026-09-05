@@ -121,6 +121,16 @@ value Argos cannot read is reported instead of guessed.
 |-----------|-------------|---------|
 | `file` | SQLite file path | `./data/mydb.sqlite` |
 
+#### SQL Server-Specific Parameters
+| Parameter | Default | Description | Example |
+|-----------|---------|-------------|---------|
+| `encrypt` | `true` | Enable connection encryption | `false` |
+| `authentication` | `sql` | Authentication mode: `sql` or `azure-cli` | `azure-cli` |
+
+With `authentication=azure-cli` the connection uses the identity already signed
+in to the Azure CLI, so `username` and `password` are neither required nor read.
+See the [SQL Server guide](../databases/sql-server.md#azure-cli-authentication).
+
 ### Default Port Numbers
 - **PostgreSQL**: 5432
 - **MySQL**: 3306

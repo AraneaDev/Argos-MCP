@@ -50,6 +50,9 @@ timeout=30000
 | `username` | SQL Server login | `app_user` |
 | `password` | SQL Server password | `SecurePassword123!` |
 
+`username` and `password` are not required when `authentication=azure-cli`; see
+[Azure CLI authentication](#azure-cli-authentication).
+
 ### Optional Parameters
 
 | Parameter | Description | Default | Example |
@@ -58,6 +61,7 @@ timeout=30000
 | `encrypt` | Enable connection encryption | `true` | `false` |
 | `timeout` | Connection timeout (ms) | `30000` | `60000` |
 | `select_only` | Restrict to SELECT queries | `true` | `false` |
+| `authentication` | Authentication mode: `sql` or `azure-cli` | `sql` | `azure-cli` |
 
 ### Advanced Configuration
 
@@ -118,6 +122,37 @@ username=user@company.com
 password=aad_password
 encrypt=true
 ```
+
+### Azure CLI authentication
+
+Authenticate as the identity already signed in to the Azure CLI, so no Azure
+credential is written to `config.ini` at all:
+
+```ini
+[database.azure_cli]
+type=mssql
+host=myserver.database.windows.net
+database=mydatabase
+authentication=azure-cli
+```
+
+Requirements:
+
+- The [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) is installed and on `PATH`.
+- `az login` has been run, and the signed-in identity has access to the database.
+- The Azure AD identity is mapped to a database user, for example:
+  `CREATE USER [you@company.com] FROM EXTERNAL PROVIDER;`
+
+Notes:
+
+- `username` and `password` are ignored in this mode. Leave them out.
+- Encryption is forced on. An `encrypt=false` is refused rather than honoured,
+  because an access token on an unencrypted connection is replayable against
+  every database the signed-in identity can reach.
+- The token is acquired per connection through the CLI, so a session that has
+  expired surfaces as a connection error telling you to run `az login` again.
+- For unattended use (CI, a server), Azure CLI authentication is the wrong tool:
+  it needs an interactive login. Use SQL authentication there.
 
 ## SSL/TLS Configuration
 

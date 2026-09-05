@@ -32,6 +32,16 @@ jest.mock('mssql', () => ({
   ConnectionPool: jest.fn(),
 }));
 
+// Mock '@azure/identity' so the adapter's Azure CLI branch can be exercised
+// without an `az` binary or a signed-in Azure account.
+const mockAzureCliCredentialCtor = jest.fn();
+jest.mock('@azure/identity', () => ({
+  AzureCliCredential: jest.fn().mockImplementation(function (this: any, ...args: unknown[]) {
+    mockAzureCliCredentialCtor(...args);
+    this.getToken = jest.fn();
+  }),
+}));
+
 import * as mssql from 'mssql';
 
 // Use jest.mocked for proper typing
@@ -126,6 +136,65 @@ describe('MSSQLAdapter', () => {
       });
       expect(mockConnect).toHaveBeenCalled();
       expect(connection).toBe(mockConnectionPool);
+    });
+
+    describe('azure-cli authentication', () => {
+      const azureConfig = (): DatabaseConfig =>
+        ({
+          type: 'mssql',
+          host: 'myserver.database.windows.net',
+          port: 1433,
+          database: 'testdb',
+          authentication: 'azure-cli',
+          timeout: 30000,
+        }) as DatabaseConfig;
+
+      it('should authenticate with an AzureCliCredential token credential', async () => {
+        await new MSSQLAdapter(azureConfig()).connect();
+
+        expect(mockAzureCliCredentialCtor).toHaveBeenCalled();
+        const passed = mockMSSQLConnectionPool.mock.calls[0][0] as any;
+        expect(passed.authentication.type).toBe('token-credential');
+        expect(typeof passed.authentication.options.credential.getToken).toBe('function');
+      });
+
+      it('should not send a user or password when using azure-cli authentication', async () => {
+        await new MSSQLAdapter(azureConfig()).connect();
+
+        const passed = mockMSSQLConnectionPool.mock.calls[0][0] as any;
+        expect(passed).not.toHaveProperty('user');
+        expect(passed).not.toHaveProperty('password');
+      });
+
+      it('should connect without a username or password in the configuration', async () => {
+        await expect(new MSSQLAdapter(azureConfig()).connect()).resolves.toBe(mockConnectionPool);
+      });
+
+      it('should force encryption on even when the config disables it', async () => {
+        // A bearer token on an unencrypted wire is worse than a password:
+        // encrypt=false must not be honoured for token authentication.
+        await new MSSQLAdapter({ ...azureConfig(), encrypt: false }).connect();
+
+        const passed = mockMSSQLConnectionPool.mock.calls[0][0] as any;
+        expect(passed.options.encrypt).toBe(true);
+      });
+
+      it('should tell the user to run az login when the CLI credential is unavailable', async () => {
+        mockConnect.mockRejectedValueOnce(
+          new Error('Azure CLI could not be found. Please visit https://aka.ms/azure-cli')
+        );
+
+        await expect(new MSSQLAdapter(azureConfig()).connect()).rejects.toThrow('az login');
+      });
+
+      it('should keep using user and password when authentication is not azure-cli', async () => {
+        await adapter.connect();
+
+        const passed = mockMSSQLConnectionPool.mock.calls[0][0] as any;
+        expect(passed.user).toBe('testuser');
+        expect(passed.password).toBe('testpass');
+        expect(passed.authentication).toBeUndefined();
+      });
     });
 
     it('should handle encryption configuration', async () => {

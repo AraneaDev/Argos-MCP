@@ -35,24 +35,29 @@ export class MSSQLAdapter extends DatabaseAdapter {
    *
    */
   async connect(): Promise<DatabaseConnection> {
-    this.validateConfig(['host', 'database', 'username', 'password']);
+    const azureCli = this.config.authentication === 'azure-cli';
 
-    const host = this.config.host as string;
-    const database = this.config.database as string;
-    const username = this.config.username as string;
-    const password = this.config.password as string;
+    this.validateConfig(
+      azureCli ? ['host', 'database'] : ['host', 'database', 'username', 'password']
+    );
 
     const connectionConfig: MSSQLConfig = {
-      server: host,
+      server: this.config.host as string,
       port: this.parseConfigValue(this.config.port, 'number', 1433),
-      database,
-      user: username,
-      password,
+      database: this.config.database as string,
       connectionTimeout: this.connectionTimeout,
       requestTimeout: this.connectionTimeout,
       options: {
-        encrypt: this.parseConfigValue(this.config.encrypt ?? true, 'boolean', true),
-        trustServerCertificate: !this.verifyServerCertificate(),
+        // A bearer token on an unencrypted wire is worse than a password: it is
+        // replayable against every database the signed-in identity can reach.
+        // Azure SQL requires TLS anyway, so encrypt=false is refused, not honoured.
+        encrypt: azureCli
+          ? true
+          : this.parseConfigValue(this.config.encrypt ?? true, 'boolean', true),
+        // encrypt=true alone is not protection. An attacker who presents a
+        // forged certificate still terminates the TLS and captures the bearer
+        // token, so ssl_verify=false cannot reach the token-auth path either.
+        trustServerCertificate: azureCli ? false : !this.verifyServerCertificate(),
         enableArithAbort: true,
       },
       pool: {
@@ -62,12 +67,31 @@ export class MSSQLAdapter extends DatabaseAdapter {
       },
     };
 
+    if (azureCli) {
+      // Imported lazily so installs that never touch Azure, and the other three
+      // adapters, do not pay to load @azure/identity.
+      const { AzureCliCredential } = await import('@azure/identity');
+      connectionConfig.authentication = {
+        type: 'token-credential',
+        options: { credential: new AzureCliCredential() },
+      };
+    } else {
+      connectionConfig.user = this.config.username as string;
+      connectionConfig.password = this.config.password as string;
+    }
+
     try {
       const pool = new sql.ConnectionPool(connectionConfig);
       await pool.connect();
       return pool as DatabaseConnection;
     } catch (error) {
-      throw this.createError('Failed to connect to SQL Server database', error as Error);
+      throw this.createError(
+        azureCli
+          ? 'Failed to connect to SQL Server database using Azure CLI authentication. ' +
+              'Check that the Azure CLI is installed and that `az login` has been run'
+          : 'Failed to connect to SQL Server database',
+        error as Error
+      );
     }
   }
 

@@ -50,6 +50,9 @@ timeout=30000
 | `username` | SQL Server login | `app_user` |
 | `password` | SQL Server password | `SecurePassword123!` |
 
+`username` and `password` are not required when `authentication=azure-cli`; see
+[Azure CLI authentication](#azure-cli-authentication).
+
 ### Optional Parameters
 
 | Parameter | Description | Default | Example |
@@ -58,6 +61,7 @@ timeout=30000
 | `encrypt` | Enable connection encryption | `true` | `false` |
 | `timeout` | Connection timeout (ms) | `30000` | `60000` |
 | `select_only` | Restrict to SELECT queries | `true` | `false` |
+| `authentication` | Authentication mode: `sql` or `azure-cli` | `sql` | `azure-cli` |
 
 ### Advanced Configuration
 
@@ -118,6 +122,41 @@ username=user@company.com
 password=aad_password
 encrypt=true
 ```
+
+### Azure CLI authentication
+
+Authenticate as the identity already signed in to the Azure CLI, so no Azure
+credential is written to `config.ini` at all:
+
+```ini
+[database.azure_cli]
+type=mssql
+host=myserver.database.windows.net
+database=mydatabase
+authentication=azure-cli
+```
+
+Requirements:
+
+- The [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) is installed and on `PATH`.
+- `az login` has been run, and the signed-in identity has access to the database.
+- The Azure AD identity is mapped to a database user, for example:
+  `CREATE USER [you@company.com] FROM EXTERNAL PROVIDER;`
+
+Notes:
+
+- `username` and `password` are ignored in this mode. Leave them out.
+- Encryption and certificate verification are both forced on. An `encrypt=false`
+  is a startup error, and `ssl_verify=false` does not reach this path. An access
+  token is a bearer credential: an attacker who terminates the TLS with a forged
+  certificate captures it and can replay it against every database the signed-in
+  identity can reach.
+- The token is acquired per connection through the CLI, so a session that has
+  expired surfaces as a connection error telling you to run `az login` again.
+- Unattended use works as long as the CLI itself has a non-interactive session,
+  which `az login --service-principal` provides. A dedicated service-principal
+  credential would be the more direct tool for that, and is not implemented yet;
+  SQL authentication remains the simpler option for CI.
 
 ## SSL/TLS Configuration
 

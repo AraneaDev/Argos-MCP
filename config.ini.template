@@ -60,3 +60,14 @@ max_rows=1000
 query_timeout=30000
 max_batch_size=10
 debug=false
+# Example Azure SQL configuration using the signed-in Azure CLI identity.
+# Requires the Azure CLI on PATH and a completed `az login`; no username or
+# password is needed, and none is stored here.
+[database.azure_sql]
+type=mssql
+host=your-server.database.windows.net
+port=1433
+database=your_database_name
+authentication=azure-cli
+select_only=true
+timeout=30000

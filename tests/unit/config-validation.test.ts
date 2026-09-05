@@ -43,3 +43,34 @@ describe('validateDatabaseConfig', () => {
     expect(r.valid).toBe(false);
   });
 });
+
+describe('validateDatabaseConfig - Azure CLI authentication', () => {
+  const mssqlBase = {
+    type: 'mssql' as const,
+    host: 'myserver.database.windows.net',
+    port: 1433,
+    database: 'db',
+  };
+
+  it('passes mssql config with azure-cli auth and no username or password', () => {
+    const r = validateDatabaseConfig({ ...mssqlBase, authentication: 'azure-cli' } as any);
+    expect(r.valid).toBe(true);
+  });
+
+  it('still requires username and password for mssql without azure-cli auth', () => {
+    const r = validateDatabaseConfig(mssqlBase as any);
+    expect(r.valid).toBe(false);
+    expect(r.errors.some((e: any) => e.field === 'user')).toBe(true);
+    expect(r.errors.some((e: any) => e.field === 'password')).toBe(true);
+  });
+
+  it('still requires username and password for mysql with azure-cli auth', () => {
+    const r = validateDatabaseConfig({
+      ...base,
+      user: '',
+      password: '',
+      authentication: 'azure-cli',
+    } as any);
+    expect(r.valid).toBe(false);
+  });
+});

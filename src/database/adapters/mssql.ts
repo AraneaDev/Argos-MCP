@@ -26,6 +26,21 @@ import type {
 /**
  *
  */
+/**
+ * Whether a connect failure came from acquiring the token rather than from the
+ * connection itself. @azure/identity raises these two; everything else --- a
+ * firewall, a private-endpoint-only server, a wrong database name --- arrives
+ * as a driver ConnectionError, and pointing the user at `az login` for one of
+ * those sends them somewhere the problem is not.
+ */
+function isCredentialFailure(error: unknown): boolean {
+  const name = (error as { name?: string } | null)?.name;
+  return name === 'CredentialUnavailableError' || name === 'AuthenticationError';
+}
+
+/**
+ *
+ */
 export class MSSQLAdapter extends DatabaseAdapter {
   // ============================================================================
   // Connection Management
@@ -69,9 +84,12 @@ export class MSSQLAdapter extends DatabaseAdapter {
       // Imported lazily so installs that never touch Azure, and the other three
       // adapters, do not pay to load @azure/identity.
       const { AzureCliCredential } = await import('@azure/identity');
+      const tenantId = this.config.azure_tenant_id;
       connectionConfig.authentication = {
         type: 'token-credential',
-        options: { credential: new AzureCliCredential() },
+        options: {
+          credential: tenantId ? new AzureCliCredential({ tenantId }) : new AzureCliCredential(),
+        },
       };
     } else {
       connectionConfig.user = this.config.username as string;
@@ -84,7 +102,7 @@ export class MSSQLAdapter extends DatabaseAdapter {
       return pool as DatabaseConnection;
     } catch (error) {
       throw this.createError(
-        azureCli
+        azureCli && isCredentialFailure(error)
           ? 'Failed to connect to SQL Server database using Azure CLI authentication. ' +
               'Check that the Azure CLI is installed and that `az login` has been run'
           : 'Failed to connect to SQL Server database',

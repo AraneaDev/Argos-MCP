@@ -423,6 +423,42 @@ describe('config', () => {
         );
       });
 
+      it('should carry azure_tenant_id through to the parsed config', () => {
+        const config = parseDatabaseConfig('db', {
+          type: 'mssql',
+          host: 'myserver.database.windows.net',
+          database: 'db',
+          authentication: 'azure-cli',
+          azure_tenant_id: 'd958da54-24bc-444a-981b-317de09e73ee',
+        });
+        expect(config.azure_tenant_id).toBe('d958da54-24bc-444a-981b-317de09e73ee');
+      });
+
+      it('should reject azure_tenant_id without azure-cli authentication', () => {
+        expect(() =>
+          parseDatabaseConfig('db', {
+            type: 'mssql',
+            host: 'localhost',
+            database: 'db',
+            username: 'u',
+            password: 'p',
+            azure_tenant_id: 'd958da54-24bc-444a-981b-317de09e73ee',
+          })
+        ).toThrow('azure_tenant_id');
+      });
+
+      it('should reject an azure_tenant_id that is not a GUID', () => {
+        expect(() =>
+          parseDatabaseConfig('db', {
+            type: 'mssql',
+            host: 'myserver.database.windows.net',
+            database: 'db',
+            authentication: 'azure-cli',
+            azure_tenant_id: 'yielder-group',
+          })
+        ).toThrow('azure_tenant_id');
+      });
+
       it('should accept an explicit sql authentication value', () => {
         const config = parseDatabaseConfig('db', {
           type: 'mssql',

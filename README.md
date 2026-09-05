@@ -51,7 +51,8 @@ nothing reaches your data unlogged.
 - **PostgreSQL** - Full support including advanced features
 - **MySQL/MariaDB** - Via mysql2, including Azure Database for MySQL/MariaDB
 - **SQLite** - Perfect for development and small applications
-- **SQL Server** - Enterprise-grade Microsoft SQL Server support
+- **SQL Server** - Enterprise-grade Microsoft SQL Server support, including Azure
+  SQL with passwordless sign-in through the Azure CLI
 
 ### **Developer Experience**
 - **One-command install** - Registers with Claude Code via the native `claude mcp add`
@@ -62,6 +63,9 @@ nothing reaches your data unlogged.
 ## Quick start
 
 **Requirements:** Node.js >= 22 and the [Claude Code CLI](https://docs.claude.com/en/docs/claude-code).
+Connecting to Azure SQL with `authentication=azure-cli` additionally needs the
+[Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli) on `PATH`
+and a completed `az login`; nothing else does.
 
 ### 1. Build
 ```bash
@@ -197,6 +201,33 @@ max_joins=5
 max_subqueries=3
 max_complexity_score=50
 ```
+
+### Azure SQL without a password
+
+The Azure CLI's own sign-in is the credential, so no secret is written to
+`config.ini` at all.
+
+```ini
+[database.azure_sql]
+type=mssql
+host=your-server.database.windows.net
+port=1433
+database=your_database_name
+authentication=azure-cli
+select_only=true
+
+# Only when the server's tenant is not the CLI's active context, which is the
+# usual case for an account with access to several tenants. Must be the GUID.
+# azure_tenant_id=00000000-0000-0000-0000-000000000000
+```
+
+Needs `az login` beforehand, and the signed-in identity mapped as a database
+user: `CREATE USER [you@company.com] FROM EXTERNAL PROVIDER;`. Encryption and
+certificate verification are forced on for this mode, because an access token is
+a bearer credential and an unverified connection hands it to whoever answers.
+
+See the [SQL Server guide](docs/databases/sql-server.md#azure-cli-authentication)
+for the details, including unattended use.
 
 ### Multi-Database Analytics Setup
 ```ini

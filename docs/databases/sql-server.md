@@ -146,13 +146,17 @@ Requirements:
 Notes:
 
 - `username` and `password` are ignored in this mode. Leave them out.
-- Encryption is forced on. An `encrypt=false` is refused rather than honoured,
-  because an access token on an unencrypted connection is replayable against
-  every database the signed-in identity can reach.
+- Encryption and certificate verification are both forced on. An `encrypt=false`
+  is a startup error, and `ssl_verify=false` does not reach this path. An access
+  token is a bearer credential: an attacker who terminates the TLS with a forged
+  certificate captures it and can replay it against every database the signed-in
+  identity can reach.
 - The token is acquired per connection through the CLI, so a session that has
   expired surfaces as a connection error telling you to run `az login` again.
-- For unattended use (CI, a server), Azure CLI authentication is the wrong tool:
-  it needs an interactive login. Use SQL authentication there.
+- Unattended use works as long as the CLI itself has a non-interactive session,
+  which `az login --service-principal` provides. A dedicated service-principal
+  credential would be the more direct tool for that, and is not implemented yet;
+  SQL authentication remains the simpler option for CI.
 
 ## SSL/TLS Configuration
 

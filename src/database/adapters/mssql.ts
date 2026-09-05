@@ -54,7 +54,10 @@ export class MSSQLAdapter extends DatabaseAdapter {
         encrypt: azureCli
           ? true
           : this.parseConfigValue(this.config.encrypt ?? true, 'boolean', true),
-        trustServerCertificate: !this.verifyServerCertificate(),
+        // encrypt=true alone is not protection. An attacker who presents a
+        // forged certificate still terminates the TLS and captures the bearer
+        // token, so ssl_verify=false cannot reach the token-auth path either.
+        trustServerCertificate: azureCli ? false : !this.verifyServerCertificate(),
         enableArithAbort: true,
       },
       pool: {

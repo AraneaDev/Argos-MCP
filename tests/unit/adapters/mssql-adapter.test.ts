@@ -179,6 +179,23 @@ describe('MSSQLAdapter', () => {
         expect(passed.options.encrypt).toBe(true);
       });
 
+      it('should verify the server certificate even when ssl_verify is false', async () => {
+        // encrypt=true without certificate verification is not protection: an
+        // attacker presenting a forged certificate still terminates the TLS and
+        // captures the bearer token. ssl_verify=false must not reach this path.
+        await new MSSQLAdapter({ ...azureConfig(), ssl_verify: false }).connect();
+
+        const passed = mockMSSQLConnectionPool.mock.calls[0][0] as any;
+        expect(passed.options.trustServerCertificate).toBe(false);
+      });
+
+      it('should still honour ssl_verify=false for sql authentication', async () => {
+        await new MSSQLAdapter({ ...config, ssl_verify: false }).connect();
+
+        const passed = mockMSSQLConnectionPool.mock.calls[0][0] as any;
+        expect(passed.options.trustServerCertificate).toBe(true);
+      });
+
       it('should tell the user to run az login when the CLI credential is unavailable', async () => {
         mockConnect.mockRejectedValueOnce(
           new Error('Azure CLI could not be found. Please visit https://aka.ms/azure-cli')

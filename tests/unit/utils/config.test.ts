@@ -258,7 +258,12 @@ describe('config', () => {
           expect(() => parseDatabaseConfig('db', { type, file: '/tmp/test.db' })).not.toThrow();
         } else {
           expect(() =>
-            parseDatabaseConfig('db', { type, host: 'localhost', username: 'root' })
+            parseDatabaseConfig('db', {
+              type,
+              host: 'localhost',
+              username: 'root',
+              password: 'secret',
+            })
           ).not.toThrow();
         }
       }
@@ -304,11 +309,66 @@ describe('config', () => {
         ).toThrow('kerberos');
       });
 
+      it('should reject encrypt=false alongside azure-cli authentication', () => {
+        expect(() =>
+          parseDatabaseConfig('db', {
+            type: 'mssql',
+            host: 'myserver.database.windows.net',
+            database: 'db',
+            authentication: 'azure-cli',
+            encrypt: 'false',
+          })
+        ).toThrow('encrypt');
+      });
+
+      it('should accept encrypt=true alongside azure-cli authentication', () => {
+        expect(() =>
+          parseDatabaseConfig('db', {
+            type: 'mssql',
+            host: 'myserver.database.windows.net',
+            database: 'db',
+            authentication: 'azure-cli',
+            encrypt: 'true',
+          })
+        ).not.toThrow();
+      });
+
+      it('should require a password for mssql sql authentication', () => {
+        expect(() =>
+          parseDatabaseConfig('db', {
+            type: 'mssql',
+            host: 'localhost',
+            database: 'db',
+            username: 'u',
+          })
+        ).toThrow("missing required 'password'");
+      });
+
+      it('should not require a password for mssql azure-cli authentication', () => {
+        expect(() =>
+          parseDatabaseConfig('db', {
+            type: 'mssql',
+            host: 'myserver.database.windows.net',
+            database: 'db',
+            authentication: 'azure-cli',
+          })
+        ).not.toThrow();
+      });
+
+      it('should not require a password for other database types', () => {
+        // postgresql peer/trust auth and .pgpass are legitimate passwordless
+        // setups, so this check stays scoped to mssql.
+        expect(() =>
+          parseDatabaseConfig('db', { type: 'postgresql', host: 'localhost', username: 'u' })
+        ).not.toThrow();
+      });
+
       it('should accept an explicit sql authentication value', () => {
         const config = parseDatabaseConfig('db', {
           type: 'mssql',
           host: 'localhost',
           username: 'u',
+          password: 'p',
           authentication: 'sql',
         });
         expect(config.authentication).toBe('sql');
@@ -319,6 +379,7 @@ describe('config', () => {
           type: 'mssql',
           host: 'localhost',
           username: 'u',
+          password: 'p',
         });
         expect(config.authentication).toBeUndefined();
       });

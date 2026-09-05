@@ -304,6 +304,20 @@ function parseAuthentication(
   }
 
   dbConfig.authentication = mode as DatabaseConfig['authentication'];
+
+  // The adapter forces encryption on for token authentication. Accepting
+  // encrypt=false here would mean quietly doing the opposite of what the file
+  // says, so an explicit one is a startup error instead.
+  if (mode === 'azure-cli' && config.encrypt !== undefined) {
+    if (!parseBool(config.encrypt, 'encrypt', name)) {
+      throw new ConfigValidationError(
+        `Database '${name}' sets encrypt=false with authentication=azure-cli. ` +
+          'An access token requires a verified, encrypted connection; remove encrypt or set it to true',
+        'encrypt',
+        name
+      );
+    }
+  }
 }
 
 /**
@@ -328,6 +342,17 @@ function validateNetworkedDatabase(
     throw new ConfigValidationError(
       `Database '${name}' missing required 'username' field`,
       'username',
+      name
+    );
+  }
+
+  // SQL Server has no passwordless login, so a missing password there is a
+  // mistake worth catching at startup. It stays a warning-free omission for the
+  // other engines, where peer/trust auth and .pgpass are legitimate.
+  if (dbConfig.type === 'mssql' && !config.password && !usesAzureCliAuth(dbConfig)) {
+    throw new ConfigValidationError(
+      `Database '${name}' missing required 'password' field`,
+      'password',
       name
     );
   }

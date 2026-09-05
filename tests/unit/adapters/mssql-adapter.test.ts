@@ -179,6 +179,18 @@ describe('MSSQLAdapter', () => {
         expect(passed.options.encrypt).toBe(true);
       });
 
+      it('should still require host and database under azure-cli authentication', async () => {
+        // Dropping username and password from the required list must not drop
+        // the two fields that have nothing to do with credentials.
+        await expect(
+          new MSSQLAdapter({ ...azureConfig(), host: undefined }).connect()
+        ).rejects.toThrow('host');
+
+        await expect(
+          new MSSQLAdapter({ ...azureConfig(), database: undefined }).connect()
+        ).rejects.toThrow('database');
+      });
+
       it('should verify the server certificate even when ssl_verify is false', async () => {
         // encrypt=true without certificate verification is not protection: an
         // attacker presenting a forged certificate still terminates the TLS and

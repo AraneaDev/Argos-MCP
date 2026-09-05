@@ -363,6 +363,66 @@ describe('config', () => {
         ).not.toThrow();
       });
 
+      it('should accept encrypt=false when authentication is explicitly sql', () => {
+        // The encrypt rejection is specific to token authentication. SQL
+        // authentication may legitimately turn encryption off, so the guard
+        // must test both halves of its condition, not just the azure-cli one.
+        // authentication has to be spelled out: parseAuthentication returns
+        // early when the key is absent, so omitting it never reaches the guard.
+        expect(() =>
+          parseDatabaseConfig('db', {
+            type: 'mssql',
+            host: 'localhost',
+            database: 'db',
+            username: 'u',
+            password: 'p',
+            authentication: 'sql',
+            encrypt: 'false',
+          })
+        ).not.toThrow();
+      });
+
+      it('should trim surrounding whitespace from the authentication value', () => {
+        const config = parseDatabaseConfig('db', {
+          type: 'mssql',
+          host: 'myserver.database.windows.net',
+          database: 'db',
+          authentication: '  azure-cli  ',
+        });
+        expect(config.authentication).toBe('azure-cli');
+      });
+
+      it('should name the offending field on each authentication error', () => {
+        // ConfigValidationError carries a structured field alongside the
+        // message. A wrong one is invisible to a test that only matches text.
+        // The property is _field, not field: it is a public constructor
+        // property wearing a private-by-convention name.
+        const fieldOf = (raw: Record<string, string>): string | undefined => {
+          try {
+            parseDatabaseConfig('db', raw);
+            return undefined;
+          } catch (error) {
+            return (error as { _field?: string })._field;
+          }
+        };
+
+        expect(
+          fieldOf({ type: 'mssql', host: 'h', username: 'u', authentication: 'kerberos' })
+        ).toBe('authentication');
+        expect(
+          fieldOf({
+            type: 'mssql',
+            host: 'h',
+            database: 'db',
+            authentication: 'azure-cli',
+            encrypt: 'false',
+          })
+        ).toBe('encrypt');
+        expect(fieldOf({ type: 'mssql', host: 'h', database: 'db', username: 'u' })).toBe(
+          'password'
+        );
+      });
+
       it('should accept an explicit sql authentication value', () => {
         const config = parseDatabaseConfig('db', {
           type: 'mssql',

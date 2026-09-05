@@ -51,9 +51,7 @@ export class MSSQLAdapter extends DatabaseAdapter {
         // A bearer token on an unencrypted wire is worse than a password: it is
         // replayable against every database the signed-in identity can reach.
         // Azure SQL requires TLS anyway, so encrypt=false is refused, not honoured.
-        encrypt: azureCli
-          ? true
-          : this.parseConfigValue(this.config.encrypt ?? true, 'boolean', true),
+        encrypt: azureCli ? true : this.parseConfigValue(this.config.encrypt, 'boolean', true),
         // encrypt=true alone is not protection. An attacker who presents a
         // forged certificate still terminates the TLS and captures the bearer
         // token, so ssl_verify=false cannot reach the token-auth path either.

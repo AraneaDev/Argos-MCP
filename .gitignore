@@ -154,6 +154,7 @@ CLAUDE.md
 # the same name deeper in the tree is not swept up by accident.
 /.knossos/
 /.knossos-ci/
+/knossos.json
 /.momus/
 /.chaos-mcp/
 /artifacts/

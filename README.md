@@ -342,15 +342,23 @@ npm test
 
 ### Layers
 
-`knossos.json` declares the layers of this codebase and the dependency rules
-between them. The layers run from `types` at the bottom, through `utils`,
-`adapters` and `domain`, up to `mcp-tools`, with `setup-cli` off to the side; a
-lower layer may never depend on a higher one.
+The source is layered, and a lower layer may never depend on a higher one:
 
-These rules are not enforced in CI. They are checked locally, with whatever tool
-reads `knossos.json`, when a change looks like it might cross a layer. The file
-is the statement of intent either way, so read it before adding an import that
-reaches upward.
+| layer | directory | may depend on |
+|---|---|---|
+| `types` | `src/types` | nothing in `src` |
+| `utils` | `src/utils` | `types` |
+| `adapters` | `src/database` | `types`, `utils` |
+| `domain` | `src/classes` | `types`, `utils`, `adapters` |
+| `mcp-tools` | `src/tools` | everything below |
+| `setup-cli` | `src/setup` | everything below, and nothing depends on it |
+
+Nothing in `src` imports from `tests` or `examples`.
+
+These rules are not enforced by CI. They are a design constraint, checked by
+hand or by whatever analysis tool you point at the checkout, so read the table
+before adding an import that reaches upward. A cycle between layers is the
+signal that something belongs in a lower one.
 
 ## License
 

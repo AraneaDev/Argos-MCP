@@ -69,5 +69,8 @@ host=your-server.database.windows.net
 port=1433
 database=your_database_name
 authentication=azure-cli
+# Only needed when the server's tenant differs from the CLI's active context,
+# which is the usual case for an account with access to several tenants.
+# azure_tenant_id=00000000-0000-0000-0000-000000000000
 select_only=true
 timeout=30000

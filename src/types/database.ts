@@ -64,6 +64,12 @@ export interface DatabaseConfig {
   // signed-in Azure CLI, so no credentials live in config.ini.
   authentication?: MSSQLAuthenticationMode;
 
+  // Tenant to acquire the Azure CLI token from. Only meaningful alongside
+  // authentication='azure-cli'. Needed when the CLI's active context is a
+  // different tenant from the one the server lives in, which is the normal
+  // case for an account with access to several.
+  azure_tenant_id?: string;
+
   // SSH Tunnel Configuration
   ssh_host?: string;
   ssh_port?: number;

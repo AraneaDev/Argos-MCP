@@ -179,6 +179,37 @@ describe('MSSQLAdapter', () => {
         expect(passed.options.encrypt).toBe(true);
       });
 
+      it('should pass the configured tenant to AzureCliCredential', async () => {
+        await new MSSQLAdapter({
+          ...azureConfig(),
+          azure_tenant_id: 'd958da54-24bc-444a-981b-317de09e73ee',
+        }).connect();
+
+        expect(mockAzureCliCredentialCtor).toHaveBeenCalledWith({
+          tenantId: 'd958da54-24bc-444a-981b-317de09e73ee',
+        });
+      });
+
+      it('should construct AzureCliCredential with no options when no tenant is set', async () => {
+        await new MSSQLAdapter(azureConfig()).connect();
+
+        expect(mockAzureCliCredentialCtor).toHaveBeenCalledWith();
+      });
+
+      it('should not blame az login for a failure that is not a credential failure', async () => {
+        // A network or policy rejection arrives as a mssql ConnectionError, and
+        // telling the user to run `az login` for one sends them nowhere.
+        const networkError = Object.assign(new Error('Deny Public Network Access is set to Yes'), {
+          name: 'ConnectionError',
+          code: 'ELOGIN',
+        });
+        mockConnect.mockRejectedValueOnce(networkError);
+
+        const attempt = new MSSQLAdapter(azureConfig()).connect();
+        await expect(attempt).rejects.toThrow('Deny Public Network Access');
+        await expect(attempt).rejects.not.toThrow('az login');
+      });
+
       it('should still require host and database under azure-cli authentication', async () => {
         // Dropping username and password from the required list must not drop
         // the two fields that have nothing to do with credentials.
@@ -209,8 +240,12 @@ describe('MSSQLAdapter', () => {
       });
 
       it('should tell the user to run az login when the CLI credential is unavailable', async () => {
+        // The real shape, confirmed against @azure/identity 4.13.1: a missing or
+        // signed-out CLI raises CredentialUnavailableError, not a bare Error.
         mockConnect.mockRejectedValueOnce(
-          new Error('Azure CLI could not be found. Please visit https://aka.ms/azure-cli')
+          Object.assign(new Error("Please run 'az login' from a command prompt to authenticate"), {
+            name: 'CredentialUnavailableError',
+          })
         );
 
         await expect(new MSSQLAdapter(azureConfig()).connect()).rejects.toThrow('az login');

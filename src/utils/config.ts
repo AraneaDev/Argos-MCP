@@ -269,6 +269,47 @@ export function parseDatabaseConfig(name: string, config: Record<string, string>
   return dbConfig;
 }
 
+const AZURE_TENANT_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Parse and validate the optional 'azure_tenant_id' key.
+ *
+ * A tenant only means something to the Azure CLI credential, so setting it
+ * without that credential is a mistake worth naming rather than ignoring. The
+ * GUID check catches the likelier typo: a tenant's display name in place of its
+ * id, which otherwise fails much later as an opaque auth error.
+ */
+function parseAzureTenantId(
+  name: string,
+  config: Record<string, string>,
+  dbConfig: DatabaseConfig
+): void {
+  if (config.azure_tenant_id === undefined) {
+    return;
+  }
+
+  const tenant = config.azure_tenant_id.trim();
+
+  if (!usesAzureCliAuth(dbConfig)) {
+    throw new ConfigValidationError(
+      `Database '${name}' sets 'azure_tenant_id' but that requires authentication=azure-cli`,
+      'azure_tenant_id',
+      name
+    );
+  }
+
+  if (!AZURE_TENANT_ID_RE.test(tenant)) {
+    throw new ConfigValidationError(
+      `Database '${name}' has invalid azure_tenant_id '${config.azure_tenant_id}'. ` +
+        'Expected a GUID, for example 00000000-0000-0000-0000-000000000000',
+      'azure_tenant_id',
+      name
+    );
+  }
+
+  dbConfig.azure_tenant_id = tenant;
+}
+
 /**
  * Parse and validate the optional 'authentication' key.
  *
@@ -337,6 +378,7 @@ function validateNetworkedDatabase(
     );
   }
   parseAuthentication(name, config, dbConfig);
+  parseAzureTenantId(name, config, dbConfig);
 
   if (!config.username && !usesAzureCliAuth(dbConfig)) {
     throw new ConfigValidationError(

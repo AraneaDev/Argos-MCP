@@ -62,6 +62,7 @@ timeout=30000
 | `timeout` | Connection timeout (ms) | `30000` | `60000` |
 | `select_only` | Restrict to SELECT queries | `true` | `false` |
 | `authentication` | Authentication mode: `sql` or `azure-cli` | `sql` | `azure-cli` |
+| `azure_tenant_id` | Tenant to take the CLI token from (GUID) | CLI's active tenant | `00000000-0000-0000-0000-000000000000` |
 
 ### Advanced Configuration
 
@@ -142,6 +143,28 @@ Requirements:
 - `az login` has been run, and the signed-in identity has access to the database.
 - The Azure AD identity is mapped to a database user, for example:
   `CREATE USER [you@company.com] FROM EXTERNAL PROVIDER;`
+
+### Choosing the tenant
+
+An account with access to more than one tenant is the normal case, and the CLI
+has exactly one active context. When the server lives in a different tenant from
+that context, the token is issued by the wrong authority and the connection
+fails with `Login failed for user '<token-identified principal>'. The server is
+not currently configured to accept this token.` Name the tenant to fix it:
+
+```ini
+[database.azure_cli]
+type=mssql
+host=myserver.database.windows.net
+database=mydatabase
+authentication=azure-cli
+azure_tenant_id=00000000-0000-0000-0000-000000000000
+```
+
+`az account list --all --query '[].{name:name, tenantId:tenantId}' -o table`
+lists the tenants you are signed in to. The value must be the GUID, not the
+tenant's display name; a name is rejected at startup rather than becoming an
+opaque auth error later.
 
 Notes:
 

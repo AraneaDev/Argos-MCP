@@ -4,7 +4,8 @@
 
 import type { DatabaseConfig, DatabaseTypeString } from '../../types/index.js';
 import { DEFAULT_DATABASE_PORTS } from '../../types/index.js';
-import { DatabaseAdapter } from './base.js';
+import { usesAzureCliAuth } from '../../utils/config.js';
+import type { DatabaseAdapter } from './base.js';
 import { MySQLAdapter } from './mysql.js';
 import { PostgreSQLAdapter } from './postgresql.js';
 import { SQLiteAdapter } from './sqlite.js';
@@ -14,6 +15,9 @@ import { MSSQLAdapter } from './mssql.js';
 // Adapter Factory
 // ============================================================================
 
+/**
+ *
+ */
 export class AdapterFactory {
   /**
    * Create a database adapter instance based on the database type
@@ -65,7 +69,7 @@ export class AdapterFactory {
   /**
    * Get required configuration fields for a database type
    */
-  static getRequiredFields(type: DatabaseTypeString): string[] {
+  static getRequiredFields(type: DatabaseTypeString, config?: DatabaseConfig): string[] {
     switch (type.toLowerCase() as DatabaseTypeString) {
       case 'sqlite':
         return ['file'];
@@ -74,6 +78,15 @@ export class AdapterFactory {
       case 'postgres':
       case 'mssql':
       case 'sqlserver':
+        // An mssql database authenticating through the Azure CLI has no username
+        // or password to give: the credential comes from the CLI's own context.
+        // MSSQLAdapter already narrows its required fields the same way, and the
+        // config loader exempts the pair too. Without this branch a valid
+        // azure-cli database parses and loads but is rejected here, before the
+        // adapter that knows how to connect it is ever built.
+        if (config && usesAzureCliAuth(config)) {
+          return ['host', 'database'];
+        }
         return ['host', 'database', 'username', 'password'];
       default:
         return [];
@@ -96,7 +109,7 @@ export class AdapterFactory {
       return { isValid: false, errors };
     }
 
-    const requiredFields = this.getRequiredFields(config.type as DatabaseTypeString);
+    const requiredFields = this.getRequiredFields(config.type as DatabaseTypeString, config);
 
     for (const field of requiredFields) {
       const value = config[field as keyof DatabaseConfig];

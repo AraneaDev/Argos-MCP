@@ -228,6 +228,44 @@ describe('AdapterFactory', () => {
     it('should return empty array for unknown type', () => {
       expect(AdapterFactory.getRequiredFields('unknown' as DatabaseTypeString)).toEqual([]);
     });
+
+    it('should drop username and password for mssql with azure-cli auth', () => {
+      // The credential comes from the CLI's own context, so there is no pair to
+      // supply. MSSQLAdapter already narrows its fields the same way; before this
+      // the factory rejected such a database before the adapter was ever built.
+      expect(
+        AdapterFactory.getRequiredFields('mssql', {
+          name: 'azure_db',
+          type: 'mssql',
+          authentication: 'azure-cli',
+          host: 'example.database.windows.net',
+          database: 'YCI',
+        } as unknown as DatabaseConfig)
+      ).toEqual(['host', 'database']);
+    });
+
+    it('should still require the pair for mssql without azure-cli auth', () => {
+      expect(
+        AdapterFactory.getRequiredFields('mssql', {
+          name: 'sql_db',
+          type: 'mssql',
+          host: 'example.database.windows.net',
+          database: 'YCI',
+        } as unknown as DatabaseConfig)
+      ).toEqual(['host', 'database', 'username', 'password']);
+    });
+
+    it('should accept an azure-cli mssql config that has no username or password', () => {
+      const result = AdapterFactory.validateConfig({
+        name: 'azure_db',
+        type: 'mssql',
+        authentication: 'azure-cli',
+        host: 'example.database.windows.net',
+        database: 'YCI',
+      } as unknown as DatabaseConfig);
+      expect(result.isValid).toBe(true);
+      expect(result.errors).toEqual([]);
+    });
   });
 
   // ============================================================================

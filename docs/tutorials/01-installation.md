@@ -63,7 +63,7 @@ dist/setup.js   the configuration wizard
 
 <!-- x-release-please-start-version -->
 ```
-Argos-MCP v4.1.1
+Argos-MCP v4.1.2
 ```
 <!-- x-release-please-end-version -->
 

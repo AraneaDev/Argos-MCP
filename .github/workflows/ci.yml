@@ -9,10 +9,19 @@ on:
 permissions:
   contents: read
 
+# One run per branch. A second push cancels the first, because whoever pushed
+# again has already answered the question the running job was asked. The runs
+# long enough to be overtaken are the expensive ones, so this is worth more
+# than the share of runs it cancels suggests.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   check:
     name: Lint, Format & Types
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v7
@@ -56,6 +65,7 @@ jobs:
   test:
     name: Test (Node ${{ matrix.node-version }})
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: write # publishes the coverage badge to the gh-pages branch
     strategy:
@@ -111,6 +121,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [check, test]
     steps:
       - name: Checkout

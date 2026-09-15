@@ -391,6 +391,10 @@ hand or by whatever analysis tool you point at the checkout, so read the table
 before adding an import that reaches upward. A cycle between layers is the
 signal that something belongs in a lower one.
 
+## Further reading
+
+- [How to give Claude safe access to your SQL database](https://tim-schipper.nl/en/blog/claude-safe-database-access)
+
 ## License
 
 Released under the [MIT License](./LICENSE), free for any use, commercial
@@ -423,4 +427,5 @@ connects to databases you already run.
 
 ---
 
-Built by [Aranea Development](https://aranea-development.nl).
+Built by [Tim Schipper](https://tim-schipper.nl/en) and released as open source under
+[Aranea Development](https://aranea-development.nl).

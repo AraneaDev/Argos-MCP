@@ -5,6 +5,13 @@ All notable changes to the Argos-MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.8](https://github.com/AraneaDev/Argos-MCP/compare/v4.1.7...v4.1.8) (2026-09-16)
+
+
+### Tests
+
+* harden resilience coverage ([#39](https://github.com/AraneaDev/Argos-MCP/issues/39)) ([4962434](https://github.com/AraneaDev/Argos-MCP/commit/4962434bf7f23e927bf6e24796fa53aaa7d5d79d))
+
 ## [4.1.7](https://github.com/AraneaDev/Argos-MCP/compare/v4.1.6...v4.1.7) (2026-09-16)
 
 

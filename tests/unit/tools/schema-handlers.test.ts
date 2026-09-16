@@ -12,6 +12,7 @@ import {
 import type { ToolHandlerContext } from '../../../src/tools/handlers/types.js';
 import type { ParsedServerConfig, DatabaseConfig } from '../../../src/types/index.js';
 import { ConfigurationError } from '../../../src/utils/error-handler.js';
+import { formatDatabaseSummary } from '../../../src/utils/response-formatter.js';
 
 // Mock response-formatter
 jest.mock('../../../src/utils/response-formatter.js', () => ({
@@ -129,6 +130,8 @@ describe('schema-handlers', () => {
       expect(result.content[0].text).toContain('Schema refreshed');
       expect(result.content[0].text).toContain('5 tables');
       expect(result.content[0].text).toContain('20 columns');
+      expect(ctx.connectionManager.executeQuery).not.toHaveBeenCalled();
+      expect(ctx.logger.info).not.toHaveBeenCalled();
     });
 
     it('should establish connection if none exists', async () => {
@@ -158,6 +161,7 @@ describe('schema-handlers', () => {
 
       expect(result.isError).toBe(true);
       expect(result.content[0].text).toContain('Failed to refresh schema');
+      expect(ctx.schemaManager.refreshSchema).not.toHaveBeenCalled();
     });
 
     it('should log SSH info when ssh_host is configured', async () => {
@@ -218,6 +222,19 @@ describe('schema-handlers', () => {
       const result = await handleListDatabases(ctx);
 
       expect(result.content[0].text).toContain('Configured Databases');
+      expect(ctx.schemaManager.getSchema).toHaveBeenCalledWith('db1');
+      expect(formatDatabaseSummary).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: 'db1',
+          host: 'localhost',
+          ssh_enabled: false,
+          ssl_enabled: false,
+          select_only_mode: true,
+          mcp_configurable: false,
+          schema_cached: true,
+          schema_info: { table_count: 10, view_count: 2, total_columns: 50 },
+        })
+      );
     });
 
     it('should include security limits when configured', async () => {
@@ -390,6 +407,10 @@ describe('schema-handlers', () => {
 
       expect(result.content[0].text).toContain('Connection successful');
       expect(result.isError).toBeUndefined();
+      expect(ctx.logger.warning).toHaveBeenCalledWith('Failed to capture schema', {
+        database: 'testdb',
+        error: 'Schema capture error',
+      });
     });
 
     it('should throw ConfigurationError for nonexistent database', async () => {

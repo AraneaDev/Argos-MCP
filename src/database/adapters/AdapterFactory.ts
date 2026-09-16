@@ -113,7 +113,7 @@ export class AdapterFactory {
 
     for (const field of requiredFields) {
       const value = config[field as keyof DatabaseConfig];
-      if (!value || (typeof value === 'string' && value.trim() === '')) {
+      if (typeof value !== 'string' || value.trim() === '') {
         errors.push(`Required field '${field}' is missing or empty`);
       }
     }

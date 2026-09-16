@@ -32,10 +32,19 @@ describe('QueryCache', () => {
       const hit = cache.get('db1', 'select * from foo', []);
       expect(hit).toEqual(fakeResult);
     });
+    it('ignores leading and trailing whitespace in cache keys', () => {
+      cache.set('db1', '  SELECT 1  ', [], fakeResult, 60);
+      expect(cache.get('db1', 'SELECT 1', [])).toEqual(fakeResult);
+    });
     it('returns undefined after TTL expires', () => {
       cache.set('db1', 'SELECT 1', [], fakeResult, 10);
       jest.advanceTimersByTime(11_000);
       expect(cache.get('db1', 'SELECT 1', [])).toBeUndefined();
+    });
+    it('keeps an entry valid exactly at its expiry boundary', () => {
+      cache.set('db1', 'SELECT 1', [], fakeResult, 10);
+      jest.advanceTimersByTime(10_000);
+      expect(cache.get('db1', 'SELECT 1', [])).toEqual(fakeResult);
     });
     it('does not cache non-deterministic queries', () => {
       cache.set('db1', 'SELECT NOW()', [], fakeResult, 60);
@@ -51,7 +60,30 @@ describe('QueryCache', () => {
       smallCache.set('db1', 'SELECT 3', [], fakeResult, 60);
       smallCache.set('db1', 'SELECT 4', [], fakeResult, 60);
       expect(smallCache.get('db1', 'SELECT 1', [])).toBeUndefined();
+      expect(smallCache.get('db1', 'SELECT 2', [])).toEqual(fakeResult);
+      expect(smallCache.get('db1', 'SELECT 3', [])).toEqual(fakeResult);
       expect(smallCache.get('db1', 'SELECT 4', [])).toEqual(fakeResult);
+    });
+
+    it('refreshes the least-recently-used order on a cache hit', () => {
+      const smallCache = new QueryCache({ maxEntriesPerDb: 2 });
+      smallCache.set('db1', 'SELECT 1', [], fakeResult, 60);
+      smallCache.set('db1', 'SELECT 2', [], fakeResult, 60);
+      expect(smallCache.get('db1', 'SELECT 1', [])).toEqual(fakeResult);
+      smallCache.set('db1', 'SELECT 3', [], fakeResult, 60);
+
+      expect(smallCache.get('db1', 'SELECT 1', [])).toEqual(fakeResult);
+      expect(smallCache.get('db1', 'SELECT 2', [])).toBeUndefined();
+    });
+
+    it('does not evict another entry when replacing an existing key at capacity', () => {
+      const smallCache = new QueryCache({ maxEntriesPerDb: 2 });
+      smallCache.set('db1', 'SELECT 1', [], fakeResult, 60);
+      smallCache.set('db1', 'SELECT 2', [], fakeResult, 60);
+      smallCache.set('db1', 'SELECT 1', [], { ...fakeResult, rowCount: 2 }, 60);
+
+      expect(smallCache.get('db1', 'SELECT 1', [])?.rowCount).toBe(2);
+      expect(smallCache.get('db1', 'SELECT 2', [])).toEqual(fakeResult);
     });
   });
 

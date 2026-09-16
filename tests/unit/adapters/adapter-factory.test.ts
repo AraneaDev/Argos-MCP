@@ -207,6 +207,15 @@ describe('AdapterFactory', () => {
       ]);
     });
 
+    it('should return connection fields for postgres alias', () => {
+      expect(AdapterFactory.getRequiredFields('postgres')).toEqual([
+        'host',
+        'database',
+        'username',
+        'password',
+      ]);
+    });
+
     it('should return connection fields for mssql', () => {
       expect(AdapterFactory.getRequiredFields('mssql')).toEqual([
         'host',
@@ -335,6 +344,19 @@ describe('AdapterFactory', () => {
       const result = AdapterFactory.validateConfig(config);
       expect(result.isValid).toBe(false);
       expect(result.errors.some((e) => e.includes("'database'"))).toBe(true);
+    });
+
+    it('should fail when a required field has a non-string runtime value', () => {
+      const config: DatabaseConfig = {
+        type: 'mysql',
+        host: 'localhost',
+        database: 123 as unknown as string,
+        username: 'user',
+        password: 'pass',
+      };
+      const result = AdapterFactory.validateConfig(config);
+      expect(result.isValid).toBe(false);
+      expect(result.errors).toContain("Required field 'database' is missing or empty");
     });
 
     // SSH validation (lines 109-116)

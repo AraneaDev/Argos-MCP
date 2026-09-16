@@ -5,6 +5,34 @@ All notable changes to the Argos-MCP will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.1.7](https://github.com/AraneaDev/Argos-MCP/compare/v4.1.6...v4.1.7) (2026-09-16)
+
+
+### Continuous integration
+
+* **release:** allow Release Please to be run by hand ([#37](https://github.com/AraneaDev/Argos-MCP/issues/37)) ([a97a0a7](https://github.com/AraneaDev/Argos-MCP/commit/a97a0a7113e4f065dcb8435ce61928daa7866ea5))
+
+## [4.1.6](https://github.com/AraneaDev/Argos-MCP/compare/v4.1.5...v4.1.6) (2026-09-16)
+
+
+### Continuous integration
+
+* **pr-title:** check out the base branch, not the pull request's pinned base commit ([#35](https://github.com/AraneaDev/Argos-MCP/issues/35)) ([a4f50df](https://github.com/AraneaDev/Argos-MCP/commit/a4f50df1ffe7d01367ab76f2550721bb50fcf7e4))
+
+## [4.1.5](https://github.com/AraneaDev/Argos-MCP/compare/v4.1.4...v4.1.5) (2026-09-16)
+
+
+### Continuous integration
+
+* **pr-title:** share one commit-style rule between CI and the hook ([#33](https://github.com/AraneaDev/Argos-MCP/issues/33)) ([0c91f73](https://github.com/AraneaDev/Argos-MCP/commit/0c91f736c116756c7338b2f6322d232d8dc63344))
+
+## [4.1.4](https://github.com/AraneaDev/Argos-MCP/compare/v4.1.3...v4.1.4) (2026-09-15)
+
+
+### Documentation
+
+* **readme:** credit the author and link the write-up ([#31](https://github.com/AraneaDev/Argos-MCP/issues/31)) ([f472a05](https://github.com/AraneaDev/Argos-MCP/commit/f472a052284530fb2c637f094032e7472c54fce5))
+
 ## [4.1.3](https://github.com/AraneaDev/Argos-MCP/compare/v4.1.2...v4.1.3) (2026-09-08)
 
 

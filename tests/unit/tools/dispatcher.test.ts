@@ -71,9 +71,10 @@ jest.mock('../../../src/tools/handlers/config-handlers.js', () => ({
 }));
 
 jest.mock('../../../src/tools/handlers/metrics-handlers.js', () => ({
-  handleGetMetrics: jest
-    .fn()
-    .mockResolvedValue({ content: [{ type: 'text', text: 'metrics result' }] }),
+  handleGetMetrics: jest.fn().mockResolvedValue({
+    content: [{ type: 'text', text: 'metrics result' }],
+    _meta: { progressToken: null },
+  } satisfies MCPToolResponse),
 }));
 
 import {

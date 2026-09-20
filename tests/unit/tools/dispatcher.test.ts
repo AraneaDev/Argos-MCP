@@ -5,53 +5,69 @@
 
 import { createToolDispatcher } from '../../../src/tools/dispatcher.js';
 import type { ToolHandlerContext } from '../../../src/tools/handlers/types.js';
-import type { ParsedServerConfig, DatabaseConfig } from '../../../src/types/index.js';
+import type {
+  ParsedServerConfig,
+  DatabaseConfig,
+  MCPToolResponse,
+} from '../../../src/types/index.js';
 import { ValidationError } from '../../../src/utils/error-handler.js';
 
 // Mock all handler modules
 jest.mock('../../../src/tools/handlers/query-handlers.js', () => ({
-  handleSqlQuery: jest
-    .fn()
-    .mockResolvedValue({ content: [{ type: 'text', text: 'query result' }] }),
-  handleBatchQuery: jest
-    .fn()
-    .mockResolvedValue({ content: [{ type: 'text', text: 'batch result' }] }),
-  handleAnalyzePerformance: jest
-    .fn()
-    .mockResolvedValue({ content: [{ type: 'text', text: 'perf result' }] }),
+  handleSqlQuery: jest.fn().mockResolvedValue({
+    content: [{ type: 'text', text: 'query result' }],
+    _meta: { progressToken: null },
+  } satisfies MCPToolResponse),
+  handleBatchQuery: jest.fn().mockResolvedValue({
+    content: [{ type: 'text', text: 'batch result' }],
+    _meta: { progressToken: null },
+  } satisfies MCPToolResponse),
+  handleAnalyzePerformance: jest.fn().mockResolvedValue({
+    content: [{ type: 'text', text: 'perf result' }],
+    _meta: { progressToken: null },
+  } satisfies MCPToolResponse),
 }));
 
 jest.mock('../../../src/tools/handlers/schema-handlers.js', () => ({
-  handleGetSchema: jest
-    .fn()
-    .mockResolvedValue({ content: [{ type: 'text', text: 'schema result' }] }),
-  handleRefreshSchema: jest
-    .fn()
-    .mockResolvedValue({ content: [{ type: 'text', text: 'refresh result' }] }),
-  handleListDatabases: jest
-    .fn()
-    .mockResolvedValue({ content: [{ type: 'text', text: 'list result' }] }),
-  handleTestConnection: jest
-    .fn()
-    .mockResolvedValue({ content: [{ type: 'text', text: 'test result' }] }),
+  handleGetSchema: jest.fn().mockResolvedValue({
+    content: [{ type: 'text', text: 'schema result' }],
+    _meta: { progressToken: null },
+  } satisfies MCPToolResponse),
+  handleRefreshSchema: jest.fn().mockResolvedValue({
+    content: [{ type: 'text', text: 'refresh result' }],
+    _meta: { progressToken: null },
+  } satisfies MCPToolResponse),
+  handleListDatabases: jest.fn().mockResolvedValue({
+    content: [{ type: 'text', text: 'list result' }],
+    _meta: { progressToken: null },
+  } satisfies MCPToolResponse),
+  handleTestConnection: jest.fn().mockResolvedValue({
+    content: [{ type: 'text', text: 'test result' }],
+    _meta: { progressToken: null },
+  } satisfies MCPToolResponse),
 }));
 
 jest.mock('../../../src/tools/handlers/config-handlers.js', () => ({
-  handleAddDatabase: jest
-    .fn()
-    .mockResolvedValue({ content: [{ type: 'text', text: 'add result' }] }),
-  handleUpdateDatabase: jest
-    .fn()
-    .mockResolvedValue({ content: [{ type: 'text', text: 'update result' }] }),
-  handleRemoveDatabase: jest
-    .fn()
-    .mockResolvedValue({ content: [{ type: 'text', text: 'remove result' }] }),
-  handleGetConfig: jest
-    .fn()
-    .mockResolvedValue({ content: [{ type: 'text', text: 'config result' }] }),
-  handleSetMcpConfigurable: jest
-    .fn()
-    .mockResolvedValue({ content: [{ type: 'text', text: 'mcp result' }] }),
+  handleAddDatabase: jest.fn().mockResolvedValue({
+    content: [{ type: 'text', text: 'add result' }],
+    _meta: { progressToken: null },
+  } satisfies MCPToolResponse),
+  handleUpdateDatabase: jest.fn().mockResolvedValue({
+    content: [{ type: 'text', text: 'update result' }],
+    _meta: { progressToken: null },
+  } satisfies MCPToolResponse),
+  handleRemoveDatabase: jest.fn().mockResolvedValue({
+    content: [{ type: 'text', text: 'remove result' }],
+    _meta: { progressToken: null },
+  } satisfies MCPToolResponse),
+  handleGetConfig: jest.fn().mockResolvedValue({
+    content: [{ type: 'text', text: 'config result' }],
+    _meta: { progressToken: null },
+  } satisfies MCPToolResponse),
+  handleSetMcpConfigurable: jest.fn().mockResolvedValue({
+    content: [{ type: 'text', text: 'mcp result' }],
+    _meta: { progressToken: null },
+  } satisfies MCPToolResponse),
 }));
 
 import {

@@ -70,6 +70,12 @@ jest.mock('../../../src/tools/handlers/config-handlers.js', () => ({
   } satisfies MCPToolResponse),
 }));
 
+jest.mock('../../../src/tools/handlers/metrics-handlers.js', () => ({
+  handleGetMetrics: jest
+    .fn()
+    .mockResolvedValue({ content: [{ type: 'text', text: 'metrics result' }] }),
+}));
+
 import {
   handleSqlQuery,
   handleBatchQuery,
@@ -88,6 +94,7 @@ import {
   handleGetConfig,
   handleSetMcpConfigurable,
 } from '../../../src/tools/handlers/config-handlers.js';
+import { handleGetMetrics } from '../../../src/tools/handlers/metrics-handlers.js';
 
 function createMockContext(): ToolHandlerContext {
   return {
@@ -281,6 +288,15 @@ describe('dispatcher', () => {
       await expect(dispatch('sql_set_mcp_configurable', { database: 'db' })).rejects.toThrow(
         ValidationError
       );
+    });
+  });
+
+  describe('sql_get_metrics', () => {
+    it('should route to handleGetMetrics', async () => {
+      const args = { database: 'mydb' };
+      await dispatch('sql_get_metrics', args);
+
+      expect(handleGetMetrics).toHaveBeenCalledWith(args, ctx);
     });
   });
 

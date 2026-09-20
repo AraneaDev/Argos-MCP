@@ -21,9 +21,12 @@
 > Hera to guard Io. Only some of his eyes slept at a time, so he was never fully asleep and
 > nothing passed him unseen. *Panoptes* means "all-seeing".
 
-Argos-MCP connects Claude Code to PostgreSQL, MySQL, SQLite, and SQL Server with strong
-security defaults, per-query auditing, and multi-database support. Every query is watched, and
-nothing reaches your data unlogged.
+**TL;DR:** Argos-MCP lets Claude Code query PostgreSQL, MySQL, SQLite, and SQL Server through
+one MCP server. It routes each request through validation, access controls, connection adapters,
+and an audit record before it reaches the database.
+
+The result is multi-database access with strong security defaults, per-query auditing, and
+support for SSH tunnels. Every query is watched, and nothing reaches your data unlogged.
 
 > **Status:** pre-release. Argos-MCP is **not yet published to npm**, and the publish step in
 > the release workflow is deliberately dormant. The source is public on
